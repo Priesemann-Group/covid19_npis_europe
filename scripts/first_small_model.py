@@ -64,10 +64,16 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 
+def SIR():
+
 @pm.model
 def model(df):
-    """ Create I_0 2d matrix with shape:
-        10 [time] x number_of_countries*number_of_age_groups 
+    """ Create I_0 2d matrix withshape:
+            10 [time]
+            x
+            number_of_countries*number_of_age_groups
+
+        We need 10 here because we choose a length of 10 for the convolution at a later point.
     """
     I_0 = yield pm.HalfCauchy(
         loc=10,
@@ -83,9 +89,11 @@ def model(df):
 
     """
         Reshape R matrix to fit model i.e.
-        number_of_countries*number_of_age_groups x number_of_countries*number_of_age_groups 
+        shape:
+            number_of_countries*number_of_age_groups
+            x
+            number_of_countries*number_of_age_groups 
     """
-
     R_reshaped = tfp.distributions.BatchReshape(
         distribution=R,
         batch_shape=[
@@ -95,17 +103,29 @@ def model(df):
     )
 
     """
-    Get rv for new_cases from SIR model
-    """
-    new_cases = yield SIR(I_0=I_0, R=R_reshaped,)  # TODO
+        Get RV for new_cases from SIR model
+        
+        it should have the shape:
+            (data_end-data_begin).days+fcast
+            x
+            number_of_countries*number_of_age_groups 
 
     """
-    Delay new cases via convolution
+
+    
+    new_cases = yield SIR(I_0=I_0, R=R_reshaped) #TODO
+
     """
-    # Delay RV
-    delay = yield pm.Normal(loc=4, scale=3, name="D", batch_shape=1)  # TODO
+        Delay new cases via convolution
+    """
+    # 1. Delay RV
 
-    # Do convolution https://www.tensorflow.org/probability/api_docs/python/tfp/experimental/nn/Convolution
-    # new_cases_delayed = yield tfp.experimental.nn.Convolution()
+    delay = yield pm.Normal(loc=4, scale=3, name="D", batch_shape=1)  # TODO shape
 
-    likelihood = pm.NegativeBinomial(observed=df.to_numpy())
+    # 2. Do convolution https://www.tensorflow.org/probability/api_docs/python/tfp/experimental/nn/Convolution
+    new_cases_delayed = yield tfp.experimental.nn.Convolution() #TODO
+
+
+
+    #supprisingly df.to_numpy() gives us the right numpy array i.e. with shape [time,countries*age_groups]
+    likelihood = pm.NegativeBinomial(new_cases, observed=df.to_numpy()) 

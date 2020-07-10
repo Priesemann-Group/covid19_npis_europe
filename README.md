@@ -6,7 +6,7 @@
 
 Install all required packages
 ```
-pip intall -r requirements.txt
+pip install -r requirements.txt
 ```
 
 
@@ -15,7 +15,7 @@ pip intall -r requirements.txt
 ### Is my gpu working?
 If we want to know if our GPU is working, we can run `tf.config.list_physical_devices()`.
 
-If the returned array is empty or only shows cpu nodes One can try to follow this guide:
+If the returned array is empty or only shows cpu nodes, one can try to follow this guide:
 https://www.tensorflow.org/install/gpu
 
 Is quite tedious tho and requires a nvidia developer account.

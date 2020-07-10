@@ -58,12 +58,23 @@ df = df.replace(0, np.nan)
 
 print(df)
 
-""" ## 
-"""
-
-
 """ # Model initilization
 """
+import pymc4 as pm
+
+
+@pm.model
+def model(df):
+    nI_0 = yield make_prior_I(stuff)  # TODO
+    R_matrix = yield make_R_matrix(stuff)  # TODO
+    R_matrix = reshape(R_matrix)  # TODO
+
+    new_cases = yield SIR(nI_0, R_matrix)  # TODO
+
+    new_cases_delayed = yield delay_new_cases(new_cases)  # TODO
+
+    likelihood = negbinomial(observed=df)  # TODO
+
 
 """ # Sample
 """

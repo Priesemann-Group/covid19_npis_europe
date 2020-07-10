@@ -12,10 +12,9 @@ import covid19_inference as cov19inf
 
 """ # Data retrieval / Convertions
 """
-
 # Configs
 data_begin = datetime.datetime(2020, 3, 1)
-data_end = datetime.datetime(2020, 3, 20)
+data_end = datetime.datetime(2020, 5, 6)
 countries = ["Belgium", "Czechia", "Latvia", "Portugal", "Switzerland"]
 age_groups = [
     "0-9",
@@ -61,23 +60,52 @@ print(df)
 """ # Model initilization
 """
 import pymc4 as pm
+import tensorflow as tf
+import tensorflow_probability as tfp
 
 
 @pm.model
 def model(df):
-    nI_0 = yield make_prior_I(stuff)  # TODO
-    R_matrix = yield make_R_matrix(stuff)  # TODO
-    R_matrix = reshape(R_matrix)  # TODO
+    """ Create I_0 2d matrix with shape:
+        10 [time] x number_of_countries*number_of_age_groups 
+    """
+    I_0 = yield pm.HalfCauchy(
+        loc=10,
+        scale=150,
+        name="I_0",
+        batch_stack=[10, len(countries) * len(age_groups)],
+    )
 
-    new_cases = yield SIR(nI_0, R_matrix)  # TODO
+    """
+        Create Reproduction number matrix (4,4)
+    """
+    R = yield pm.Normal(loc=1, scale=2.5, name="R", batch_stack=[4, 4])
 
-    new_cases_delayed = yield delay_new_cases(new_cases)  # TODO
+    """
+        Reshape R matrix to fit model i.e.
+        number_of_countries*number_of_age_groups x number_of_countries*number_of_age_groups 
+    """
 
-    likelihood = negbinomial(observed=df)  # TODO
+    R_reshaped = tfp.distributions.BatchReshape(
+        distribution=R,
+        batch_shape=[
+            len(countries) * len(age_groups),
+            len(countries) * len(age_groups),
+        ],
+    )
 
+    """
+    Get rv for new_cases from SIR model
+    """
+    new_cases = yield SIR(I_0=I_0, R=R_reshaped,)  # TODO
 
-""" # Sample
-"""
+    """
+    Delay new cases via convolution
+    """
+    # Delay RV
+    delay = yield pm.Normal(loc=4, scale=3, name="D", batch_shape=1)  # TODO
 
-""" # Plotting
-"""
+    # Do convolution https://www.tensorflow.org/probability/api_docs/python/tfp/experimental/nn/Convolution
+    # new_cases_delayed = yield tfp.experimental.nn.Convolution()
+
+    likelihood = pm.NegativeBinomial(observed=df.to_numpy())

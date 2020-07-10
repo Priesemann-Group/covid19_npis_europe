@@ -3,6 +3,10 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 ## First steps
+Initialize submodule while cloning
+```
+git clone --recurse-submodules https://github.com/Priesemann-Group/covid19_npis_europe.git
+```
 
 Install all required packages
 ```

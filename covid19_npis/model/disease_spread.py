@@ -71,15 +71,19 @@ def _construct_generation_interval_gamma(
     g = yield pm.Gamma(
         # Emil: How do I make this time dependent?
         # Sebastian: Not too use, we also want it normalized. Maybe Jonas can help with that.
+        # Matthias: We're not interested in drawing samples from this distribution, but need the pdf
+        #   fortunately tfp is simple in that regard g.pdf([0,1,2,3,....,10]) gives the 'weights' of the generation interval
         name="g",
         concentration=g_mu / g_theta,
         rate=1 / g_theta,
         # batch_stack = time ?
     )
+    
+    
     return g
 
 
-def NewCasesModel(I_0, R, g):
+def NewCasesModel(I_0, R, g, N, C):
     r"""
     .. math::
 
@@ -97,9 +101,14 @@ def NewCasesModel(I_0, R, g):
     I_0:
         Initial number of infectious.
     R:
-        Reproduction number matrix.
+        Reproduction number matrix. (time x country x age_group)
     g:
         Generation interval
+    N:
+        Initial population
+    
+    C:
+        inter-age-group Contact-Matrix (see 8)
 
     Returns
     -------
@@ -113,6 +122,7 @@ def NewCasesModel(I_0, R, g):
         #Calculate new newly infectious per day
         #Sebastian: This will probably not work like that. Someone else should look over
         #it since im not too sure how to do that.
+        #Matthias: Wip see notebook, needs some variable-renaming.
         
         
         #New susceptible pool
@@ -130,3 +140,23 @@ def NewCasesModel(I_0, R, g):
         initializer=[S_0, I_0],  # S_0 should be population size i.e. N
     )
     """
+    
+    def new_infectious_cases_next_day(a,R_t):
+        # Unpack:
+        I_t, I_lastv, S_t = a
+        f = S_t / N
+        
+        infectious = tf.tensordot(E_lastv,serial_p,1)
+        # TODO: Insert some untested magic involving R_t and contact-matrix
+        new_infected = 0
+        
+        new_v = tf.reshape(new,[new.shape[0],new.shape[1],1])   # add dimension for concatenation
+        I_nextv = tf.concat([new_v,I_lastv[:,:,:-1]], -1 )  # Create new infected population for new step, insert latest at front
+        
+        return [new, I_nextv, S_t-new]
+    
+    # Initialze the internal state for the scan function
+    initial = [tf.zeros(N.shape,dtype=np.float64),tf.zeros([N.shape[0],N.shape[1],l],dtype=np.float64),N]
+    
+    out = tf.scan(new_infectious_cases_next_day,R_T,initial)
+    return out

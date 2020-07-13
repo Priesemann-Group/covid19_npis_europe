@@ -7,10 +7,15 @@ Welcome to COVID-19 NPIS's documentation!
 =========================================
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+	:maxdepth: 2
+	:caption: Contents:
 
+.. toctree::
+	:titlesonly:
+	:maxdepth: 2
+	:caption: Reference
 
+	doc/model
 
 Indices and tables
 ==================
@@ -18,3 +23,4 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+

@@ -68,30 +68,23 @@ import tensorflow_probability as tfp
 
 
 @pm.model
-def NewCasesModel(I_0, R, s_mu_input, mu_mu_input, s_theta_input, mu_theta_input):
+def NewCasesModel(
+    I_0, R, g,
+):
     r"""
-        <Model description here>
+        The Gamma distribution g that models the generation
+        interval is parametrized by its mean
 
         Parameters:
         -----------
 
         I_0:
             Initial number of infectious.
-
         R:
             Reproduction number matrix.
+        g:
+            Generation interval
 
-        s_mu_input: float
-            s_mu is the scale of the distribution for mu_gen.
-
-        mu_mu_input: float
-            mu_mu is the mean of the distribution for mu_gen.
-
-        s_theta_input: float
-            s_theta is the scale of the distribution for theta_gen.
-
-        mu_theta_input: float
-            mu_theta is the mean of the distribution for theta_gen.
 
         Returns:
         --------
@@ -100,50 +93,19 @@ def NewCasesModel(I_0, R, s_mu_input, mu_mu_input, s_theta_input, mu_theta_input
 
     """
 
-    # mean of generation interval distribution
-    # k_mu is the shape of the distribution for mu_gen
-    s_mu = s_mu_input  # 0.04
-    mu_mu = mu_mu_input  # 4.8
-    k_mu = mu_mu / s_mu
-    mu_gen = yield pm.Gamma(  # eq 5
-        name="mu_gen", loc=mu_mu, scale=s_mu, batch_stack=k_mu
-    )
-
-    # scale parameter of generation interval distribution
-    # k_theta is the shape of the distribution for theta_gen
-    s_theta = s_theta_input  # 0.1
-    mu_theta = mu_theta_input  # 0.8
-    k_theta = mu_theta / s_theta
-    theta_gen = yield pm.Gamma(  # eq 6
-        name="theta_gen", loc=mu_theta, scale=s_theta, batch_stack=k_theta  # shape
-    )
-
-    # shape parameter of generation interval distribution
-    k_gen = mu_gen / theta_gen
-
-    # generation interval distribution
-    # Emil: How do I make this time dependent?
-    # Sebastian: Not too use, we also want it normalized. Maybe Jonas can help with that.
-    g = yield pm.Gamma(name="g", loc=k_gen, scale=theta_gen)  # eq 2
-
+    """ TODO:
     def new_infectious_cases_next_day(S_t, Ĩ_t):
-        """
-        Using tf scan this function...
-        """
+        
+        #Calculate new newly infectious per day
+        #Sebastian: This will probably not work like that. Someone else should look over
+        #it since im not too sure how to do that.
+        
+        
+        #New susceptible pool
+        
 
-        """
-        Calculate new newly infectious per day
-        Sebastian: This will probably not work like that. Someone else should look over
-        it since im not too sure how to do that.
-        """
-        for i in range(0, Ĩ_t.length):
-            _sum = Ĩ_t[i] * g[i]  # Maybe there is a nice tf function for that
+        Ĩ_t_new = tf.tensordot(Ĩ_t, g)
 
-        Ĩ_t_new = S_t / N_pop * R * _sum  # eq 1
-
-        """
-        New susceptible pool
-        """
         S_t_new = S_t - Ĩ_t_new  # eq 4
 
         return [S_t_new, Ĩ_t_new]
@@ -151,8 +113,10 @@ def NewCasesModel(I_0, R, s_mu_input, mu_mu_input, s_theta_input, mu_theta_input
     S_t, Ĩ_t = tf.scan(
         fn=new_infectious_cases_next_day,
         elems=[],
-        initializer=[S_0, I_0],  # TODO  # TODO
+        initializer=[S_0, I_0],  # S_0 should be population size i.e. N
     )
+    """
+    return Ĩ_t
 
 
 @pm.model
@@ -194,6 +158,11 @@ def model(df):
     )
 
     """
+        Create generation interval RV
+    """
+    g = covid19_npis.model.disease_spread()
+
+    """
         Get RV for new_cases from SIR model
 
         it should have the shape:
@@ -202,8 +171,7 @@ def model(df):
             number_of_countries*number_of_age_groups
 
     """
-
-    new_cases = yield NewCasesModel(I_0=I_0, R=R_reshaped)  # TODO
+    new_cases = yield NewCasesModel(I_0=I_0, R=R_reshaped, g=g)  # TODO
 
     """
         Delay new cases via convolution

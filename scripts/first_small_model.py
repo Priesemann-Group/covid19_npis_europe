@@ -66,28 +66,66 @@ import tensorflow_probability as tfp
 """ 1. Implement equations 1-6 of manuscript
 """
 @pm.model
-def NewCasesModel():
+def NewCasesModel(
+    I_0,
+    R,
+    s_mu_input,
+    mu_mu_input,
+    s_theta_input,
+    mu_theta_input
+):
+    r"""
+        <Model description here>
+
+        Parameters:
+        -----------
+
+        I_0:
+            Initial number of infectious.
+
+        R:
+            Reproduction number matrix.
+
+        s_mu_input: float
+            s_mu is the scale of the distribution for mu_gen.
+
+        mu_mu_input: float
+            mu_mu is the mean of the distribution for mu_gen.
+
+        s_theta_input: float
+            s_theta is the scale of the distribution for theta_gen.
+
+        mu_theta_input: float
+            mu_theta is the mean of the distribution for theta_gen.
+
+        Returns:
+        --------
+
+        Sample from distribution of new, daily cases
+
+    """
     #new_I_t = S_t / N_pop[]
 
     # mean of generation interval distribution
-    # s_mu is the scale of the distribution for mu_gen
     # k_mu is the shape of the distribution for mu_gen
-    s_mu = 0.04
-    k_mu = 4.8 / s_mu
-    mu_gen = yield pm.Gamma(k_mu, s_mu)
+    s_mu = s_mu_input#0.04
+    mu_mu = mu_mu_input#4.8
+    k_mu = mu_mu / s_mu
+    mu_gen = yield pm.Gamma("mu_gen", k_mu, s_mu)
 
     # scale parameter of generation interval distribution
-    # s_theta is the scale of the distribution for theta_gen
     # k_theta is the shape of the distribution for theta_gen
-    s_theta = 0.1
-    k_theta = 0.8 / s_theta
-    theta_gen = yield pm.Gamma(k_theta, s_theta)
+    s_theta = s_theta_input#0.1
+    mu_theta = mu_theta_input#0.8
+    k_theta = mu_theta / s_theta
+    theta_gen = yield pm.Gamma("theta_gen", k_theta, s_theta)
 
     # shape parameter of generation interval distribution
     k_gen = mu_gen / theta_gen
 
     # generation interval distribution
-    g = yield pm.Gamma(tau, k_gen, theta_gen)
+    # Emil: How do I make this time dependent?
+    g = yield pm.Gamma("g", k_gen, theta_gen)
 
 @pm.model
 def model(df):

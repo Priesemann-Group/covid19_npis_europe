@@ -99,15 +99,14 @@ def NewCasesModel(I_0, R, s_mu_input, mu_mu_input, s_theta_input, mu_theta_input
         Sample from distribution of new, daily cases
 
     """
-    # new_I_t = S_t / N_pop[]
 
     # mean of generation interval distribution
     # k_mu is the shape of the distribution for mu_gen
     s_mu = s_mu_input  # 0.04
     mu_mu = mu_mu_input  # 4.8
     k_mu = mu_mu / s_mu
-    mu_gen = yield pm.Gamma(
-        name="mu_gen", loc=mu_mu, scale=s_mu, batch_stack=k_mu  # shape
+    mu_gen = yield pm.Gamma(  # eq 5
+        name="mu_gen", loc=mu_mu, scale=s_mu, batch_stack=k_mu
     )
 
     # scale parameter of generation interval distribution
@@ -115,7 +114,7 @@ def NewCasesModel(I_0, R, s_mu_input, mu_mu_input, s_theta_input, mu_theta_input
     s_theta = s_theta_input  # 0.1
     mu_theta = mu_theta_input  # 0.8
     k_theta = mu_theta / s_theta
-    theta_gen = yield pm.Gamma(
+    theta_gen = yield pm.Gamma(  # eq 6
         name="theta_gen", loc=mu_theta, scale=s_theta, batch_stack=k_theta  # shape
     )
 
@@ -124,9 +123,10 @@ def NewCasesModel(I_0, R, s_mu_input, mu_mu_input, s_theta_input, mu_theta_input
 
     # generation interval distribution
     # Emil: How do I make this time dependent?
-    g = yield pm.Gamma("g", k_gen, theta_gen)
+    # Sebastian: Not too use, we also want it normalized. Maybe Jonas can help with that.
+    g = yield pm.Gamma(name="g", loc=k_gen, scale=theta_gen)  # eq 2
 
-    def new_infectious_cases_next_day(S_t, Ĩ_t, g):
+    def new_infectious_cases_next_day(S_t, Ĩ_t):
         """
         Using tf scan this function...
         """
@@ -134,20 +134,24 @@ def NewCasesModel(I_0, R, s_mu_input, mu_mu_input, s_theta_input, mu_theta_input
         """
         Calculate new newly infectious per day
         Sebastian: This will probably not work like that. Someone else should look over
-        it since im not too sure how to do that. I
+        it since im not too sure how to do that.
         """
         for i in range(0, Ĩ_t.length):
             _sum = Ĩ_t[i] * g[i]  # Maybe there is a nice tf function for that
 
-        Ĩ_t_new = S_t / N_pop * R * _sum
+        Ĩ_t_new = S_t / N_pop * R * _sum  # eq 1
 
         """
         New susceptible pool
         """
-        S_t_new = S_t - Ĩ_t_new
+        S_t_new = S_t - Ĩ_t_new  # eq 4
 
-    new_cases = tf.scan(
-        fn=new_infectious_cases_next_day, elems=[], initializer=initial  # TODO  # TODO
+        return [S_t_new, Ĩ_t_new]
+
+    S_t, Ĩ_t = tf.scan(
+        fn=new_infectious_cases_next_day,
+        elems=[],
+        initializer=[S_0, I_0],  # TODO  # TODO
     )
 
 

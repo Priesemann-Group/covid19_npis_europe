@@ -63,8 +63,31 @@ import pymc4 as pm
 import tensorflow as tf
 import tensorflow_probability as tfp
 
+""" 1. Implement equations 1-6 of manuscript
+"""
+@pm.model
+def NewCasesModel():
+    #new_I_t = S_t / N_pop[]
 
-def SIR():
+    # mean of generation interval distribution
+    # s_mu is the scale of the distribution for mu_gen
+    # k_mu is the shape of the distribution for mu_gen
+    s_mu = 0.04
+    k_mu = 4.8 / s_mu
+    mu_gen = yield pm.Gamma(k_mu, s_mu)
+
+    # scale parameter of generation interval distribution
+    # s_theta is the scale of the distribution for theta_gen
+    # k_theta is the shape of the distribution for theta_gen
+    s_theta = 0.1
+    k_theta = 0.8 / s_theta
+    theta_gen = yield pm.Gamma(k_theta, s_theta)
+
+    # shape parameter of generation interval distribution
+    k_gen = mu_gen / theta_gen
+
+    # generation interval distribution
+    g = yield pm.Gamma(tau, k_gen, theta_gen)
 
 @pm.model
 def model(df):
@@ -92,7 +115,7 @@ def model(df):
         shape:
             number_of_countries*number_of_age_groups
             x
-            number_of_countries*number_of_age_groups 
+            number_of_countries*number_of_age_groups
     """
     R_reshaped = tfp.distributions.BatchReshape(
         distribution=R,
@@ -104,16 +127,16 @@ def model(df):
 
     """
         Get RV for new_cases from SIR model
-        
+
         it should have the shape:
             (data_end-data_begin).days+fcast
             x
-            number_of_countries*number_of_age_groups 
+            number_of_countries*number_of_age_groups
 
     """
 
-    
-    new_cases = yield SIR(I_0=I_0, R=R_reshaped) #TODO
+
+    new_cases = yield NewCasesModel(I_0=I_0, R=R_reshaped) #TODO
 
     """
         Delay new cases via convolution
@@ -128,4 +151,4 @@ def model(df):
 
 
     #supprisingly df.to_numpy() gives us the right numpy array i.e. with shape [time,countries*age_groups]
-    likelihood = pm.NegativeBinomial(new_cases, observed=df.to_numpy()) 
+    likelihood = pm.NegativeBinomial(new_cases, observed=df.to_numpy())

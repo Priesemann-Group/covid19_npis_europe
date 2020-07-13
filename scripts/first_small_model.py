@@ -65,15 +65,10 @@ import tensorflow_probability as tfp
 
 """ 1. Implement equations 1-6 of manuscript
 """
+
+
 @pm.model
-def NewCasesModel(
-    I_0,
-    R,
-    s_mu_input,
-    mu_mu_input,
-    s_theta_input,
-    mu_theta_input
-):
+def NewCasesModel(I_0, R, s_mu_input, mu_mu_input, s_theta_input, mu_theta_input):
     r"""
         <Model description here>
 
@@ -104,21 +99,25 @@ def NewCasesModel(
         Sample from distribution of new, daily cases
 
     """
-    #new_I_t = S_t / N_pop[]
+    # new_I_t = S_t / N_pop[]
 
     # mean of generation interval distribution
     # k_mu is the shape of the distribution for mu_gen
-    s_mu = s_mu_input#0.04
-    mu_mu = mu_mu_input#4.8
+    s_mu = s_mu_input  # 0.04
+    mu_mu = mu_mu_input  # 4.8
     k_mu = mu_mu / s_mu
-    mu_gen = yield pm.Gamma("mu_gen", k_mu, s_mu)
+    mu_gen = yield pm.Gamma(
+        name="mu_gen", loc=mu_mu, scale=s_mu, batch_stack=k_mu  # shape
+    )
 
     # scale parameter of generation interval distribution
     # k_theta is the shape of the distribution for theta_gen
-    s_theta = s_theta_input#0.1
-    mu_theta = mu_theta_input#0.8
+    s_theta = s_theta_input  # 0.1
+    mu_theta = mu_theta_input  # 0.8
     k_theta = mu_theta / s_theta
-    theta_gen = yield pm.Gamma("theta_gen", k_theta, s_theta)
+    theta_gen = yield pm.Gamma(
+        name="theta_gen", loc=mu_theta, scale=s_theta, batch_stack=k_theta  # shape
+    )
 
     # shape parameter of generation interval distribution
     k_gen = mu_gen / theta_gen
@@ -126,6 +125,31 @@ def NewCasesModel(
     # generation interval distribution
     # Emil: How do I make this time dependent?
     g = yield pm.Gamma("g", k_gen, theta_gen)
+
+    def new_infectious_cases_next_day(S_t, Ĩ_t, g):
+        """
+        Using tf scan this function...
+        """
+
+        """
+        Calculate new newly infectious per day
+        Sebastian: This will probably not work like that. Someone else should look over
+        it since im not too sure how to do that. I
+        """
+        for i in range(0, Ĩ_t.length):
+            _sum = Ĩ_t[i] * g[i]  # Maybe there is a nice tf function for that
+
+        Ĩ_t_new = S_t / N_pop * R * _sum
+
+        """
+        New susceptible pool
+        """
+        S_t_new = S_t - Ĩ_t_new
+
+    new_cases = tf.scan(
+        fn=new_infectious_cases_next_day, elems=[], initializer=initial  # TODO  # TODO
+    )
+
 
 @pm.model
 def model(df):
@@ -154,6 +178,8 @@ def model(df):
             number_of_countries*number_of_age_groups
             x
             number_of_countries*number_of_age_groups
+
+        Sebastian: Not too sure if it works like that, we will see.
     """
     R_reshaped = tfp.distributions.BatchReshape(
         distribution=R,
@@ -173,8 +199,7 @@ def model(df):
 
     """
 
-
-    new_cases = yield NewCasesModel(I_0=I_0, R=R_reshaped) #TODO
+    new_cases = yield NewCasesModel(I_0=I_0, R=R_reshaped)  # TODO
 
     """
         Delay new cases via convolution
@@ -184,9 +209,7 @@ def model(df):
     delay = yield pm.Normal(loc=4, scale=3, name="D", batch_shape=1)  # TODO shape
 
     # 2. Do convolution https://www.tensorflow.org/probability/api_docs/python/tfp/experimental/nn/Convolution
-    new_cases_delayed = yield tfp.experimental.nn.Convolution() #TODO
+    new_cases_delayed = yield tfp.experimental.nn.Convolution()  # TODO
 
-
-
-    #supprisingly df.to_numpy() gives us the right numpy array i.e. with shape [time,countries*age_groups]
+    # supprisingly df.to_numpy() gives us the right numpy array i.e. with shape [time,countries*age_groups]
     likelihood = pm.NegativeBinomial(new_cases, observed=df.to_numpy())

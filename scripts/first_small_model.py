@@ -63,65 +63,11 @@ import pymc4 as pm
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-""" 1. Implement equations 1-6 of manuscript
-"""
-
-
-@pm.model
-def NewCasesModel(
-    I_0, R, g,
-):
-    r"""
-        The Gamma distribution g that models the generation
-        interval is parametrized by its mean
-
-        Parameters:
-        -----------
-
-        I_0:
-            Initial number of infectious.
-        R:
-            Reproduction number matrix.
-        g:
-            Generation interval
-
-
-        Returns:
-        --------
-
-        Sample from distribution of new, daily cases
-
-    """
-
-    """ TODO:
-    def new_infectious_cases_next_day(S_t, Ĩ_t):
-        
-        #Calculate new newly infectious per day
-        #Sebastian: This will probably not work like that. Someone else should look over
-        #it since im not too sure how to do that.
-        
-        
-        #New susceptible pool
-        
-
-        Ĩ_t_new = tf.tensordot(Ĩ_t, g)
-
-        S_t_new = S_t - Ĩ_t_new  # eq 4
-
-        return [S_t_new, Ĩ_t_new]
-
-    S_t, Ĩ_t = tf.scan(
-        fn=new_infectious_cases_next_day,
-        elems=[],
-        initializer=[S_0, I_0],  # S_0 should be population size i.e. N
-    )
-    """
-    return Ĩ_t
-
 
 @pm.model
 def model(df):
-    """ Create I_0 2d matrix withshape:
+    """ Create I_0 2d matrix with
+        shape:
             10 [time]
             x
             number_of_countries*number_of_age_groups
@@ -135,21 +81,17 @@ def model(df):
         batch_stack=[10, len(countries) * len(age_groups)],
     )
 
-    """
-        Create Reproduction number matrix (4,4)
+    """ Create Reproduction number matrix (4,4)
     """
     R = yield pm.Normal(loc=1, scale=2.5, name="R", batch_stack=[4, 4])
 
-    """
-        Reshape R matrix to fit model i.e.
+    """ Reshape R matrix to fit model i.e.
         shape:
             number_of_countries*number_of_age_groups
             x
             number_of_countries*number_of_age_groups
-
-        Sebastian: Not too sure if it works like that, we will see.
     """
-    R_reshaped = tfp.distributions.BatchReshape(
+    R_reshaped = tfp.distributions.BatchReshape(  # Sebastian: Not too sure if it works like that, we will see.
         distribution=R,
         batch_shape=[
             len(countries) * len(age_groups),
@@ -157,10 +99,10 @@ def model(df):
         ],
     )
 
+    """ Create generation interval RV
+        see function documentation for more informations
     """
-        Create generation interval RV
-    """
-    g = covid19_npis.model.disease_spread()
+    g = covid19_npis.model._construct_generation_interval_gamma()
 
     """
         Get RV for new_cases from SIR model
@@ -171,7 +113,7 @@ def model(df):
             number_of_countries*number_of_age_groups
 
     """
-    new_cases = yield NewCasesModel(I_0=I_0, R=R_reshaped, g=g)  # TODO
+    new_cases = covid19_npis.model.NewCasesModel(I_0=I_0, R=R_reshaped, g=g)  # TODO
 
     """
         Delay new cases via convolution

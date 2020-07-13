@@ -1,6 +1,2 @@
-# ------------------------------------------------------------------------------ #
-# @Author:        Sebastian B. Mohr
-# @Email:
-# @Created:       2020-07-13 17:24:47
-# @Last Modified: 2020-07-13 17:24:47
-# ------------------------------------------------------------------------------ #
+from .disease_spread import _construct_generation_interval_gamma
+from .disease_spread import NewCasesModel

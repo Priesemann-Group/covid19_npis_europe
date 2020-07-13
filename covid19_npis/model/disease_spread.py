@@ -29,6 +29,15 @@ def _construct_generation_interval_gamma(
         k/concentration parameter for underlying gamma distribution of theta (:math:`\theta_{D_\text{gene}}`).
     theta_theta : number, optional
         theta/scale parameter for underlying gamma distribution of theta (:math:`\theta_{D_\text{gene}}`).
+
+    Returns
+    -------
+    : 
+        Generator for the generation interval distribution :math:`g(\tau)`
+
+    TODO
+    ----
+    - g time dependent 
     """
     g = {}
 
@@ -56,7 +65,7 @@ def _construct_generation_interval_gamma(
     )
 
     """ Construct generation interval gamma distribution from underlying
-        generation distriibutions (see above)
+        generation distributions (see above)
         k = alpha = mu/θ
     """
     g = yield pm.Gamma(
@@ -68,3 +77,56 @@ def _construct_generation_interval_gamma(
         # batch_stack = time ?
     )
     return g
+
+
+def NewCasesModel(I_0, R, g):
+    r"""
+    .. math::
+
+         \tilde{I_l}(t) = \frac{S_l(t)}{N_{\text{pop}, j}} R_l(t)\sum_{\tau=0}^{t} \tilde{I_l}(t-\tau) g(\tau) \label{eq:I_gene}
+    
+
+    TODO
+    ----
+    - documentation
+    - tf scan function
+    - write code
+
+    Parameters
+    ----------
+    I_0:
+        Initial number of infectious.
+    R:
+        Reproduction number matrix.
+    g:
+        Generation interval
+
+    Returns
+    -------
+    :
+        Sample from distribution of new, daily cases
+    """
+
+    """ Old pseudocode:
+    def new_infectious_cases_next_day(S_t, Ĩ_t):
+        
+        #Calculate new newly infectious per day
+        #Sebastian: This will probably not work like that. Someone else should look over
+        #it since im not too sure how to do that.
+        
+        
+        #New susceptible pool
+        
+
+        Ĩ_t_new = tf.tensordot(Ĩ_t, g)
+
+        S_t_new = S_t - Ĩ_t_new  # eq 4
+
+        return [S_t_new, Ĩ_t_new]
+
+    S_t, Ĩ_t = tf.scan(
+        fn=new_infectious_cases_next_day,
+        elems=[],
+        initializer=[S_0, I_0],  # S_0 should be population size i.e. N
+    )
+    """

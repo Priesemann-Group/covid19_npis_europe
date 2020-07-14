@@ -1,5 +1,6 @@
 # covid19_npis_europe
 
+[![Documentation Status](https://readthedocs.org/projects/covid19-npis-europe/badge/?version=latest)](https://covid19-npis-europe.readthedocs.io/en/latest/?badge=latest)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 ## First steps
@@ -13,6 +14,7 @@ Install all required packages
 pip install -r requirements.txt
 ```
 
+## Documentation: [link](https://covid19-npis-europe.readthedocs.io/en/latest)
 
 ## Frequent Problems
 

@@ -17,6 +17,13 @@ Welcome to COVID-19 NPIS's documentation!
 
 	doc/model
 
+.. toctree::
+    :titlesonly:
+    :maxdepth: 2
+    :caption: For developpers
+
+    doc/contributing
+
 Indices and tables
 ==================
 

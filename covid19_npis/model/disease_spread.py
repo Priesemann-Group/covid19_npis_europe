@@ -68,22 +68,23 @@ def _construct_generation_interval_gamma(
         generation distributions (see above)
         k = alpha = mu/θ
     """
-    g = yield pm.Gamma(
+    g = tfp.distributions.Gamma(
         # Emil: How do I make this time dependent?
         # Sebastian: Not too use, we also want it normalized. Maybe Jonas can help with that.
         # Matthias: We're not interested in drawing samples from this distribution, but need the pdf
         #   fortunately tfp is simple in that regard g.pdf([0,1,2,3,....,10]) gives the 'weights' of the generation interval
+        # Sebastian: Indeed, that is very nice! FYI the function is called .prob([]) As far as i can see one
+        #   cant call it within the pymc4 model context.
+        #   try to add .prob(np.arange(0,20,0.001))
         name="g",
         concentration=g_mu / g_theta,
         rate=1 / g_theta,
-        # batch_stack = time ?
     )
-    
-    
+
     return g
 
 
-def NewCasesModel(I_0, R, g, N, C):
+def InfectionModel(I_0, R, g, N, C):
     r"""
     .. math::
 
@@ -93,6 +94,7 @@ def NewCasesModel(I_0, R, g, N, C):
     TODO
     ----
     - documentation
+    - implement I_0
     - tf scan function
     - write code
 
@@ -101,14 +103,15 @@ def NewCasesModel(I_0, R, g, N, C):
     I_0:
         Initial number of infectious.
     R:
-        Reproduction number matrix. (time x country x age_group)
+        Reproduction number matrix. (time x country x age_group) 
     g:
         Generation interval
     N:
         Initial population
-    
     C:
         inter-age-group Contact-Matrix (see 8)
+    l: number, optional
+        Length of generation interval i.e :math:`t` in the formula above
 
     Returns
     -------
@@ -140,23 +143,39 @@ def NewCasesModel(I_0, R, g, N, C):
         initializer=[S_0, I_0],  # S_0 should be population size i.e. N
     )
     """
-    
-    def new_infectious_cases_next_day(a,R_t):
-        # Unpack:
+
+    # Normalize
+    norm = tf.keras.utils.normalize(g.prob(tf.range(0, l)))
+
+    def new_infectious_cases_next_day(a, R_t):
+        # Unpack a:
+        # Old I_next is I_lastv now
         I_t, I_lastv, S_t = a
         f = S_t / N
-        
-        infectious = tf.tensordot(E_lastv,serial_p,1)
+
+        _sum = tf.tensordot(I_lastv, g, 1)
         # TODO: Insert some untested magic involving R_t and contact-matrix
+
+        # Calcs outer product S ⊗ R --> axes = 0
+        I_t = tf.tensordot(S_t / N, R * _sum, axes=0)
+
         new_infected = 0
-        
-        new_v = tf.reshape(new,[new.shape[0],new.shape[1],1])   # add dimension for concatenation
-        I_nextv = tf.concat([new_v,I_lastv[:,:,:-1]], -1 )  # Create new infected population for new step, insert latest at front
-        
-        return [new, I_nextv, S_t-new]
-    
+
+        new_v = tf.reshape(
+            new, [new.shape[0], new.shape[1], 1]
+        )  # add dimension for concatenation
+        I_nextv = tf.concat(
+            [new_v, I_lastv[:, :, :-1]], -1
+        )  # Create new infected population for new step, insert latest at front
+
+        return [new, I_nextv, S_t - new]
+
     # Initialze the internal state for the scan function
-    initial = [tf.zeros(N.shape,dtype=np.float64),tf.zeros([N.shape[0],N.shape[1],l],dtype=np.float64),N]
-    
-    out = tf.scan(new_infectious_cases_next_day,R_T,initial)
+    initial = [
+        tf.zeros(N.shape, dtype=np.float64),
+        tf.zeros([N.shape[0], N.shape[1], l], dtype=np.float64),
+        N,
+    ]
+
+    out = tf.scan(fn=new_infectious_cases_next_day, elems=R_T, initializer=initial)
     return out

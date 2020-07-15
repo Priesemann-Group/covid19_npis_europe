@@ -66,38 +66,42 @@ import tensorflow_probability as tfp
 
 @pm.model
 def model(df):
-    """ Create I_0 2d matrix with
-        shape:
-            10 [time]
-            x
-            number_of_countries*number_of_age_groups
-
-        We need 10 here because we choose a length of 10 for the convolution at a later point.
-    """
-    I_0 = yield pm.HalfCauchy(
-        loc=10,
-        scale=150,
-        name="I_0",
-        batch_stack=[10, len(countries) * len(age_groups)],
-    )
-
-    """ Create Reproduction number matrix (4,4)
-    """
-    R = yield pm.Normal(loc=1, scale=2.5, name="R", batch_stack=[4, 4])
-
-    """ Reshape R matrix to fit model i.e.
+    """ Create I_0 with
         shape:
             number_of_countries*number_of_age_groups
-            x
-            number_of_countries*number_of_age_groups
     """
-    R_reshaped = tfp.distributions.BatchReshape(  # Sebastian: Not too sure if it works like that, we will see.
-        distribution=R,
-        batch_shape=[
-            len(countries) * len(age_groups),
-            len(countries) * len(age_groups),
-        ],
+    batch_shape = len(countries) * len(age_groups)
+    I_0 = yield pm.HalfCauchy(loc=[10] * batch_shape, name="I_0")
+
+    """ Create Contact number matrix 
+        with LKJ prior and
+        shape:
+        [
+          number_of_age_groups
+          x
+          number_of_age_groups
+        ]
+          x
+          number_of_countries
+    """
+    batch_shape = len(countries)
+    C = yield pm.LKJ(
+        dimension=len(age_groups),
+        concentration=[2] * batch_shape,  # eta
+        name="Contact_matrix",
     )
+
+    """ Create Reproduction number matrix,
+        should be diagonal matrix
+        shape:
+            number_of_age_groups
+            x
+            number_of_age_groups
+    """
+    batch_shape = len(age_groups)  # *time?
+    # Create RV with shape number_of_age_groups and convert to diag matrix
+    R = yield pm.Normal(loc=[2] * batch_shape, scale=2.5, name="R_age_groups")
+    R_diag = tf.linalg.diag(R)
 
     """ Create generation interval RV
         see function documentation for more informations
@@ -113,7 +117,7 @@ def model(df):
             number_of_countries*number_of_age_groups
 
     """
-    new_cases = covid19_npis.model.NewCasesModel(I_0=I_0, R=R_reshaped, g=g)  # TODO
+    new_cases = covid19_npis.model.NewCasesModel(I_0=I_0, R=R_diag, g=g)  # TODO
 
     """
         Delay new cases via convolution

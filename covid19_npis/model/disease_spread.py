@@ -84,7 +84,7 @@ def _construct_generation_interval_gamma(
     return g
 
 
-def InfectionModel(I_0, R, g, N, C):
+def InfectionModel(I_0, R, C, g, N):
     r"""
     .. math::
 
@@ -104,12 +104,12 @@ def InfectionModel(I_0, R, g, N, C):
         Initial number of infectious.
     R:
         Reproduction number matrix. (time x country x age_group) 
+    C:
+        inter-age-group Contact-Matrix (see 8)
     g:
         Generation interval
     N:
         Initial population
-    C:
-        inter-age-group Contact-Matrix (see 8)
     l: number, optional
         Length of generation interval i.e :math:`t` in the formula above
 
@@ -145,7 +145,7 @@ def InfectionModel(I_0, R, g, N, C):
     """
 
     # Normalize
-    norm = tf.keras.utils.normalize(g.prob(tf.range(0, l)))
+    g_prob = tf.math.l2_normalize(g.prob(tf.range(0, l)))
 
     def new_infectious_cases_next_day(a, R_t):
         # Unpack a:

@@ -137,7 +137,7 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
     )
     # shift range by 1e-12 to allow distributions which are undefined for \tau = 0
 
-    def new_infectious_cases_next_day(a, R_t):
+    def new_infectious_cases_next_day(a, R):
         # Unpack a:
         # Old I_next is I_lastv now
         I_t, I_lastv, S_t = a  # Internal state
@@ -147,9 +147,9 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
         infectious = tf.einsum("tca,t->ca", I_lastv, g_p)
 
         # Calculate effective R_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
-        log.info(f"R_t inside scan:\n{R_t}")
+        log.info(f"R_t inside scan:\n{R}")
         log.info(f"I_t inside scan:\n{I_t}")
-        R_sqrt = tf.math.sqrt(R_t)
+        R_sqrt = tf.math.sqrt(R)
         log.info(f"R_sqrt:\n{R_sqrt}")
         R_diag = tf.linalg.diag(R_sqrt)
         log.info(f"R_diag:\n{R_diag}")
@@ -189,9 +189,9 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
     I_0_t = tf.einsum("ca,t->tca", I_0, exp_d)
     log.info(f"I_0_t:\n{I_0_t}")
 
-    initial = [tf.zeros(N.shape, dtype=tf.float32), I_0_t, N]
-    R_array = tf.stack([R_t] * 50)
+    initial = [tf.zeros(N.shape, dtype=R_t.dtype), I_0_t, N]
+
     log.info(f"initial:\n{initial[0]}\n{initial[1]}\n{initial[2]}")
     log.info(f"R_t outside scan:\n{R_t}")
-    out = tf.scan(fn=new_infectious_cases_next_day, elems=R_array, initializer=initial)
+    out = tf.scan(fn=new_infectious_cases_next_day, elems=R_t, initializer=initial)
     return out[0]

@@ -34,16 +34,21 @@ def test_model(data):
 
     # Create Reproduktion number for every age group
     shape_R = num_age_groups * num_countries
-    R = yield pm.Normal(name="R_age_groups", loc=[5] * shape_R, scale=2.5,)
+    R = yield pm.LogNormal(name="R_age_groups", loc=[0] * shape_R, scale=2.5,)
     R = tf.reshape(R, (num_countries, num_age_groups))  # 1==time
-    log.info(f"R:\n{R}")
+    R_t = tf.stack([R] * 50)
+
+    log.info(f"R:\n{R_t.shape}")
 
     # Create Contact matrix
+    shape_C = num_countries
     C = yield pm.LKJ(
         name="Contact_matrix",
         dimension=num_age_groups,
-        concentration=[2] * num_countries,  # eta
+        concentration=[2] * shape_C,  # eta
     )
+    log.info(f"C:\n{C}")
+    C, norm = tf.linalg.normalize(C, 1)
     log.info(f"C:\n{C}")
 
     # Create N tensor (vector) should be done earlier in the real model
@@ -51,36 +56,36 @@ def test_model(data):
     N = tf.reshape(N, (num_countries, num_age_groups))
     log.info(f"N:\n{N}")
     new_cases = yield covid19_npis.model.InfectionModel(
-        N=N, I_0=I_0, R_t=R, C=C, g=None, l=16  # default value
+        N=N, I_0=I_0, R_t=R_t, C=C, g=None, l=16  # default value
     )
     log.info(f"new_cases:\n{new_cases}")  # dimensons=t,c,a
     log.info(f"new_cases:\n{new_cases[:,0,:]}")
-    """
-    def convert(mu):
-        r = 1 / 1e-12
+
+    def convert(mu, var):
+        r = 1 / var
         p = mu / (mu + r)
-        return r, 1 - p
+        return r, p
 
-    print(f"r:{r}")
-    print(p)
+    r, p = convert(new_cases, 0.2)
 
+    log.info(f"r:{r}")
+    log.info(f"p:{p}")
+
+    data = data.to_numpy().reshape((50, 2, 4))
+    log.info(f"data:\n{data}")
+
+    likelihood = yield pm.StudentT(
+        name="like", loc=new_cases, scale=100, df=4, observed=data.astype("float32")
+    )
+    """
     likelihood = yield pm.NegativeBinomial(
         name="like",
-        total_count=tf.cast(r, "int32"),
+        total_count=r,
         probs=p,
-        observed=data.astype("int32"),
+        observed=data.astype("float32"),
         allow_nan_stats=True,
     )
-
-    """
-    # Reshape data to fit
-    data = data.to_numpy().reshape((50, 2, 4))  # To match tca fromat
-    print(f"data:\n{data}")
-    """
-    likelihood = yield pm.LogNormal(
-        name="like", loc=new_cases, scale=100, observed=data
-    )
     """
 
 
-trace = pm.sample(test_model(I_new), num_samples=50, burn_in=80, num_chains=8)
+trace = pm.sample(test_model(I_new), num_samples=50, burn_in=80, num_chains=1)

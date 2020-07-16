@@ -84,7 +84,7 @@ def _construct_generation_interval_gamma(
     return g
 
 
-def InfectionModel(N, I_0, R_T, C, g ,l=16):
+def InfectionModel(N, I_0, R_t, C, g=None, l=16):
     r"""
     .. math::
 
@@ -102,7 +102,7 @@ def InfectionModel(N, I_0, R_T, C, g ,l=16):
     ----------
     I_0:
         Initial number of infectious.
-    R_T:
+    R_t:
         Reproduction number matrix. (time x country x age_group) 
     g:
         Generation interval
@@ -118,72 +118,59 @@ def InfectionModel(N, I_0, R_T, C, g ,l=16):
     :
         Sample from distribution of new, daily cases
     """
+    if g is None:
+        g = _construct_generation_interval_gamma()
 
-    """ Old pseudocode:
-    def new_infectious_cases_next_day(S_t, Ĩ_t):
-        
-        #Calculate new newly infectious per day
-        #Sebastian: This will probably not work like that. Someone else should look over
-        #it since im not too sure how to do that.
-        #Matthias: Wip see notebook, needs some variable-renaming.
-        
-        
-        #New susceptible pool
-        
-
-        Ĩ_t_new = tf.tensordot(Ĩ_t, g)
-
-        S_t_new = S_t - Ĩ_t_new  # eq 4
-
-        return [S_t_new, Ĩ_t_new]
-
-    S_t, Ĩ_t = tf.scan(
-        fn=new_infectious_cases_next_day,
-        elems=[],
-        initializer=[S_0, I_0],  # S_0 should be population size i.e. N
-    )
-    """
-
-    # Normalize
-    g_p = g.prob(tf.range(1e-12,l+1e-12,dtype=g.dtype)) # shift range by 1e-12 to allow distributions which are undefined for \tau = 0
-    g_p /= tf_sum(g_p)
+    # Get the pdf and normalize
+    g_p = tf.linalg.normalize(
+        g.prob(tf.range(1e-12, l + 1e-12, dtype=g.dtype), 1)
+    )  # shift range by 1e-12 to allow distributions which are undefined for \tau = 0
 
     def new_infectious_cases_next_day(a, R_t):
         # Unpack a:
         # Old I_next is I_lastv now
-        I_t, I_lastv, S_t = a       # Internal state
+        I_t, I_lastv, S_t = a  # Internal state
         f = S_t / N
-        
+
         # Calc "infectious" people, weighted by serial_p (country x age_group)
-        infectious = tf.einsum("tca,t->ca",I_lastv,g_p) 
-        
+        infectious = tf.einsum("tca,t->ca", I_lastv, g_p)
+
         # Calculate effective R_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
         R_sqrt = tf.sqrt(R_t)
-        R_diag = tf.einsum("ij,ci->cij",tf.eye(R_t.shape[-1],dtype=R_t.dtype), R_sqrt)
-        R_eff = tf.einsum("cij,ik,ckl->cil", R_diag, C, R_diag) # Effective growth number 
-        
+        R_diag = tf.einsum("ij,ci->cij", tf.eye(R_t.shape[-1], dtype=R_t.dtype), R_sqrt)
+        R_eff = tf.einsum(
+            "cij,ik,ckl->cil", R_diag, C, R_diag
+        )  # Effective growth number
+
         # Calculate new infections
-        new = tf.einsum("nj,njk,nk->nk",infectious,R_eff,f)
-        
+        new = tf.einsum("nj,njk,nk->nk", infectious, R_eff, f)
+
         new_v = tf.reshape(
-            new, [1 ,new.shape[0], new.shape[1]]
+            new, [1, new.shape[0], new.shape[1]]
         )  # add dimension for concatenation
         I_nextv = tf.concat(
             [new_v, I_lastv[:-1, :, :]], 0
         )  # Create new infected population for new step, insert latest at front
 
         return [new, I_nextv, S_t - new]
-    
-    # Generate exponential distributed intial I_0_t, sum = I_0
+
+    """ # Generate exponential distributed intial I_0_t,
+        whereby t goes l days into the past
+        
+        It shoul be in sum = I_0
+    """
+
     # I't not the real thing right now, as the slope of the exponential doesn't match R_t,
     # but close enough to avoid starting oscillations
-    exp_r = tf.range(start=l,limit=0.,delta=-1.,dtype=g.dtype)
+    exp_r = tf.range(start=l, limit=0.0, delta=-1.0, dtype=g.dtype)
     exp_d = tf.math.exp(exp_r)
-    exp_d = exp_d * g_p # wieght by serial_p
-    exp_d /= tf_sum(exp_d,axis=0)   # normalize by dividing by sum over time-dimension
+    exp_d = exp_d * g_p  # wieght by serial_p
+    exp_d = tf.linalg.normalize(
+        exp_d, axis=0
+    )  # normalize by dividing by sum over time-dimension
     I_0_t = tf.einsum("ca,t->tca", I_0, exp_d)
- 
-    initial = [tf.zeros(N.shape,dtype=np.float64), I_0_t, N]
+
+    initial = [tf.zeros(N.shape, dtype=np.float64), I_0_t, N]
 
     # Initialze the internal state for the scan function
     initial = [
@@ -194,4 +181,3 @@ def InfectionModel(N, I_0, R_T, C, g ,l=16):
 
     out = tf.scan(fn=new_infectious_cases_next_day, elems=R_T, initializer=initial)
     return out
-

@@ -84,7 +84,7 @@ def _construct_generation_interval_gamma(
     return g
 
 
-def InfectionModel(I_0, R, g, N, C):
+def InfectionModel(N, I_0, R_T, C, g ,l=16):
     r"""
     .. math::
 
@@ -102,7 +102,7 @@ def InfectionModel(I_0, R, g, N, C):
     ----------
     I_0:
         Initial number of infectious.
-    R:
+    R_T:
         Reproduction number matrix. (time x country x age_group) 
     g:
         Generation interval
@@ -145,30 +145,47 @@ def InfectionModel(I_0, R, g, N, C):
     """
 
     # Normalize
-    norm = tf.keras.utils.normalize(g.prob(tf.range(0, l)))
+    g_p = g.prob(tf.range(1e-12,l+1e-12,dtype=g.dtype)) # shift range by 1e-12 to allow distributions which are undefined for \tau = 0
+    g_p /= tf_sum(g_p)
 
     def new_infectious_cases_next_day(a, R_t):
         # Unpack a:
         # Old I_next is I_lastv now
         I_t, I_lastv, S_t = a
         f = S_t / N
-
-        _sum = tf.tensordot(I_lastv, g, 1)
-        # TODO: Insert some untested magic involving R_t and contact-matrix
-
-        # Calcs outer product S ⊗ R --> axes = 0
-        I_t = tf.tensordot(S_t / N, R * _sum, axes=0)
-
-        new_infected = 0
-
+        
+        # Calc "infectious" people, weighted by serial_p (country x age_group)
+        infectious = tf.einsum("tca,t->ca",E_lastv,g_p) 
+        
+        # Calculate effective R_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
+        R_sqrt = tf.sqrt(R_t)
+        R_diag = tf.einsum("ij,ci->cij",tf.eye(R_t.shape[-1],dtype=R_t.dtype), R_sqrt)
+        R_eff = tf.einsum("cij,ik,ckl->cil", R_diag, C, R_diag) # Effective growth
+        
+        # Calculate new infections
+        new = tf.einsum("nj,njk,nk->nk",infectious,R_eff,f)
+        
         new_v = tf.reshape(
-            new, [new.shape[0], new.shape[1], 1]
+            new, [1 ,new.shape[0], new.shape[1]]
         )  # add dimension for concatenation
         I_nextv = tf.concat(
-            [new_v, I_lastv[:, :, :-1]], -1
+            [new_v, I_lastv[:-1, :, :]], 0
         )  # Create new infected population for new step, insert latest at front
 
         return [new, I_nextv, S_t - new]
+    
+    # Generate exponential distributed intial I_0_t, sum = I_0
+    # I't not the real thing right now, as the slope of the exponential doesn't match R_t,
+    # but close enough to avoid starting oscillations
+    exp_r = tf.range(start=l,limit=0.,delta=-1.,dtype=g.dtype)
+    exp_d = tf.math.exp(exp_r)
+    exp_d = exp_d * g_p # wieght by serial_p
+    exp_d /= tf_sum(exp_d,axis=0)   # normalize by dividing by sum over time-dimension
+    I_0_t = tf.einsum("ca,t->tca",I_0,exp_d)
+    #    I_0_t = tf.tensordot(I_0, exp_d, axes=0) # Calculate the outer product (axes=0) --> initial distribution
+    
+    # Exchanged for I_0_t
+    initial = [tf.zeros(N.shape,dtype=np.float64), I_0_t, N]
 
     # Initialze the internal state for the scan function
     initial = [
@@ -179,3 +196,4 @@ def InfectionModel(I_0, R, g, N, C):
 
     out = tf.scan(fn=new_infectious_cases_next_day, elems=R_T, initializer=initial)
     return out
+

@@ -1,3 +1,11 @@
+import tensorflow as tf
+import logging
+import pymc4 as pm
+import tensorflow_probability as tfp
+
+log = logging.getLogger(__name__)
+
+
 def _construct_generation_interval_gamma(
     mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 0.1, theta_theta=0.1,
 ):
@@ -51,7 +59,9 @@ def _construct_generation_interval_gamma(
     # Pymc4 and tf use alpha and beta as parameters so we need to take 1/θ as rate.
     # See https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Gamma
     # and https://en.wikipedia.org/wiki/Gamma_distribution
-    g_mu = yield pm.Gamma(name="g_mu", concentration=g["k"]["k"], rate=1 / g["mu"]["θ"])
+    g_mu = yield pm.Gamma(
+        name="g_mu", concentration=g["mu"]["k"], rate=1 / g["mu"]["θ"]
+    )
 
     """ Shape parameter k of generation interval distribution is
         a gamma distribution with:
@@ -68,6 +78,7 @@ def _construct_generation_interval_gamma(
         generation distributions (see above)
         k = alpha = mu/θ
     """
+
     g = tfp.distributions.Gamma(
         # Emil: How do I make this time dependent?
         # Sebastian: Not too use, we also want it normalized. Maybe Jonas can help with that.
@@ -76,11 +87,10 @@ def _construct_generation_interval_gamma(
         # Sebastian: Indeed, that is very nice! FYI the function is called .prob([]) As far as i can see one
         #   cant call it within the pymc4 model context.
         #   try to add .prob(np.arange(0,20,0.001))
-        name="g",
+        name="generation_interval",
         concentration=g_mu / g_theta,
         rate=1 / g_theta,
     )
-
     return g
 
 
@@ -119,12 +129,13 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
         Sample from distribution of new, daily cases
     """
     if g is None:
-        g = _construct_generation_interval_gamma()
+        g = yield _construct_generation_interval_gamma()
 
     # Get the pdf and normalize
-    g_p = tf.linalg.normalize(
-        g.prob(tf.range(1e-12, l + 1e-12, dtype=g.dtype), 1)
-    )  # shift range by 1e-12 to allow distributions which are undefined for \tau = 0
+    g_p, norm = tf.linalg.normalize(
+        g.prob(tf.range(1e-12, l + 1e-12, dtype=g.dtype)), 1
+    )
+    # shift range by 1e-12 to allow distributions which are undefined for \tau = 0
 
     def new_infectious_cases_next_day(a, R_t):
         # Unpack a:
@@ -136,15 +147,22 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
         infectious = tf.einsum("tca,t->ca", I_lastv, g_p)
 
         # Calculate effective R_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
-        R_sqrt = tf.sqrt(R_t)
-        R_diag = tf.einsum("ij,ci->cij", tf.eye(R_t.shape[-1], dtype=R_t.dtype), R_sqrt)
+        log.info(f"R_t inside scan:\n{R_t}")
+        log.info(f"I_t inside scan:\n{I_t}")
+        R_sqrt = tf.math.sqrt(R_t)
+        log.info(f"R_sqrt:\n{R_sqrt}")
+        R_diag = tf.linalg.diag(R_sqrt)
+        log.info(f"R_diag:\n{R_diag}")
+        log.info(f"C:\n{C}")
         R_eff = tf.einsum(
-            "cij,ik,ckl->cil", R_diag, C, R_diag
+            "cij,cik,ckl->cil", R_diag, C, R_diag
         )  # Effective growth number
-
+        log.info(f"R_eff:\n{R_eff}")
         # Calculate new infections
-        new = tf.einsum("nj,njk,nk->nk", infectious, R_eff, f)
-
+        log.info(f"infectious:\n{infectious}")
+        log.info(f"f:\n{f}")
+        new = tf.einsum("ci,cij,cj->cj", infectious, R_eff, f)
+        log.info(f"new:\n{new}")
         new_v = tf.reshape(
             new, [1, new.shape[0], new.shape[1]]
         )  # add dimension for concatenation
@@ -156,28 +174,24 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
 
     """ # Generate exponential distributed intial I_0_t,
         whereby t goes l days into the past
-        
-        It shoul be in sum = I_0
-    """
+        I_0_t should be in sum = I_0
 
-    # I't not the real thing right now, as the slope of the exponential doesn't match R_t,
-    # but close enough to avoid starting oscillations
+        TODO
+        ----
+        - slope of exponenet should match R_0
+    """
     exp_r = tf.range(start=l, limit=0.0, delta=-1.0, dtype=g.dtype)
     exp_d = tf.math.exp(exp_r)
     exp_d = exp_d * g_p  # wieght by serial_p
-    exp_d = tf.linalg.normalize(
+    exp_d, norm = tf.linalg.normalize(
         exp_d, axis=0
     )  # normalize by dividing by sum over time-dimension
     I_0_t = tf.einsum("ca,t->tca", I_0, exp_d)
+    log.info(f"I_0_t:\n{I_0_t}")
 
-    initial = [tf.zeros(N.shape, dtype=np.float64), I_0_t, N]
-
-    # Initialze the internal state for the scan function
-    initial = [
-        tf.zeros(N.shape, dtype=np.float64),
-        tf.zeros([N.shape[0], N.shape[1], l], dtype=np.float64),
-        N,
-    ]
-
-    out = tf.scan(fn=new_infectious_cases_next_day, elems=R_T, initializer=initial)
-    return out
+    initial = [tf.zeros(N.shape, dtype=tf.float32), I_0_t, N]
+    R_array = tf.stack([R_t] * 50)
+    log.info(f"initial:\n{initial[0]}\n{initial[1]}\n{initial[2]}")
+    log.info(f"R_t outside scan:\n{R_t}")
+    out = tf.scan(fn=new_infectious_cases_next_day, elems=R_array, initializer=initial)
+    return out[0]

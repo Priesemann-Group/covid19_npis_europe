@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 
 
-def simple_new_I():
+def simple_new_I(factor):
     """
         Generates a simple test dataset with fixed 
         R_t = R
@@ -29,7 +29,7 @@ def simple_new_I():
         return R_t @ I_t
 
     # 4 Age groups
-    R_0 = np.diag([1, 2, 3, 2]) + np.random.random(size=[4, 4]) * 0.25
+    R_0 = np.diag([1, 2, 3, 2]) * factor + np.random.random(size=[4, 4]) * 0.25
     I_0 = np.array([10, 10, 10, 10])
 
     t = np.arange(start=0, stop=50)

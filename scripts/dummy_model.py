@@ -22,6 +22,7 @@ num_countries = 2
 
 """ # Construct pymc4 model
 """
+data = I_new.to_numpy().reshape((50, 2, 4))
 
 
 @pm.model
@@ -55,7 +56,7 @@ def test_model(data):
     N = tf.convert_to_tensor([10e5, 10e5, 10e5, 10e5] * 2)
     N = tf.reshape(N, (num_countries, num_age_groups))
     log.info(f"N:\n{N}")
-    new_cases = yield covid19_npis.model.InfectionModel(
+    new_cases = covid19_npis.model.InfectionModel(
         N=N, I_0=I_0, R_t=R_t, C=C, g=None, l=16  # default value
     )
     log.info(f"new_cases:\n{new_cases}")  # dimensons=t,c,a
@@ -71,11 +72,8 @@ def test_model(data):
     log.info(f"r:{r}")
     log.info(f"p:{p}")
 
-    data = data.to_numpy().reshape((50, 2, 4))
-    log.info(f"data:\n{data}")
-
     likelihood = yield pm.StudentT(
-        name="like", loc=new_cases, scale=100, df=4, observed=data.astype("float32")
+        name="like", loc=new_cases, scale=100, df=4, observed=data
     )
     """
     likelihood = yield pm.NegativeBinomial(
@@ -88,4 +86,4 @@ def test_model(data):
     """
 
 
-trace = pm.sample(test_model(I_new), num_samples=50, burn_in=80, num_chains=1)
+trace = pm.sample(test_model(data), num_samples=50, burn_in=80, num_chains=1)

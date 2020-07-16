@@ -6,6 +6,10 @@ import tensorflow_probability as tfp
 log = logging.getLogger(__name__)
 
 
+def gamma(x, alpha, beta):
+    return tf.math.pow(x, (alpha - 1)) * tf.exp(-beta * x)
+
+
 def _construct_generation_interval_gamma(
     mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 0.1, theta_theta=0.1,
 ):
@@ -60,7 +64,7 @@ def _construct_generation_interval_gamma(
     # See https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Gamma
     # and https://en.wikipedia.org/wiki/Gamma_distribution
     g_mu = yield pm.Gamma(
-        name="g_mu", concentration=g["mu"]["k"], rate=1 / g["mu"]["θ"]
+        name="g_mu", concentration=g["mu"]["k"], rate=1.0 / g["mu"]["θ"]
     )
 
     """ Shape parameter k of generation interval distribution is
@@ -71,7 +75,7 @@ def _construct_generation_interval_gamma(
     g["θ"]["θ"] = theta_theta
 
     g_theta = yield pm.Gamma(
-        name="g_theta", concentration=g["θ"]["k"], rate=1 / g["θ"]["θ"]
+        name="g_theta", concentration=g["θ"]["k"], rate=1.0 / g["θ"]["θ"]
     )
 
     """ Construct generation interval gamma distribution from underlying
@@ -79,19 +83,7 @@ def _construct_generation_interval_gamma(
         k = alpha = mu/θ
     """
 
-    g = tfp.distributions.Gamma(
-        # Emil: How do I make this time dependent?
-        # Sebastian: Not too use, we also want it normalized. Maybe Jonas can help with that.
-        # Matthias: We're not interested in drawing samples from this distribution, but need the pdf
-        #   fortunately tfp is simple in that regard g.pdf([0,1,2,3,....,10]) gives the 'weights' of the generation interval
-        # Sebastian: Indeed, that is very nice! FYI the function is called .prob([]) As far as i can see one
-        #   cant call it within the pymc4 model context.
-        #   try to add .prob(np.arange(0,20,0.001))
-        name="generation_interval",
-        concentration=g_mu / g_theta,
-        rate=1 / g_theta,
-    )
-    return g
+    return g_mu, g_theta
 
 
 def InfectionModel(N, I_0, R_t, C, g=None, l=16):
@@ -128,13 +120,13 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
     :
         Sample from distribution of new, daily cases
     """
-    if g is None:
-        g = yield _construct_generation_interval_gamma()
 
+    if g is None:
+        g_mu, g_theta = _construct_generation_interval_gamma()
+
+    g = gamma(tf.range(1e-12, l + 1e-12, dtype=g_mu.dtype), 4, 1 / 0.5)
     # Get the pdf and normalize
-    g_p, norm = tf.linalg.normalize(
-        g.prob(tf.range(1e-12, l + 1e-12, dtype=g.dtype)), 1
-    )
+    g_p, norm = tf.linalg.normalize(g, 1)
     # shift range by 1e-12 to allow distributions which are undefined for \tau = 0
 
     def new_infectious_cases_next_day(a, R):
@@ -167,7 +159,15 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
             new, [1, new.shape[0], new.shape[1]]
         )  # add dimension for concatenation
         I_nextv = tf.concat(
-            [new_v, I_lastv[:-1, :, :]], 0
+            [
+                new_v,
+                tf.slice(
+                    I_lastv,
+                    [0, 0, 0],
+                    [I_lastv.shape[0] - 1, I_lastv.shape[1], I_lastv.shape[2]],
+                ),
+            ],
+            0,
         )  # Create new infected population for new step, insert latest at front
 
         return [new, I_nextv, S_t - new]
@@ -182,10 +182,11 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
     """
     exp_r = tf.range(start=l, limit=0.0, delta=-1.0, dtype=g.dtype)
     exp_d = tf.math.exp(exp_r)
-    exp_d = exp_d * g_p  # wieght by serial_p
+    # exp_d = exp_d * g_p  # wieght by serial_p
     exp_d, norm = tf.linalg.normalize(
         exp_d, axis=0
     )  # normalize by dividing by sum over time-dimension
+
     I_0_t = tf.einsum("ca,t->tca", I_0, exp_d)
     log.info(f"I_0_t:\n{I_0_t}")
 

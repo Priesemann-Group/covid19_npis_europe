@@ -151,16 +151,16 @@ def InfectionModel(N, I_0, R_T, C, g ,l=16):
     def new_infectious_cases_next_day(a, R_t):
         # Unpack a:
         # Old I_next is I_lastv now
-        I_t, I_lastv, S_t = a
+        I_t, I_lastv, S_t = a       # Internal state
         f = S_t / N
         
         # Calc "infectious" people, weighted by serial_p (country x age_group)
-        infectious = tf.einsum("tca,t->ca",E_lastv,g_p) 
+        infectious = tf.einsum("tca,t->ca",I_lastv,g_p) 
         
         # Calculate effective R_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
         R_sqrt = tf.sqrt(R_t)
         R_diag = tf.einsum("ij,ci->cij",tf.eye(R_t.shape[-1],dtype=R_t.dtype), R_sqrt)
-        R_eff = tf.einsum("cij,ik,ckl->cil", R_diag, C, R_diag) # Effective growth
+        R_eff = tf.einsum("cij,ik,ckl->cil", R_diag, C, R_diag) # Effective growth number 
         
         # Calculate new infections
         new = tf.einsum("nj,njk,nk->nk",infectious,R_eff,f)
@@ -181,10 +181,8 @@ def InfectionModel(N, I_0, R_T, C, g ,l=16):
     exp_d = tf.math.exp(exp_r)
     exp_d = exp_d * g_p # wieght by serial_p
     exp_d /= tf_sum(exp_d,axis=0)   # normalize by dividing by sum over time-dimension
-    I_0_t = tf.einsum("ca,t->tca",I_0,exp_d)
-    #    I_0_t = tf.tensordot(I_0, exp_d, axes=0) # Calculate the outer product (axes=0) --> initial distribution
-    
-    # Exchanged for I_0_t
+    I_0_t = tf.einsum("ca,t->tca", I_0, exp_d)
+ 
     initial = [tf.zeros(N.shape,dtype=np.float64), I_0_t, N]
 
     # Initialze the internal state for the scan function

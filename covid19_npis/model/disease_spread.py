@@ -64,7 +64,7 @@ def _construct_generation_interval_gamma(
     # See https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Gamma
     # and https://en.wikipedia.org/wiki/Gamma_distribution
     g_mu = yield pm.Gamma(
-        name="g_mu", concentration=g["mu"]["k"], rate=1.0 / g["mu"]["θ"]
+        name="g_mu", concentration=g["mu"]["k"], rate=1.0 / g["mu"]["θ"],conditionally_independent=True,
     )
 
     """ Shape parameter k of generation interval distribution is
@@ -75,7 +75,7 @@ def _construct_generation_interval_gamma(
     g["θ"]["θ"] = theta_theta
 
     g_theta = yield pm.Gamma(
-        name="g_theta", concentration=g["θ"]["k"], rate=1.0 / g["θ"]["θ"]
+        name="g_theta", concentration=g["θ"]["k"], rate=1.0 / g["θ"]["θ"],conditionally_independent=True,
     )
 
     """ Construct generation interval gamma distribution from underlying
@@ -86,12 +86,14 @@ def _construct_generation_interval_gamma(
     return g_mu, g_theta
 
 
+
+@tf.function
 def InfectionModel(N, I_0, R_t, C, g=None, l=16):
     r"""
     .. math::
 
          \tilde{I_l}(t) = \frac{S_l(t)}{N_{\text{pop}, j}} R_l(t)\sum_{\tau=0}^{t} \tilde{I_l}(t-\tau) g(\tau) \label{eq:I_gene}
-    
+
 
     TODO
     ----
@@ -105,7 +107,7 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
     I_0:
         Initial number of infectious.
     R_t:
-        Reproduction number matrix. (time x country x age_group) 
+        Reproduction number matrix. (time x country x age_group)
     g:
         Generation interval
     N:
@@ -124,53 +126,47 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
     if g is None:
         g_mu, g_theta = _construct_generation_interval_gamma()
 
-    g = gamma(tf.range(1e-12, l + 1e-12, dtype=g_mu.dtype), 4, 1 / 0.5)
+    g = gamma(tf.range(1, l, dtype=g_mu.dtype), 4, 1 / 0.5)
     # Get the pdf and normalize
     g_p, norm = tf.linalg.normalize(g, 1)
+
     # shift range by 1e-12 to allow distributions which are undefined for \tau = 0
 
-    def new_infectious_cases_next_day(a, R):
-        # Unpack a:
-        # Old I_next is I_lastv now
-        I_t, I_lastv, S_t = a  # Internal state
+
+    def new_infectious_cases_next_day(i, new_infections, S_t):
+
+        # Internal state
         f = S_t / N
+        R = tf.gather(R_t,  i, axis=0)
+
+        I_array = new_infections.gather(indices=tf.range(i-1,i-l, -1))
 
         # Calc "infectious" people, weighted by serial_p (country x age_group)
-        infectious = tf.einsum("tca,t->ca", I_lastv, g_p)
+        infectious = tf.einsum("t...ca,t->...ca", I_array, g_p)
 
         # Calculate effective R_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
-        log.info(f"R_t inside scan:\n{R}")
-        log.info(f"I_t inside scan:\n{I_t}")
+        #log.info(f"R_t inside scan:\n{R}")
+        #log.info(f"I_t inside scan:\n{I_array}")
         R_sqrt = tf.math.sqrt(R)
-        log.info(f"R_sqrt:\n{R_sqrt}")
+        #log.info(f"R_sqrt:\n{R_sqrt}")
         R_diag = tf.linalg.diag(R_sqrt)
-        log.info(f"R_diag:\n{R_diag}")
-        log.info(f"C:\n{C}")
+        #log.info(f"R_diag:\n{R_diag}")
+        #log.info(f"C:\n{C}")
         R_eff = tf.einsum(
-            "cij,cik,ckl->cil", R_diag, C, R_diag
+            "...cij,...cik,...ckl->...cil", R_diag, C, R_diag
         )  # Effective growth number
-        log.info(f"R_eff:\n{R_eff}")
+        #log.info(f"R_eff:\n{R_eff}")
         # Calculate new infections
-        log.info(f"infectious:\n{infectious}")
-        log.info(f"f:\n{f}")
-        new = tf.einsum("ci,cij,cj->cj", infectious, R_eff, f)
-        log.info(f"new:\n{new}")
-        new_v = tf.reshape(
-            new, [1, new.shape[0], new.shape[1]]
-        )  # add dimension for concatenation
-        I_nextv = tf.concat(
-            [
-                new_v,
-                tf.slice(
-                    I_lastv,
-                    [0, 0, 0],
-                    [I_lastv.shape[0] - 1, I_lastv.shape[1], I_lastv.shape[2]],
-                ),
-            ],
-            0,
-        )  # Create new infected population for new step, insert latest at front
+        #log.info(f"infectious:\n{infectious}")
+        #log.info(f"f:\n{f}")
+        new = tf.einsum("...ci,...cij,...cj->...cj", infectious, R_eff, f)
+        new = tf.clip_by_value(new, 1e-7, 1e9)
 
-        return [new, I_nextv, S_t - new]
+        log.info(f"new:\n{new}")
+        new_infections.write(i, new)
+
+
+        return i+1, new_infections, S_t
 
     """ # Generate exponential distributed intial I_0_t,
         whereby t goes l days into the past
@@ -187,12 +183,26 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
         exp_d, axis=0
     )  # normalize by dividing by sum over time-dimension
 
-    I_0_t = tf.einsum("ca,t->tca", I_0, exp_d)
+    I_0_t = tf.einsum("...ca,t->t...ca", I_0, exp_d)
     log.info(f"I_0_t:\n{I_0_t}")
 
-    initial = [tf.zeros(N.shape, dtype=R_t.dtype), I_0_t, N]
 
-    log.info(f"initial:\n{initial[0]}\n{initial[1]}\n{initial[2]}")
     log.info(f"R_t outside scan:\n{R_t}")
-    out = tf.scan(fn=new_infectious_cases_next_day, elems=R_t, initializer=initial)
-    return out[0]
+    total_days = R_t.shape[0]
+    new_infections = tf.TensorArray(
+      dtype=R_t.dtype, size=total_days, element_shape=R_t.shape[1:])
+    for i in range(l):
+        new_infections.write(i, I_0_t[i])
+    cond = lambda i, *_: i < total_days
+
+    _, daily_infections_final, last_S_t = tf.while_loop(
+        cond, new_infectious_cases_next_day,
+        (l, new_infections, N),
+        maximum_iterations=total_days-l)
+
+    daily_infections_final = daily_infections_final.stack()
+    if len(daily_infections_final.shape) == 4:
+        daily_infections_final = tf.transpose(daily_infections_final, perm=(1,0,2,3))
+
+    return daily_infections_final
+

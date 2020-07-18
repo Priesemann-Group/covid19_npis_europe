@@ -34,14 +34,14 @@ data = I_new.to_numpy().reshape((50, 2, 4))
 @pm.model
 def test_model(data):
     # Create I_0
-    I_0 = yield pm.HalfCauchy(name="I_0", loc=10.0, scale=num_countries*[num_age_groups*[25]], conditionally_independent=True,
-                              reinterpreted_batch_ndims=2, transform=transformations.Log(reinterpreted_batch_ndims=2))
+    I_0 = yield pm.HalfCauchy(name="I_0", loc=10.0, scale=25, conditionally_independent=True,
+                              event_stack=(num_countries, num_age_groups), transform=transformations.Log(reinterpreted_batch_ndims=2))
 
     log.info(f"I_0:\n{I_0}")
 
     # Create Reproduktion number for every age group
-    R = yield pm.LogNormal(name="R_age_groups", loc=num_countries*[num_age_groups*[1]], scale=2.5, conditionally_independent=True,
-                           reinterpreted_batch_ndims=2, transform=transformations.Log(reinterpreted_batch_ndims=2))
+    R = yield pm.LogNormal(name="R_age_groups", loc=1, scale=2.5, conditionally_independent=True,
+                           event_stack=(num_countries, num_age_groups), transform=transformations.Log(reinterpreted_batch_ndims=2))
 
     R_t = tf.stack([R] * 50)
 
@@ -53,9 +53,9 @@ def test_model(data):
     C = yield pm.LKJ(
         name="Contact_matrix",
         dimension=num_age_groups,
-        concentration=[2]*num_countries,  # eta
+        concentration=2,  # eta
         conditionally_independent = True,
-        reinterpreted_batch_ndims=1
+        event_stack=num_countries
         #event_stack = num_countries,
         #batch_stack=batch_stack
     )
@@ -108,6 +108,6 @@ def test_model(data):
     return likelihood
 #a = pm.sample_prior_predictive(test_model(data), sample_shape=1000, use_auto_batching=False)
 
-trace = pm.sample(test_model(data), num_samples=10, burn_in=10, use_auto_batching=False, num_chains=1)
+trace = pm.sample(test_model(data), num_samples=50, burn_in=200, use_auto_batching=False, num_chains=2)
 
 

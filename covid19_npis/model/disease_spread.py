@@ -105,9 +105,9 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
     Parameters
     ----------
     I_0:
-        Initial number of infectious.
+        Initial number of infectious. (batch_dims x country x age_group)
     R_t:
-        Reproduction number matrix. (time x country x age_group)
+        Reproduction number matrix. (time x batch_dims x country x age_group)
     g:
         Generation interval
     N:
@@ -139,6 +139,7 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
         f = S_t / N
         R = tf.gather(R_t,  i, axis=0)
 
+        #These are the infections over which the convolution is done
         I_array = new_infections.gather(indices=tf.range(i-1,i-l, -1))
 
         # Calc "infectious" people, weighted by serial_p (country x age_group)
@@ -165,6 +166,7 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
         log.info(f"new:\n{new}")
         new_infections.write(i, new)
 
+        S_t = S_t - new
 
         return i+1, new_infections, S_t
 
@@ -189,15 +191,21 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
 
     log.info(f"R_t outside scan:\n{R_t}")
     total_days = R_t.shape[0]
+
+    #Create an Tensor array and initalize the first l elements
     new_infections = tf.TensorArray(
       dtype=R_t.dtype, size=total_days, element_shape=R_t.shape[1:])
     for i in range(l):
         new_infections.write(i, I_0_t[i])
+
+
     cond = lambda i, *_: i < total_days
+
+    S_initial=N - tf.reduce_sum(I_0_t, axis=0)
 
     _, daily_infections_final, last_S_t = tf.while_loop(
         cond, new_infectious_cases_next_day,
-        (l, new_infections, N),
+        (l, new_infections, S_initial),
         maximum_iterations=total_days-l)
 
     daily_infections_final = daily_infections_final.stack()

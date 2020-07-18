@@ -11,6 +11,7 @@ sys.path.append("../")
 import covid19_npis
 from covid19_npis import transformations
 
+##For eventual debugging:
 #tf.config.run_functions_eagerly(True)
 #tf.debugging.enable_check_numerics(
 #    stack_height_limit=30, path_length_limit=50
@@ -58,12 +59,10 @@ def test_model(data):
         #event_stack = num_countries,
         #batch_stack=batch_stack
     )
-    #C = tf.linalg.diag(tf.ones((num_countries, num_age_groups)))
 
     log.info(f"C:\n{C}")
     #C, norm = tf.linalg.normalize(C, 1)
     #log.info(f"C:\n{C.shape}\n{C}")
-    #tf.print(C)
 
     # Create N tensor (vector) should be done earlier in the real model
     N = tf.convert_to_tensor([10e5, 10e5, 10e5, 10e5] * 2)

@@ -178,6 +178,7 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
         ----
         - slope of exponenet should match R_0
     """
+
     exp_r = tf.range(start=l, limit=0.0, delta=-1.0, dtype=g.dtype)
     exp_d = tf.math.exp(exp_r)
     # exp_d = exp_d * g_p  # wieght by serial_p
@@ -212,5 +213,5 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
     if len(daily_infections_final.shape) == 4:
         daily_infections_final = tf.transpose(daily_infections_final, perm=(1,0,2,3))
 
-    return daily_infections_final
+    return daily_infections_final #batch_dims x time x country x age
 

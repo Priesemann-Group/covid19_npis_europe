@@ -43,7 +43,7 @@ def test_model(data):
     R = yield pm.LogNormal(name="R_age_groups", loc=1, scale=2.5, conditionally_independent=True,
                            event_stack=(num_countries, num_age_groups), transform=transformations.Log(reinterpreted_batch_ndims=2))
 
-    R_t = tf.stack([R] * 50)
+    R_t = tf.stack([R] * 50) #R_t has dimensions time x batch_dims x num_countries x num_age_groups
 
     log.info(f"R:\n{R_t.shape}")
 
@@ -58,7 +58,7 @@ def test_model(data):
         event_stack=num_countries
         #event_stack = num_countries,
         #batch_stack=batch_stack
-    )
+    ) # dimensions: batch_dims x num_countries x num_age_groups x num_age_groups
 
     log.info(f"C:\n{C}")
     #C, norm = tf.linalg.normalize(C, 1)

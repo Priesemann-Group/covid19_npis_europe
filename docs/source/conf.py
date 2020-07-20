@@ -112,6 +112,10 @@ html_css_files = [
     "css/custom.css",  # i.e. _static/css/custom.css
 ]
 
+# Somehow the above does not work with the web hosting
+def setup(app):
+    app.add_css_file("css/custom.css")
+
 
 # -- Extension configuration -------------------------------------------------
 

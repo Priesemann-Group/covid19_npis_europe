@@ -57,7 +57,7 @@ def _construct_generation_interval_gamma(
 ):
     r"""
     Constructs the underlying distributions :math:`\mu_{D_{\text{gene}}}`
-    and :math:`\theta_{D_\text{gene}}` distributions for :math:`g(\tau)`.
+    and :math:`\theta_{D_\text{gene}}` for the generation interval :math:`g(\tau)`.
 
     .. math::
 
@@ -158,7 +158,7 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
         #. Converts the given :math:`I_0` values  to an exponential distributed initial :math:`I_{0_t}` with an
            length of :math:`l` this can be seen in :py:func:`_construct_I_0_t`.
 
-        #. Calculates :math:`R_{eff}` for each time step using the give contact matrix :math:`C`:
+        #. Calculates :math:`R_{eff}` for each time step using the given contact matrix :math:`C`:
             
             .. math::
                 R_{diag} &= \text{diag}(\sqrt{R}) \\

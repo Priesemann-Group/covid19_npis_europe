@@ -68,6 +68,9 @@ autodoc_mock_imports = [
     "numpy",
     "matplotlib",
     "matplotlib.pyplot",
+    "tensorflow",
+    "tensorflow_probability",
+    "pymc4",
     "mpl_toolkits",
     "scipy",
     "pymc3",
@@ -103,6 +106,12 @@ html_theme_options = {
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 
+# These paths are either relative to html_static_path
+# or fully qualified paths (eg. https://...)
+html_css_files = [
+    "css/custom.css",  # i.e. _static/css/custom.css
+]
+
 
 # -- Extension configuration -------------------------------------------------
 
@@ -125,3 +134,15 @@ autodoc_member_order = "bysource"
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
+
+
+# -- Substitutions -------------------------
+rst_epilog = """
+.. |default| raw:: html
+
+    <br/> <span class="value-section"> <span class="value-label">Default:</span>
+
+.. |shape| raw:: html
+
+    <br/> <span class="value-section"> <span class="value-label">Dimensions:</span>
+"""

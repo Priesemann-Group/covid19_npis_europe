@@ -20,30 +20,32 @@ from covid19_npis.benchmarking import benchmark
 #    stack_height_limit=30, path_length_limit=50
 # )
 
-tf.config.threading.set_inter_op_parallelism_threads(1)
-tf.config.threading.set_intra_op_parallelism_threads(1)
-
-#os.environ['XLA_FLAGS']="--xla_force_host_platform_device_count=4"
+tf.config.threading.set_inter_op_parallelism_threads(2)
+tf.config.threading.set_intra_op_parallelism_threads(2)
 
 """ # Data Retrieval
     Retries some dum)my/test data
 """
 # Fixed R matrix for now one country one age group
 I_new = covid19_npis.test_data.simple_new_I(0.35)
-I_new = I_new.join(covid19_npis.test_data.simple_new_I(0.3), lsuffix="C1", rsuffix="C2")
+I_new = I_new.join(covid19_npis.test_data.simple_new_I(0.3))
 num_age_groups = 4
 num_countries = 2
 
 """ # Construct pymc4 model
+    We create our own config object which holds names of the distributions
+    ,shape label and the observed data. This is necessary for the data converter
+    later on.
 """
-data = I_new.to_numpy().reshape((50, 2, 4))
+
+config = covid19_npis.Config(I_new)
 
 
 @pm.model
-def test_model(data):
+def test_model(config):
     # Create I_0
     I_0 = yield pm.HalfCauchy(
-        name="I_0",
+        name=config.distributions["I_0"]["name"],
         loc=10.0,
         scale=25,
         conditionally_independent=True,
@@ -53,9 +55,9 @@ def test_model(data):
     I_0 = tf.clip_by_value(I_0, 1e-9, 1e10)
     log.info(f"I_0:\n{I_0}")
 
-    # Create Reproduktion number for every age group
+    # Create Reproduction Number for every age group
     R = yield pm.LogNormal(
-        name="R_age_groups",
+        name=config.distributions["R"]["name"],
         loc=1,
         scale=2.5,
         conditionally_independent=True,
@@ -73,7 +75,7 @@ def test_model(data):
 
     # Use Cholesky version as the non Cholesky version uses tf.linalg.slogdet which isn't implemented in JAX
     C = yield pm.LKJCholesky(
-        name="Contact_matrix",
+        name=config.distributions["C"]["name"],
         dimension=num_age_groups,
         concentration=2,  # eta
         conditionally_independent=True,
@@ -100,6 +102,20 @@ def test_model(data):
 
     new_cases = tf.clip_by_value(new_cases, 1e-7, 1e9)
 
+    sigma = yield pm.HalfCauchy(name=config.distributions["sigma"]["name"], scale=50)
+    for i in range(3):
+        sigma = tf.expand_dims(sigma, axis=-1)
+
+    likelihood = yield pm.StudentT(
+        name="like",
+        loc=new_cases,
+        scale=sigma * tf.sqrt(new_cases) + 1,
+        df=4,
+        observed=config.get_data().to_numpy().astype("float32").reshape((50, 2, 4)),
+        reinterpreted_batch_ndims=3,
+    )
+
+    """ UNUSED NEGATIVE BINOMIAL CODE
     def convert(mu, var):
         r = 1 / var
         p = mu / (mu + r)
@@ -116,6 +132,7 @@ def test_model(data):
         sigma = tf.expand_dims(sigma, axis=-1)
 
     likelihood = yield pm.StudentT(
+    likelihood = yield pm.NegativeBinomial(
         name="like",
         loc=new_cases,
         scale=sigma * tf.sqrt(new_cases) + 1,

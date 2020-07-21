@@ -9,3 +9,4 @@ log = logging.getLogger(__name__)
 
 from . import test_data
 from . import model
+from .config import Config

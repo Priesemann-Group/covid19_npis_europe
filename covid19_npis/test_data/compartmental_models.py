@@ -50,13 +50,19 @@ def simple_new_I(factor):
         # Only append to I_t because R_t gets constructed beforehand
         I_t.append(I_n)
 
+    # timestamp
+    ts = str(datetime.datetime.now().timestamp())
+
     # Prep data for return
     I_t = np.array(I_t)
     df = pd.DataFrame()
     df["date"] = dates
-    df["new_cases_agegroup_0"] = I_t[:, 0]
-    df["new_cases_agegroup_1"] = I_t[:, 1]
-    df["new_cases_agegroup_2"] = I_t[:, 2]
-    df["new_cases_agegroup_3"] = I_t[:, 3]
+    df[(ts, "new_cases_agegroup_0")] = I_t[:, 0]
+    df[(ts, "new_cases_agegroup_1")] = I_t[:, 1]
+    df[(ts, "new_cases_agegroup_2")] = I_t[:, 2]
+    df[(ts, "new_cases_agegroup_3")] = I_t[:, 3]
+
     df = df.set_index("date")
+    df.columns = pd.MultiIndex.from_tuples(df.columns, names=["country", "age group"])
+
     return df

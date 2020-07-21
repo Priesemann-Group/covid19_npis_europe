@@ -67,11 +67,11 @@ def _construct_generation_interval_gamma(
         k = \frac{\mu_{D_{\text{gene}}}}{\theta_{D_\text{gene}}},
         \theta=\theta_{D_\text{gene}})
 
-    
+
     whereby the underlying distribution are modeled as follows
 
     .. math::
-    
+
         \mu_{D_{\text{gene}}} &\sim Gamma(k = 4.8/0.04, \theta=0.04) \\
         \theta_{D_\text{gene}} &\sim Gamma(k = 0.8/0.1, \theta=0.1)
 
@@ -105,7 +105,7 @@ def _construct_generation_interval_gamma(
 
     Returns
     -------
-    : 
+    :
         :math:`g(\tau)`
 
     """
@@ -213,8 +213,9 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
     # Get the pdf and normalize
     g_p, norm = tf.linalg.normalize(g, 1)
 
-    # Generate exponential distributed intial I_0_t,
+    # Generate exponential distributed intial I_0_t
     I_0_t = _construct_I_0_t(I_0, l)
+    # Clip in order to avoid infinities
     I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
 
     #@tf.function(autograph=False)
@@ -264,9 +265,15 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
         - slope of exponenet should match R_0
     """
 
-    exp_r = tf.range(start=l, limit=0.0, delta=-1.0, dtype=g.dtype, name='exp_range')
+    exp_r = tf.range(
+        start=l,
+        limit=0.0,
+        delta=-1.0,
+        dtype=g.dtype,
+        name='exp_range'
+    )
     exp_d = tf.math.exp(exp_r)
-    # exp_d = exp_d * g_p  # wieght by serial_p
+    # exp_d = exp_d * g_p  # weight by serial_p
     exp_d, norm = tf.linalg.normalize(
         exp_d, axis=0
     )  # normalize by dividing by sum over time-dimension
@@ -279,24 +286,28 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
 
     #Create an Tensor array and initalize the first l elements
     new_infections = tf.TensorArray(
-      dtype=R_t.dtype, size=total_days, element_shape=R_t.shape[1:])
+        dtype=R_t.dtype,
+        size=total_days,
+        element_shape=R_t.shape[1:]
+    )
     for i in range(l):
         new_infections = new_infections.write(i, I_0_t[i])
 
 
     cond = lambda i, *_: i < total_days
 
-    S_initial=N - tf.reduce_sum(I_0_t, axis=0)
+    S_initial = N - tf.reduce_sum(I_0_t, axis=0)
 
     _, daily_infections_final, last_S_t = tf.while_loop(
-        cond, new_infectious_cases_next_day,
+        cond,
+        new_infectious_cases_next_day,
         (l, new_infections, S_initial),
         maximum_iterations=total_days-l,
-        name='spreading_loop')
+        name='spreading_loop'
+    )
 
     daily_infections_final = daily_infections_final.stack()
     if len(daily_infections_final.shape) == 4:
         daily_infections_final = tf.transpose(daily_infections_final, perm=(1,0,2,3))
 
-    return daily_infections_final #batch_dims x time x country x age
-
+    return daily_infections_final # batch_dims x time x country x age

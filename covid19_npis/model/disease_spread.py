@@ -41,7 +41,7 @@ def _construct_I_0_t(I_0, l=16):
     """
 
     # Construct exponential function
-    exp = tf.math.exp(tf.range(start=l, limit=0.0, delta=-1.0, dtype=g.dtype))
+    exp = tf.math.exp(tf.range(start=l, limit=0.0, delta=-1.0, dtype="float32"))
 
     # Normalize to one
     exp, norm = tf.linalg.normalize(tensor=exp, ord=1, axis=0)
@@ -207,7 +207,7 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
 
     # Generate generation interval
     # - TODO implement _construct_generation_interval_gamma()
-    g = gamma(tf.range(1, l, dtype=g_mu.dtype), 4, 1 / 0.5)
+    g = gamma(tf.range(1, l, dtype="float32"), 4, 1 / 0.5)
     # Get the pdf and normalize
     g_p, norm = tf.linalg.normalize(g, 1)
 

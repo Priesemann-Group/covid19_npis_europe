@@ -149,7 +149,7 @@ def _construct_generation_interval_gamma(
     return g
 
 
-@tf.function
+#@tf.function(autograph=False)
 def InfectionModel(N, I_0, R_t, C, g=None, l=16):
     r"""
     This function combines a variety of different steps:
@@ -209,7 +209,7 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
 
     # Generate generation interval
     # - TODO implement _construct_generation_interval_gamma()
-    g = gamma(tf.range(1, l, dtype="float32"), 4, 1 / 0.5)
+    g = gamma(tf.range(1, l, dtype="float32", name='gamma_range'), 4, 1 / 0.5)
     # Get the pdf and normalize
     g_p, norm = tf.linalg.normalize(g, 1)
 
@@ -217,6 +217,7 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
     I_0_t = _construct_I_0_t(I_0, l)
     I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
 
+    #@tf.function(autograph=False)
     def new_infectious_cases_next_day(i, new_infections, S_t):
 
         # Internal state
@@ -224,9 +225,10 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
         R = tf.gather(R_t, i, axis=0)
 
         # These are the infections over which the convolution is done
-        I_array = new_infections.gather(indices=tf.range(i - 1, i - l, -1))
+        I_array = new_infections.stack(name='stack')[:-l:-1]
 
         # Calc "infectious" people, weighted by serial_p (country x age_group)
+        #I_array = tf.ones((15,2,4))
         infectious = tf.einsum("t...ca,t->...ca", I_array, g_p)
 
         # Calculate effective R_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
@@ -245,7 +247,6 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
         # log.info(f"infectious:\n{infectious}")
         # log.info(f"f:\n{f}")
         new = tf.einsum("...ci,...cij,...cj->...cj", infectious, R_eff, f)
-        new = tf.clip_by_value(new, 1e-7, 1e9)
 
         log.info(f"new:\n{new}")
         new_infections.write(i, new)
@@ -263,14 +264,13 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
         - slope of exponenet should match R_0
     """
 
-    exp_r = tf.range(start=l, limit=0.0, delta=-1.0, dtype=g.dtype)
+    exp_r = tf.range(start=l, limit=0.0, delta=-1.0, dtype=g.dtype, name='exp_range')
     exp_d = tf.math.exp(exp_r)
     # exp_d = exp_d * g_p  # wieght by serial_p
     exp_d, norm = tf.linalg.normalize(
         exp_d, axis=0
     )  # normalize by dividing by sum over time-dimension
 
-    I_0_t = tf.einsum("...ca,t->t...ca", I_0, exp_d)
     log.info(f"I_0_t:\n{I_0_t}")
 
 
@@ -291,7 +291,8 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
     _, daily_infections_final, last_S_t = tf.while_loop(
         cond, new_infectious_cases_next_day,
         (l, new_infections, S_initial),
-        maximum_iterations=total_days-l)
+        maximum_iterations=total_days-l,
+        name='spreading_loop')
 
     daily_infections_final = daily_infections_final.stack()
     if len(daily_infections_final.shape) == 4:

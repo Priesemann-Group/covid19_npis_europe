@@ -31,15 +31,19 @@ num_age_groups = 4
 num_countries = 2
 
 """ # Construct pymc4 model
+    We create our own config object which holds names of the distributions
+    ,shape label and the observed data. This is necessary for the data converter
+    later on.
 """
-data = I_new.to_numpy().reshape((50, 2, 4))
+
+config = covid19_npis.Config(I_new)
 
 
 @pm.model
-def test_model(data):
+def test_model(config):
     # Create I_0
     I_0 = yield pm.HalfCauchy(
-        name="I_0",
+        name=config.distributions["I_0"]["name"],
         loc=10.0,
         scale=25,
         conditionally_independent=True,
@@ -51,7 +55,7 @@ def test_model(data):
 
     # Create Reproduction Number for every age group
     R = yield pm.LogNormal(
-        name="R_age_groups",
+        name=config.distributions["R"]["name"],
         loc=1,
         scale=2.5,
         conditionally_independent=True,
@@ -69,7 +73,7 @@ def test_model(data):
 
     # Use Cholesky version as the non Cholesky version uses tf.linalg.slogdet which isn't implemented in JAX
     C = yield pm.LKJCholesky(
-        name="Contact_matrix",
+        name=config.distributions["C"]["name"],
         dimension=num_age_groups,
         concentration=2,  # eta
         conditionally_independent=True,
@@ -96,6 +100,20 @@ def test_model(data):
 
     new_cases = tf.clip_by_value(new_cases, 1e-7, 1e9)
 
+    sigma = yield pm.HalfCauchy(name=config.distributions["sigma"]["name"], scale=50)
+    for i in range(3):
+        sigma = tf.expand_dims(sigma, axis=-1)
+
+    likelihood = yield pm.StudentT(
+        name="like",
+        loc=new_cases,
+        scale=sigma * tf.sqrt(new_cases) + 1,
+        df=4,
+        observed=config.get_data().to_numpy().astype("float32").reshape((50, 2, 4)),
+        reinterpreted_batch_ndims=3,
+    )
+
+    """ UNUSED NEGATIVE BINOMIAL CODE
     def convert(mu, var):
         r = 1 / var
         p = mu / (mu + r)
@@ -106,34 +124,28 @@ def test_model(data):
     log.info(f"r:{r}")
     log.info(f"p:{p}")
     log.info(f"data:{data.shape}")
-
-    sigma = yield pm.HalfCauchy(name="scale_likelihood", scale=50)
-    for i in range(3):
-        sigma = tf.expand_dims(sigma, axis=-1)
-
-    likelihood = yield pm.StudentT(
-        name="like",
-        loc=new_cases,
-        scale=sigma * tf.sqrt(new_cases) + 1,
-        df=4,
-        observed=data.astype("float32"),
-        reinterpreted_batch_ndims=3,
+    likelihood = yield pm.NegativeBinomial(
+       name="like",
+       total_count=r,
+       probs=p,
+       observed=data.astype("float32"),
+       allow_nan_stats=True,
+       reinterpreted_batch_ndims=3
     )
-
-    # likelihood = yield pm.NegativeBinomial(
-    #    name="like",
-    #    total_count=r,
-    #    probs=p,
-    #    observed=data.astype("float32"),
-    #    allow_nan_stats=True,
-    #    reinterpreted_batch_ndims=3
-    # )
+    """
 
     return likelihood
 
 
 # a = pm.sample_prior_predictive(test_model(data), sample_shape=1000, use_auto_batching=False)
 begin_time = time.time()
-trace = pm.sample(test_model(data), num_samples=50, burn_in=50, use_auto_batching=False, num_chains=2, xla=True)
+trace = pm.sample(
+    test_model(config),
+    num_samples=50,
+    burn_in=50,
+    use_auto_batching=False,
+    num_chains=2,
+    xla=True,
+)
 end_time = time.time()
-print('running time: {:.1f}s'.format(end_time-begin_time))
+print("running time: {:.1f}s".format(end_time - begin_time))

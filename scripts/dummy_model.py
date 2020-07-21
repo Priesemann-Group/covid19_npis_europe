@@ -49,7 +49,7 @@ def test_model(data):
     I_0 = tf.clip_by_value(I_0, 1e-9, 1e10)
     log.info(f"I_0:\n{I_0}")
 
-    # Create Reproduktion number for every age group
+    # Create Reproduction Number for every age group
     R = yield pm.LogNormal(
         name="R_age_groups",
         loc=1,
@@ -67,7 +67,7 @@ def test_model(data):
 
     # Create Contact matrix
 
-    #Use Cholesky version as the non Cholesky version uses tf.linalg.slogdet which isn't implemented in JAX
+    # Use Cholesky version as the non Cholesky version uses tf.linalg.slogdet which isn't implemented in JAX
     C = yield pm.LKJCholesky(
         name="Contact_matrix",
         dimension=num_age_groups,
@@ -138,5 +138,3 @@ begin_time = time.time()
 trace = pm.sample(test_model(data), num_samples=50, burn_in=50, use_auto_batching=False, num_chains=2, xla=True)
 end_time = time.time()
 print('running time: {:.1f}s'.format(end_time-begin_time))
-
-

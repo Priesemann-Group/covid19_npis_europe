@@ -20,8 +20,9 @@ from covid19_npis.benchmarking import benchmark
 #    stack_height_limit=30, path_length_limit=50
 # )
 
-tf.config.threading.set_inter_op_parallelism_threads(2)
-tf.config.threading.set_intra_op_parallelism_threads(2)
+#tf.config.threading.set_inter_op_parallelism_threads(2)
+#tf.config.threading.set_intra_op_parallelism_threads(2)
+#os.environ['XLA_FLAGS']="--xla_force_host_platform_device_count=4"
 
 """ # Data Retrieval
     Retries some dum)my/test data
@@ -126,43 +127,28 @@ def test_model(config):
     log.info(f"r:{r}")
     log.info(f"p:{p}")
     log.info(f"data:{data.shape}")
-
-    sigma = yield pm.HalfCauchy(name="scale_likelihood", scale=50)
-    for i in range(3):
-        sigma = tf.expand_dims(sigma, axis=-1)
-
-    likelihood = yield pm.StudentT(
     likelihood = yield pm.NegativeBinomial(
         name="like",
-        loc=new_cases,
-        scale=sigma * tf.sqrt(new_cases) + 1,
-        df=4,
+        total_count=r,
+        probs=p,
         observed=data.astype("float32"),
-        reinterpreted_batch_ndims=3,
+        allow_nan_stats=True,
+        reinterpreted_batch_ndims=3
     )
-
-    # likelihood = yield pm.NegativeBinomial(
-    #    name="like",
-    #    total_count=r,
-    #    probs=p,
-    #    observed=data.astype("float32"),
-    #    allow_nan_stats=True,
-    #    reinterpreted_batch_ndims=3
-    # )
-
+    """
     return likelihood
 
 
 # a = pm.sample_prior_predictive(test_model(data), sample_shape=1000, use_auto_batching=False)
 begin_time = time.time()
 #trace = pm.sample(
-#    test_model(data),
-#    num_samples=10,
-#    burn_in=10,
+#    test_model(config),
+#    num_samples=50,
+#    burn_in=50,
 #    use_auto_batching=False,
 #    num_chains=4,
 #    xla=False,
 #)
-benchmark(test_model(data), only_xla=True, iters=50)
+benchmark(test_model(config), only_xla=False, iters=10, num_chains=(2,20))
 end_time = time.time()
 print("running time: {:.1f}s".format(end_time - begin_time))

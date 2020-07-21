@@ -159,7 +159,7 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
            length of :math:`l` this can be seen in :py:func:`_construct_I_0_t`.
 
         #. Calculates :math:`R_{eff}` for each time step using the given contact matrix :math:`C`:
-            
+
             .. math::
                 R_{diag} &= \text{diag}(\sqrt{R}) \\
                 R_{eff}  &= R_{diag} \cdot C \cdot R_{diag}
@@ -171,7 +171,7 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
 
             .. math::
                     \tilde{I}(t) &= \frac{S(t)}{N} \cdot R_{eff} \cdot \sum_{\tau=0}^{t} \tilde{I}(t-1-\tau) g(\tau) \\
-                    S(t) &= S(t-1) - \tilde{I}(t-1)        
+                    S(t) &= S(t-1) - \tilde{I}(t-1)
 
     TODO
     ----
@@ -182,7 +182,7 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
     Parameters
     ----------
     I_0:
-        Initial number of infectious. 
+        Initial number of infectious.
         |shape| batch_dims, country, age_group
     R_t:
         Reproduction number matrix.
@@ -213,6 +213,7 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
 
     # Generate exponential distributed intial I_0_t,
     I_0_t = _construct_I_0_t(I_0, l)
+    I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
 
     def new_infectious_cases_next_day(i, new_infections, S_t):
 
@@ -251,28 +252,48 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
 
         return i + 1, new_infections, S_t
 
+    """ # Generate exponential distributed intial I_0_t,
+        whereby t goes l days into the past
+        I_0_t should be in sum = I_0
+
+        TODO
+        ----
+        - slope of exponenet should match R_0
+    """
+
+    exp_r = tf.range(start=l, limit=0.0, delta=-1.0, dtype=g.dtype)
+    exp_d = tf.math.exp(exp_r)
+    # exp_d = exp_d * g_p  # wieght by serial_p
+    exp_d, norm = tf.linalg.normalize(
+        exp_d, axis=0
+    )  # normalize by dividing by sum over time-dimension
+
+    I_0_t = tf.einsum("...ca,t->t...ca", I_0, exp_d)
+    log.info(f"I_0_t:\n{I_0_t}")
+
+
+    log.info(f"R_t outside scan:\n{R_t}")
     total_days = R_t.shape[0]
 
-    # Create an Tensor array and initalize the first l elements
+    #Create an Tensor array and initalize the first l elements
     new_infections = tf.TensorArray(
-        dtype=R_t.dtype, size=total_days, element_shape=R_t.shape[1:]
-    )
+      dtype=R_t.dtype, size=total_days, element_shape=R_t.shape[1:])
     for i in range(l):
         new_infections.write(i, I_0_t[i])
 
+
     cond = lambda i, *_: i < total_days
 
-    S_initial = N - tf.reduce_sum(I_0_t, axis=0)
+    S_initial=N - tf.reduce_sum(I_0_t, axis=0)
 
     _, daily_infections_final, last_S_t = tf.while_loop(
-        cond,
-        new_infectious_cases_next_day,
+        cond, new_infectious_cases_next_day,
         (l, new_infections, S_initial),
-        maximum_iterations=total_days - l,
-    )
+        maximum_iterations=total_days-l)
 
     daily_infections_final = daily_infections_final.stack()
     if len(daily_infections_final.shape) == 4:
-        daily_infections_final = tf.transpose(daily_infections_final, perm=(1, 0, 2, 3))
+        daily_infections_final = tf.transpose(daily_infections_final, perm=(1,0,2,3))
 
-    return daily_infections_final  # batch_dims x time x country x age
+    return daily_infections_final #batch_dims x time x country x age
+

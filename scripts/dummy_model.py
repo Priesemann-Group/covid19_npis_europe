@@ -11,7 +11,6 @@ log = logging.getLogger(__name__)
 sys.path.append("../")
 import covid19_npis
 from covid19_npis import transformations
-from covid19_npis.distributions import LKJ
 
 ##For eventual debugging:
 # tf.config.run_functions_eagerly(True)

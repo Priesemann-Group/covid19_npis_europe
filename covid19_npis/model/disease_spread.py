@@ -67,11 +67,11 @@ def _construct_generation_interval_gamma(
         k = \frac{\mu_{D_{\text{gene}}}}{\theta_{D_\text{gene}}},
         \theta=\theta_{D_\text{gene}})
 
-    
+
     whereby the underlying distribution are modeled as follows
 
     .. math::
-    
+
         \mu_{D_{\text{gene}}} &\sim Gamma(k = 4.8/0.04, \theta=0.04) \\
         \theta_{D_\text{gene}} &\sim Gamma(k = 0.8/0.1, \theta=0.1)
 
@@ -105,7 +105,7 @@ def _construct_generation_interval_gamma(
 
     Returns
     -------
-    : 
+    :
         :math:`g(\tau)`
 
     """
@@ -213,8 +213,9 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
     # Get the pdf and normalize
     g_p, norm = tf.linalg.normalize(g, 1)
 
-    # Generate exponential distributed intial I_0_t,
+    # Generate exponential distributed intial I_0_t
     I_0_t = _construct_I_0_t(I_0, l)
+    # Clip in order to avoid infinities
     I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
 
     #@tf.function(autograph=False)
@@ -299,4 +300,3 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
         daily_infections_final = tf.transpose(daily_infections_final, perm=(1,0,2,3))
 
     return daily_infections_final #batch_dims x time x country x age
-

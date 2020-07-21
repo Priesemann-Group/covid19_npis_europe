@@ -20,10 +20,10 @@ from covid19_npis.benchmarking import benchmark
 #    stack_height_limit=30, path_length_limit=50
 # )
 
-tf.config.threading.set_inter_op_parallelism_threads(4)
-tf.config.threading.set_intra_op_parallelism_threads(2)
+tf.config.threading.set_inter_op_parallelism_threads(1)
+tf.config.threading.set_intra_op_parallelism_threads(1)
 
-os.environ['XLA_FLAGS']="--xla_force_host_platform_device_count=4"
+#os.environ['XLA_FLAGS']="--xla_force_host_platform_device_count=4"
 
 """ # Data Retrieval
     Retries some dum)my/test data
@@ -63,9 +63,9 @@ def test_model(data):
         transform=transformations.Log(reinterpreted_batch_ndims=2),
     )
 
-    # R_t has dimensions batch_dims x time  x num_countries x num_age_groups
-    R_t = tf.einsum("...ca, t->...tca", R, tf.ones(data.shape[0]))
-
+    R_t = tf.stack(
+        [R] * 50
+    )  # R_t has dimensions time x batch_dims x num_countries x num_age_groups
 
     log.info(f"R:\n{R_t.shape}")
 

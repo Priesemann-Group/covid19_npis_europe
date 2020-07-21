@@ -4,7 +4,7 @@ from timeit import timeit
 from timerit import Timerit
 import tensorflow_probability as tfp
 
-def benchmark(model, num_chains=(2,20), use_auto_batching=False, only_xla=True, iters=5, n_evals=1000):
+def benchmark(model, num_chains=(2,20), use_auto_batching=False, only_xla=True, iters=5, n_evals=100):
     data_dicts = []
     for nchains in num_chains:
         (

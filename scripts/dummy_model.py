@@ -26,7 +26,7 @@ tf.config.threading.set_intra_op_parallelism_threads(2)
 """
 # Fixed R matrix for now one country one age group
 I_new = covid19_npis.test_data.simple_new_I(0.35)
-I_new = I_new.join(covid19_npis.test_data.simple_new_I(0.3), lsuffix="C1", rsuffix="C2")
+I_new = I_new.join(covid19_npis.test_data.simple_new_I(0.3))
 num_age_groups = 4
 num_countries = 2
 
@@ -107,8 +107,7 @@ def test_model(data):
     log.info(f"p:{p}")
     log.info(f"data:{data.shape}")
 
-
-    sigma = yield pm.HalfCauchy(name='scale_likelihood', scale=50)
+    sigma = yield pm.HalfCauchy(name="scale_likelihood", scale=50)
     for i in range(3):
         sigma = tf.expand_dims(sigma, axis=-1)
 

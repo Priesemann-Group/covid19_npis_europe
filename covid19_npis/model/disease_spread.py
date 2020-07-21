@@ -2,6 +2,7 @@ import tensorflow as tf
 import logging
 import pymc4 as pm
 import tensorflow_probability as tfp
+import os
 
 log = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ def _construct_I_0_t(I_0, l=16):
     exp, norm = tf.linalg.normalize(tensor=exp, ord=1, axis=0)
 
     # sums every given I_0 with the exponential function values
-    I_0_t = tf.einsum("...ca,t->t...ca", I_0, exp)
+    I_0_t = tf.einsum("...ca,t->...tca", I_0, exp)
     I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
 
 
@@ -188,7 +189,7 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
         |shape| batch_dims, country, age_group
     R_t:
         Reproduction number matrix.
-        |shape| time, batch_dims, country, age_group
+        |shape| batch_dims, time, country, age_group
     g: optional
         Generation interval
     N:
@@ -217,86 +218,86 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
     I_0_t = _construct_I_0_t(I_0, l)
     I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
 
-    #@tf.function(autograph=False)
-    def new_infectious_cases_next_day(i, new_infections, S_t):
+    total_days = R_t.shape[-3]
 
-        # Internal state
-        f = S_t / N
-        R = tf.gather(R_t, i, axis=0)
 
-        # These are the infections over which the convolution is done
-        I_array = new_infections.stack(name='stack')[:-l:-1]
+    def batch_body(params):
+        I_0_t, R_t, C = params
+        # @tf.function(autograph=False)
+        def new_infectious_cases_next_day(i, new_infections, S_t):
+            # Internal state
+            f = S_t / N
+            R = tf.gather(R_t, i, axis=0)
 
-        # Calc "infectious" people, weighted by serial_p (country x age_group)
-        #I_array = tf.ones((15,2,4))
-        infectious = tf.einsum("t...ca,t->...ca", I_array, g_p)
+            # These are the infections over which the convolution is done
+            I_array = new_infections.stack(name='stack')[:-l:-1]
 
-        # Calculate effective R_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
-        # log.info(f"R_t inside scan:\n{R}")
-        # log.info(f"I_t inside scan:\n{I_array}")
-        R_sqrt = tf.math.sqrt(R)
-        # log.info(f"R_sqrt:\n{R_sqrt}")
-        R_diag = tf.linalg.diag(R_sqrt)
-        # log.info(f"R_diag:\n{R_diag}")
-        # log.info(f"C:\n{C}")
-        R_eff = tf.einsum(
-            "...cij,...cik,...ckl->...cil", R_diag, C, R_diag
-        )  # Effective growth number
-        # log.info(f"R_eff:\n{R_eff}")
-        # Calculate new infections
-        # log.info(f"infectious:\n{infectious}")
-        # log.info(f"f:\n{f}")
-        new = tf.einsum("...ci,...cij,...cj->...cj", infectious, R_eff, f)
+            # Calc "infectious" people, weighted by serial_p (country x age_group)
+            # I_array = tf.ones((15,2,4))
+            infectious = tf.einsum("t...ca,t->...ca", I_array, g_p)
 
-        log.info(f"new:\n{new}")
-        new_infections.write(i, new)
+            # Calculate effective R_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
+            # log.info(f"R_t inside scan:\n{R}")
+            # log.info(f"I_t inside scan:\n{I_array}")
+            R_sqrt = tf.math.sqrt(R)
+            # log.info(f"R_sqrt:\n{R_sqrt}")
+            R_diag = tf.linalg.diag(R_sqrt)
+            # log.info(f"R_diag:\n{R_diag}")
+            # log.info(f"C:\n{C}")
+            R_eff = tf.einsum(
+                "...cij,...cik,...ckl->...cil", R_diag, C, R_diag
+            )  # Effective growth number
+            # log.info(f"R_eff:\n{R_eff}")
+            # Calculate new infections
+            # log.info(f"infectious:\n{infectious}")
+            # log.info(f"f:\n{f}")
+            new = tf.einsum("...ci,...cij,...cj->...cj", infectious, R_eff, f)
 
-        S_t = S_t - new
+            log.info(f"new:\n{new}")
+            new_infections.write(i, new)
 
-        return i + 1, new_infections, S_t
+            S_t = S_t - new
 
-    """ # Generate exponential distributed intial I_0_t,
-        whereby t goes l days into the past
-        I_0_t should be in sum = I_0
+            return i + 1, new_infections, S_t
 
-        TODO
-        ----
-        - slope of exponenet should match R_0
-    """
+        # Create an Tensor array and initalize the first l elements
+        new_infections = tf.TensorArray(
+            dtype=R_t.dtype, size=total_days, element_shape=R_t.shape[1:])
+        for i in range(l):
+            new_infections.write(i, I_0_t[i])
 
-    exp_r = tf.range(start=l, limit=0.0, delta=-1.0, dtype=g.dtype, name='exp_range')
-    exp_d = tf.math.exp(exp_r)
-    # exp_d = exp_d * g_p  # wieght by serial_p
-    exp_d, norm = tf.linalg.normalize(
-        exp_d, axis=0
-    )  # normalize by dividing by sum over time-dimension
+        cond = lambda i, *_: i < total_days
+
+        S_initial = N - tf.reduce_sum(I_0_t, axis=0)
+
+        _, daily_infections_final, last_S_t = tf.while_loop(
+            cond, new_infectious_cases_next_day,
+            (l, new_infections, S_initial),
+            maximum_iterations=total_days - l,
+            name='spreading_loop')
+
+        return daily_infections_final.stack()
 
     log.info(f"I_0_t:\n{I_0_t}")
 
+    def unstack(x):
+        return tf.unstack(x, axis=0)
+
+    if len(I_0_t.shape) == 4: #We have a batch dim:
+        #I_0_t, R_t, C = map(unstack, (I_0_t, R_t,C))
+        #daily_infections = tf.stack(list(map(batch_body, I_0_t, R_t, C)))
+        daily_infections = tf.map_fn(batch_body, elems=[I_0_t, R_t, C],
+                                     fn_output_signature=tf.TensorSpec((total_days, *I_0_t.shape[-2:]),
+                                                                       dtype=I_0_t.dtype))
+    else:
+        daily_infections = batch_body((I_0_t, R_t, C))
+
+
 
     log.info(f"R_t outside scan:\n{R_t}")
-    total_days = R_t.shape[0]
-
-    #Create an Tensor array and initalize the first l elements
-    new_infections = tf.TensorArray(
-      dtype=R_t.dtype, size=total_days, element_shape=R_t.shape[1:])
-    for i in range(l):
-        new_infections.write(i, I_0_t[i])
 
 
-    cond = lambda i, *_: i < total_days
 
-    S_initial=N - tf.reduce_sum(I_0_t, axis=0)
 
-    _, daily_infections_final, last_S_t = tf.while_loop(
-        cond, new_infectious_cases_next_day,
-        (l, new_infections, S_initial),
-        maximum_iterations=total_days-l,
-        name='spreading_loop')
-
-    daily_infections_final = daily_infections_final.stack()
-    if len(daily_infections_final.shape) == 4:
-        daily_infections_final = tf.transpose(daily_infections_final, perm=(1,0,2,3))
-
-    return daily_infections_final #batch_dims x time x country x age
+    return daily_infections #batch_dims x time x country x age
 

@@ -3,6 +3,7 @@ import pymc4 as pm
 import tensorflow as tf
 import numpy as np
 import time
+import os
 
 import logging
 
@@ -11,6 +12,7 @@ log = logging.getLogger(__name__)
 sys.path.append("../")
 import covid19_npis
 from covid19_npis import transformations
+from covid19_npis.benchmarking import benchmark
 
 ##For eventual debugging:
 # tf.config.run_functions_eagerly(True)
@@ -18,8 +20,10 @@ from covid19_npis import transformations
 #    stack_height_limit=30, path_length_limit=50
 # )
 
-tf.config.threading.set_inter_op_parallelism_threads(2)
+tf.config.threading.set_inter_op_parallelism_threads(4)
 tf.config.threading.set_intra_op_parallelism_threads(2)
+
+os.environ['XLA_FLAGS']="--xla_force_host_platform_device_count=4"
 
 """ # Data Retrieval
     Retries some dum)my/test data
@@ -59,15 +63,15 @@ def test_model(data):
         transform=transformations.Log(reinterpreted_batch_ndims=2),
     )
 
-    R_t = tf.stack(
-        [R] * 50
-    )  # R_t has dimensions time x batch_dims x num_countries x num_age_groups
+    # R_t has dimensions batch_dims x time  x num_countries x num_age_groups
+    R_t = tf.einsum("...ca, t->...tca", R, tf.ones(data.shape[0]))
+
 
     log.info(f"R:\n{R_t.shape}")
 
     # Create Contact matrix
 
-    #Use Cholesky version as the non Cholesky version uses tf.linalg.slogdet which isn't implemented in JAX
+    # Use Cholesky version as the non Cholesky version uses tf.linalg.slogdet which isn't implemented in JAX
     C = yield pm.LKJCholesky(
         name="Contact_matrix",
         dimension=num_age_groups,
@@ -107,8 +111,7 @@ def test_model(data):
     log.info(f"p:{p}")
     log.info(f"data:{data.shape}")
 
-
-    sigma = yield pm.HalfCauchy(name='scale_likelihood', scale=50)
+    sigma = yield pm.HalfCauchy(name="scale_likelihood", scale=50)
     for i in range(3):
         sigma = tf.expand_dims(sigma, axis=-1)
 
@@ -135,8 +138,14 @@ def test_model(data):
 
 # a = pm.sample_prior_predictive(test_model(data), sample_shape=1000, use_auto_batching=False)
 begin_time = time.time()
-trace = pm.sample(test_model(data), num_samples=50, burn_in=50, use_auto_batching=False, num_chains=2, xla=True)
+#trace = pm.sample(
+#    test_model(data),
+#    num_samples=10,
+#    burn_in=10,
+#    use_auto_batching=False,
+#    num_chains=4,
+#    xla=False,
+#)
+benchmark(test_model(data), only_xla=True, iters=50)
 end_time = time.time()
-print('running time: {:.1f}s'.format(end_time-begin_time))
-
-
+print("running time: {:.1f}s".format(end_time - begin_time))

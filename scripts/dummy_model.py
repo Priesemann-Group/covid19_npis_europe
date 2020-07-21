@@ -89,6 +89,8 @@ def test_model(data):
     # tf.print(f"new_cases tf:\n{new_cases[-1,0]}")
     # log.info(f"new_cases:\n{new_cases[:,0,:]}")
 
+    new_cases = tf.clip_by_value(new_cases, 1e-7, 1e9)
+
     def convert(mu, var):
         r = 1 / var
         p = mu / (mu + r)
@@ -100,7 +102,8 @@ def test_model(data):
     log.info(f"p:{p}")
     log.info(f"data:{data.shape}")
 
-    sigma = yield pm.HalfCauchy(name="scale_likelihood", scale=50)
+
+    sigma = yield pm.HalfCauchy(name='scale_likelihood', scale=50)
     for i in range(3):
         sigma = tf.expand_dims(sigma, axis=-1)
 
@@ -127,6 +130,6 @@ def test_model(data):
 
 # a = pm.sample_prior_predictive(test_model(data), sample_shape=1000, use_auto_batching=False)
 
-trace = pm.sample(
-    test_model(data), num_samples=50, burn_in=200, use_auto_batching=False, num_chains=2
-)
+trace = pm.sample(test_model(data), num_samples=10, burn_in=10, use_auto_batching=False, num_chains=2)
+
+

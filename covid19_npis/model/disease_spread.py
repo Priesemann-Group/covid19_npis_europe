@@ -41,13 +41,15 @@ def _construct_I_0_t(I_0, l=16):
     """
 
     # Construct exponential function
-    exp = tf.math.exp(tf.range(start=l, limit=0.0, delta=-1.0, dtype="float32"))
+    exp = tf.math.exp(tf.range(start=l, limit=0.0, delta=-1.0, dtype=I_0.dtype))
 
     # Normalize to one
     exp, norm = tf.linalg.normalize(tensor=exp, ord=1, axis=0)
 
     # sums every given I_0 with the exponential function values
     I_0_t = tf.einsum("...ca,t->t...ca", I_0, exp)
+    I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
+
 
     return I_0_t
 

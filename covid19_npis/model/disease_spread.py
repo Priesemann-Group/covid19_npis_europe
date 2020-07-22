@@ -31,7 +31,7 @@ def _construct_I_0_t(I_0, l=16):
     ----------
         I_0:
             Tensor of initial I_0 values.
-        l:number,optional
+        l: number,optional
             Number of time steps we need into the past
             |default| 16
     Returns
@@ -49,7 +49,6 @@ def _construct_I_0_t(I_0, l=16):
     # sums every given I_0 with the exponential function values
     I_0_t = tf.einsum("...ca,t->t...ca", I_0, exp)
     I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
-
 
     return I_0_t
 
@@ -247,15 +246,6 @@ def InfectionModel(N, I_0, R_t, C, g_p):
     # Clip in order to avoid infinities
     I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
     log.info(f"I_0_t:\n{I_0_t}")
-
-    """ Emil: What is this? What is this for? Where is it used?
-    """
-    exp_r = tf.range(start=l, limit=0.0, delta=-1.0, dtype=R_t.dtype, name="exp_range")
-    exp_d = tf.math.exp(exp_r)
-    # exp_d = exp_d * g_p  # weight by serial_p
-    exp_d, norm = tf.linalg.normalize(
-        exp_d, axis=0
-    )  # normalize by dividing by sum over time-dimension
 
     # TO DO: Documentation
     log.info(f"R_t outside scan:\n{R_t}")

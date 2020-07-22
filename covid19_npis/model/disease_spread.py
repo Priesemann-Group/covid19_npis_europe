@@ -186,7 +186,8 @@ def InfectionModel(N, I_0, R_t, C, g_p):
         Reproduction number matrix.
         |shape| time, batch_dims, country, age_group
     N:
-        Initial population
+        Total population per country
+        |shape| country, age_group
     C:
         inter-age-group Contact-Matrix (see 8)
         |shape| country, age_group, age_group
@@ -199,14 +200,6 @@ def InfectionModel(N, I_0, R_t, C, g_p):
     :
         Sample from distribution of new, daily cases
     """
-
-    # Number of days that we look into the past for our convolution
-    l = g_p.shape[-1] + 1
-
-    # Generate exponential distributed intial I_0_t
-    I_0_t = _construct_I_0_t(I_0, l)
-    # Clip in order to avoid infinities
-    I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
 
     # @tf.function(autograph=False)
     def new_infectious_cases_next_day(i, new_infections, S_t):
@@ -246,15 +239,17 @@ def InfectionModel(N, I_0, R_t, C, g_p):
 
         return i + 1, new_infections, S_t
 
-    """ # Generate exponential distributed intial I_0_t,
-        whereby t goes l days into the past
-        I_0_t should be in sum = I_0
+    # Number of days that we look into the past for our convolution
+    l = g_p.shape[-1] + 1
 
-        TODO
-        ----
-        - slope of exponenet should match R_0
+    # Generate exponential distributed intial I_0_t
+    I_0_t = _construct_I_0_t(I_0, l)
+    # Clip in order to avoid infinities
+    I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
+    log.info(f"I_0_t:\n{I_0_t}")
+
+    """ Emil: What is this? What is this for? Where is it used?
     """
-
     exp_r = tf.range(start=l, limit=0.0, delta=-1.0, dtype=R_t.dtype, name="exp_range")
     exp_d = tf.math.exp(exp_r)
     # exp_d = exp_d * g_p  # weight by serial_p
@@ -262,8 +257,7 @@ def InfectionModel(N, I_0, R_t, C, g_p):
         exp_d, axis=0
     )  # normalize by dividing by sum over time-dimension
 
-    log.info(f"I_0_t:\n{I_0_t}")
-
+    # TO DO: Documentation
     log.info(f"R_t outside scan:\n{R_t}")
     total_days = R_t.shape[0]
 
@@ -274,10 +268,16 @@ def InfectionModel(N, I_0, R_t, C, g_p):
     for i in range(l):
         new_infections = new_infections.write(i, I_0_t[i])
 
+    # TO DO: Documentation
     cond = lambda i, *_: i < total_days
 
+    # Initial susceptible population = total - infected
     S_initial = N - tf.reduce_sum(I_0_t, axis=0)
 
+    """ Calculate time evolution of new, daily infections
+        as well as time evolution of susceptibles
+        as lists
+    """
     _, daily_infections_final, last_S_t = tf.while_loop(
         cond,
         new_infectious_cases_next_day,
@@ -286,7 +286,9 @@ def InfectionModel(N, I_0, R_t, C, g_p):
         name="spreading_loop",
     )
 
+    # Stack list of new, daily infections into one tensor
     daily_infections_final = daily_infections_final.stack()
+    # Transpose tensor in order to have batch dim before time dim
     if len(daily_infections_final.shape) == 4:
         daily_infections_final = tf.transpose(daily_infections_final, perm=(1, 0, 2, 3))
 

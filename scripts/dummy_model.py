@@ -54,7 +54,7 @@ def test_model(config):
         transform=transformations.Log(reinterpreted_batch_ndims=2),
     )
     I_0 = tf.clip_by_value(I_0, 1e-9, 1e10)
-    log.info(f"I_0:\n{I_0}")
+    log.info(f"I_0:\n{I_0} {type(I_0)}")
 
     # Create Reproduction Number for every age group
     R = yield pm.LogNormal(
@@ -70,7 +70,7 @@ def test_model(config):
         [R] * 50
     )  # R_t has dimensions time x batch_dims x num_countries x num_age_groups
 
-    log.info(f"R:\n{R_t.shape}")
+    log.info(f"R:\n{R_t.shape} {type(R_t)}")
 
     # Create Contact matrix
 
@@ -78,26 +78,27 @@ def test_model(config):
     C = yield pm.LKJCholesky(
         name=config.distributions["C"]["name"],
         dimension=num_age_groups,
-        concentration=2,  # eta
+        concentration=tf.constant(2.),  # eta
         conditionally_independent=True,
         event_stack=num_countries
         # event_stack = num_countries,
         # batch_stack=batch_stack
     )  # dimensions: batch_dims x num_countries x num_age_groups x num_age_groups
     C = tf.einsum("...ab,...ba->...ab", C, C)
+    #C = tf.eye(num_age_groups)
 
-    log.info(f"C:\n{C}")
+    log.info(f"C:\n{C} {type(C)}")
     # C, norm = tf.linalg.normalize(C, 1)
     # log.info(f"C:\n{C.shape}\n{C}")
 
     g_p = yield covid19_npis.model.construct_generation_interval()
 
-    log.info(f"g_p:\n{g_p}")
+    log.info(f"g_p:\n{g_p} {type(g_p)}")
 
     # Create N tensor (vector) should be done earlier in the real model
     N = tf.convert_to_tensor([10e5, 10e5, 10e5, 10e5] * 2)
     N = tf.reshape(N, (num_countries, num_age_groups))
-    log.info(f"N:\n{N}")
+    log.info(f"N:\n{N} {type(N)}")
     new_cases = covid19_npis.model.InfectionModel(
         N=N, I_0=I_0, R_t=R_t, C=C, g_p=g_p  # default valueOp:AddV2
     )
@@ -145,14 +146,14 @@ def test_model(config):
 
 # a = pm.sample_prior_predictive(test_model(data), sample_shape=1000, use_auto_batching=False)
 begin_time = time.time()
-#trace = pm.sample(
-#    test_model(config),
-#    num_samples=50,
-#    burn_in=50,
-#    use_auto_batching=False,
-#    num_chains=4,
-#    xla=True,
-#)
-benchmark(test_model(config), only_xla=False, iters=10, num_chains=(4,), parallelize=True, n_evals=100)
+trace = pm.sample(
+    test_model(config),
+    num_samples=50,
+    burn_in=50,
+    use_auto_batching=False,
+    num_chains=3,
+    xla=True,
+)
+#benchmark(test_model(config), only_xla=False, iters=3, num_chains=(2,20,50), parallelize=True, n_evals=100)
 end_time = time.time()
 print("running time: {:.1f}s".format(end_time - begin_time))

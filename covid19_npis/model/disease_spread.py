@@ -97,11 +97,15 @@ def construct_generation_interval(mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 
     g = gamma(tf.range(1, l, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
 
     # Get the pdf and normalize
-    g_p, norm = tf.linalg.normalize(g, 1)
-    return g_p
+    #g_p, norm = tf.linalg.normalize(g, 1)
+    if len(g.shape) > 1:
+        g = g / tf.expand_dims(tf.reduce_sum(g, axis=-1), axis=-1)
+    else:
+        g = g / tf.reduce_sum(g)
+    return g
 
 
-#@tf.function(autograph=False, experimental_compile=True)
+
 def InfectionModel(N, I_0, R_t, C, g_p):
     r"""
     This function combines a variety of different steps:
@@ -277,5 +281,5 @@ def InfectionModel(N, I_0, R_t, C, g_p):
     daily_infections_final = daily_infections_final.stack()
     if len(daily_infections_final.shape) == 4:
         daily_infections_final = tf.transpose(daily_infections_final, perm=(1,0,2,3))
-
+    #tf.print(f'daily infection: {daily_infections_final.shape} {type(daily_infections_final)}' )
     return daily_infections_final # batch_dims x time x country x age

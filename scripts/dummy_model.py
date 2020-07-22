@@ -90,12 +90,16 @@ def test_model(config):
     # C, norm = tf.linalg.normalize(C, 1)
     # log.info(f"C:\n{C.shape}\n{C}")
 
+    g_p = yield covid19_npis.model.construct_generation_interval()
+
+    log.info(f"g_p:\n{g_p}")
+
     # Create N tensor (vector) should be done earlier in the real model
     N = tf.convert_to_tensor([10e5, 10e5, 10e5, 10e5] * 2)
     N = tf.reshape(N, (num_countries, num_age_groups))
     log.info(f"N:\n{N}")
-    new_cases = yield covid19_npis.model.InfectionModel(
-        N=N, I_0=I_0, R_t=R_t, C=C, l=16  # default valueOp:AddV2
+    new_cases = covid19_npis.model.InfectionModel(
+        N=N, I_0=I_0, R_t=R_t, C=C, g_p=g_p  # default valueOp:AddV2
     )
     log.info(f"new_cases:\n{new_cases[0,:]}")  # dimensons=t,c,a
     # tf.print(f"new_cases tf:\n{new_cases[-1,0]}")

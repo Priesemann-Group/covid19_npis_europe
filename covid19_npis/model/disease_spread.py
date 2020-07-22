@@ -53,10 +53,56 @@ def _construct_I_0_t(I_0, l=16):
 
     return I_0_t
 
+def construct_generation_interval(mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 0.1, theta_theta=0.1, l=16):
+    # Generate generation interval
+    g = {}
 
-@tf.function(autograph=False, experimental_compile=True)
-def InfectionModel(N, I_0, R_t, C,
-    l=16, mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 0.1, theta_theta=0.1):
+    """ The Shape parameter k of generation interval distribution is
+        a gamma distribution with:
+    """
+    g["mu"] = {}
+    g["mu"]["k"] = mu_k
+    g["mu"]["θ"] = mu_theta
+
+    # Pymc4 and tf use alpha and beta as parameters so we need to take 1/θ as rate.
+    # See https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Gamma
+    # and https://en.wikipedia.org/wiki/Gamma_distribution
+    g_mu = yield pm.Gamma(
+        name="g_mu",
+        concentration=g["mu"]["k"],
+        rate=1.0 / g["mu"]["θ"],
+        conditionally_independent=True,
+    )
+
+    """ Shape parameter k of generation interval distribution is
+        a gamma distribution with:
+    """
+    g["θ"] = {}
+    g["θ"]["k"] = theta_k
+    g["θ"]["θ"] = theta_theta
+
+    g_theta = yield pm.Gamma(
+        name="g_theta",
+        concentration=g["θ"]["k"],
+        rate=1.0 / g["θ"]["θ"],
+        conditionally_independent=True,
+    )
+
+    """ Construct generation interval gamma distribution from underlying
+        generation distribution
+    """
+    if len(g_theta.shape)>0:
+        g_theta = tf.expand_dims(g_theta, axis=-1)
+        g_mu = tf.expand_dims(g_mu, axis=-1)
+    g = gamma(tf.range(1, l, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
+
+    # Get the pdf and normalize
+    g_p, norm = tf.linalg.normalize(g, 1)
+    return g_p
+
+
+#@tf.function(autograph=False, experimental_compile=True)
+def InfectionModel(N, I_0, R_t, C, g_p):
     r"""
     This function combines a variety of different steps:
 
@@ -133,47 +179,7 @@ def InfectionModel(N, I_0, R_t, C,
         Sample from distribution of new, daily cases
     """
 
-    # Generate generation interval
-    g = {}
-
-    """ The Shape parameter k of generation interval distribution is
-        a gamma distribution with:
-    """
-    g["mu"] = {}
-    g["mu"]["k"] = mu_k
-    g["mu"]["θ"] = mu_theta
-
-    # Pymc4 and tf use alpha and beta as parameters so we need to take 1/θ as rate.
-    # See https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Gamma
-    # and https://en.wikipedia.org/wiki/Gamma_distribution
-    g_mu = yield pm.Gamma(
-        name="g_mu",
-        concentration=g["mu"]["k"],
-        rate=1.0 / g["mu"]["θ"],
-        conditionally_independent=True,
-    )
-
-    """ Shape parameter k of generation interval distribution is
-        a gamma distribution with:
-    """
-    g["θ"] = {}
-    g["θ"]["k"] = theta_k
-    g["θ"]["θ"] = theta_theta
-
-    g_theta = yield pm.Gamma(
-        name="g_theta",
-        concentration=g["θ"]["k"],
-        rate=1.0 / g["θ"]["θ"],
-        conditionally_independent=True,
-    )
-
-    """ Construct generation interval gamma distribution from underlying
-        generation distribution
-    """
-    g = gamma(tf.range(1, l, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
-
-    # Get the pdf and normalize
-    g_p, norm = tf.linalg.normalize(g, 1)
+    l = g_p.shape[-1]+1
 
     # Generate exponential distributed intial I_0_t
     I_0_t = _construct_I_0_t(I_0, l)
@@ -192,7 +198,7 @@ def InfectionModel(N, I_0, R_t, C,
 
         # Calc "infectious" people, weighted by serial_p (country x age_group)
         #I_array = tf.ones((15,2,4))
-        infectious = tf.einsum("t...ca,t->...ca", I_array, g_p)
+        infectious = tf.einsum("t...ca,...t->...ca", I_array, g_p)
 
         # Calculate effective R_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
         # log.info(f"R_t inside scan:\n{R}")

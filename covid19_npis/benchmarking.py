@@ -3,8 +3,10 @@ import tensorflow as tf
 from timeit import timeit
 from timerit import Timerit
 import tensorflow_probability as tfp
+from multiprocessing.pool import ThreadPool
+import numpy as np
 
-def benchmark(model, num_chains=(2,20), use_auto_batching=False, only_xla=True, iters=5, n_evals=100):
+def benchmark(model, num_chains=(2,20), use_auto_batching=False, only_xla=True, iters=5, n_evals=100, parallelize=False):
     data_dicts = []
     for nchains in num_chains:
         (
@@ -31,27 +33,45 @@ def benchmark(model, num_chains=(2,20), use_auto_batching=False, only_xla=True, 
             init_state = tile_init(init_state, nchains)
 
         #@tf.function(autograph=False, experimental_compile=False)
+
+        @tf.function(autograph=True, experimental_compile=True)
         def run_chains(init=init_state):
+            def chain_body(init):
 
-            #@tf.function(autograph=False, experimental_compile=xla)
-            def body(i, x):
-                def randomize(x):
-                    return x + tf.random.uniform(x.shape)*1e-3
+                def body(i, x):
+                    def randomize(x):
+                        return x + tf.random.uniform(x.shape)*0.1
 
-                init_rand = list(map(randomize, init))
+                    init_rand = list(map(randomize, init))
 
-                return i + 1, x + parallel_logpfn(*init_rand) + tf.cast(i, 'float32')
+                    return i + 1, x + tf.reduce_sum(parallel_logpfn(*init_rand)) + tf.cast(i, 'float32')
 
-            i = tf.constant(0)
-            c = lambda i, _: tf.less(i, n_evals)
+                i = tf.constant(0)
+                c = lambda i, _: tf.less(i, n_evals)
 
-            _, result = tf.while_loop(c, body, [i, tf.zeros(nchains)], parallel_iterations=1)
+                _, result = tf.while_loop(c, body, [i, 0.], parallel_iterations=1)
+                return result
+            if parallelize:
+                #pool = ThreadPool(processes=2)
+                #chain_body(next(zip(*init)))
+                #init = list(map(lambda x: tf.unstack(x), init))
 
-            return result
+                #results = []
+                #for init_chain in zip(*init):
+                #    results.append(chain_body(init_chain))
+
+                #results = pool.map(chain_body, zip(*init))
+                #pool.close()
+                #pool.join()
+                results = tf.map_fn(chain_body, init, fn_output_signature=tf.TensorSpec((), dtype=init[0].dtype))
+            else:
+                results = chain_body(init)
+
+            return results
 
         if only_xla:
             config = tfp.debugging.benchmarking.BenchmarkTfFunctionConfig(
-                strategies=('function/xla',),
+                strategies=('eager',),
                 hardware=('cpu', 'gpu')
             )
         else:

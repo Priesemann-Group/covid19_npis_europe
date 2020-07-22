@@ -22,7 +22,7 @@ from covid19_npis.benchmarking import benchmark
 
 #tf.config.threading.set_inter_op_parallelism_threads(2)
 #tf.config.threading.set_intra_op_parallelism_threads(2)
-#os.environ['XLA_FLAGS']="--xla_force_host_platform_device_count=4"
+os.environ['XLA_FLAGS']="--xla_force_host_platform_device_count=2"
 
 """ # Data Retrieval
     Retries some dum)my/test data
@@ -147,8 +147,8 @@ begin_time = time.time()
 #    burn_in=50,
 #    use_auto_batching=False,
 #    num_chains=4,
-#    xla=False,
+#    xla=True,
 #)
-benchmark(test_model(config), only_xla=False, iters=10, num_chains=(2,20))
+benchmark(test_model(config), only_xla=True, iters=10, num_chains=(2,10), parallelize=True, n_evals=2000)
 end_time = time.time()
 print("running time: {:.1f}s".format(end_time - begin_time))

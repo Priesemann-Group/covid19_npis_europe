@@ -50,19 +50,19 @@ class Config(object):
                 "name": "I_0",
                 "long_name": "Initial infectious people",
                 "shape": (num_countries, num_age_groups),
-                "shape_label": ("country", "age group"),
+                "shape_label": ("country", "age_group"),
             },
             "R": {
                 "name": "R",
                 "long_name": "Reproduction number",
                 "shape": (num_countries, num_age_groups),
-                "shape_label": ("country", "age group"),
+                "shape_label": ("country", "age_group"),
             },
             "C": {
                 "name": "C",
                 "long_name": "Contact matrix",
-                "shape": (num_age_groups, num_age_groups),
-                "shape_label": ("age group", "age group"),
+                "shape": (num_countries, num_age_groups, num_age_groups),
+                "shape_label": ("country", "age_group_i", "age_group_j"),
             },
             "sigma": {
                 "name": "sigma",
@@ -78,16 +78,16 @@ class Config(object):
         data = {  # Is set on init
             "begin": df.index.min(),
             "end": df.index.max(),
-            "age groups": {},
-            "countries": {},
+            "age_groups": [],
+            "countries": [],
         }
 
         # Create countries lookup list dynamic from data dataframe
         for i in range(len(df.columns.levels[0])):
-            data["countries"][i] = df.columns.levels[0][i]
+            data["countries"].append(df.columns.levels[0][i])
 
         # Create age group list dynamic from data dataframe
         for i in range(len(df.columns.levels[1])):
-            data["age groups"][i] = df.columns.levels[1][i]
+            data["age_groups"].append(df.columns.levels[1][i])
 
         return data

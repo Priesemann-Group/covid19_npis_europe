@@ -1,2 +1,1 @@
-from .disease_spread import _construct_generation_interval_gamma
 from .disease_spread import InfectionModel

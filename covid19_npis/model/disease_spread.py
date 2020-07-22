@@ -5,7 +5,7 @@ import tensorflow_probability as tfp
 
 log = logging.getLogger(__name__)
 
-
+# Distribution pdf for generation interval
 def gamma(x, alpha, beta):
     return tf.math.pow(x, (alpha - 1)) * tf.exp(-beta * x)
 
@@ -54,51 +54,75 @@ def _construct_I_0_t(I_0, l=16):
     return I_0_t
 
 
-def _construct_generation_interval_gamma(
-    l=16, mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 0.1, theta_theta=0.1,
-):
+@tf.function(autograph=False, experimental_compile=True)
+def InfectionModel(N, I_0, R_t, C,
+    l=16, mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 0.1, theta_theta=0.1):
     r"""
-    Constructs the underlying distributions :math:`\mu_{D_{\text{gene}}}`
-    and :math:`\theta_{D_\text{gene}}` for the generation interval :math:`g(\tau)`.
+    This function combines a variety of different steps:
 
-    .. math::
+        #. Generates the generation interval with two underlying gamma distributions for mu and theta
+            .. math::
 
-        g(\tau) = Gamma(\tau;
-        k = \frac{\mu_{D_{\text{gene}}}}{\theta_{D_\text{gene}}},
-        \theta=\theta_{D_\text{gene}})
+                g(\tau) = Gamma(\tau;
+                k = \frac{\mu_{D_{\text{gene}}}}{\theta_{D_\text{gene}}},
+                \theta=\theta_{D_\text{gene}})
 
 
-    whereby the underlying distribution are modeled as follows
+            whereby the underlying distribution are modeled as follows
 
-    .. math::
+            .. math::
 
-        \mu_{D_{\text{gene}}} &\sim Gamma(k = 4.8/0.04, \theta=0.04) \\
-        \theta_{D_\text{gene}} &\sim Gamma(k = 0.8/0.1, \theta=0.1)
+                \mu_{D_{\text{gene}}} &\sim Gamma(k = 4.8/0.04, \theta=0.04) \\
+                \theta_{D_\text{gene}} &\sim Gamma(k = 0.8/0.1, \theta=0.1)
+
+        #. Converts the given :math:`I_0` values  to an exponential distributed initial :math:`I_{0_t}` with an
+           length of :math:`l` this can be seen in :py:func:`_construct_I_0_t`.
+
+        #. Calculates :math:`R_{eff}` for each time step using the given contact matrix :math:`C`:
+
+            .. math::
+                R_{diag} &= \text{diag}(\sqrt{R}) \\
+                R_{eff}  &= R_{diag} \cdot C \cdot R_{diag}
+
+        #. Calculates the :math:`\tilde{I}` arrays i.e. new infectious for each age group and
+           country, with the efficient reproduction matrix :math:`R_{eff}`, the susceptible pool
+           :math:`S`, the population size :math:`N` and the generation interval :math:`g(\tau)`.
+           This is done recursive for every time step.
+
+            .. math::
+                    \tilde{I}(t) &= \frac{S(t)}{N} \cdot R_{eff} \cdot \sum_{\tau=0}^{t} \tilde{I}(t-1-\tau) g(\tau) \\
+                    S(t) &= S(t-1) - \tilde{I}(t-1)
 
     TODO
     ----
-    - check batch and event shapes
-    - implement into :py:func:`InfectionModel`
+    - rewrite while loop to tf.scan function
+
 
     Parameters
     ----------
-    l : number, optional
-        Number of time steps to return i.e. the length of the convolution with Infectious
-        which is done at a later point.
+    I_0:
+        Initial number of infectious.
+        |shape| batch_dims, country, age_group
+    R_t:
+        Reproduction number matrix.
+        |shape| time, batch_dims, country, age_group
+    N:
+        Initial population
+    C:
+        inter-age-group Contact-Matrix (see 8)
+        |shape| country, age_group, age_group
+    l: number, optional
+        Length of generation interval i.e :math:`t` in the formula above
         |default| 16
-
     mu_k : number, optional
         Concentration/k parameter for underlying gamma distribution of mu (:math:`\mu_{D_{\text{gene}}}`).
         |default| 120
-
     mu_theta : number, optional
         Scale/theta parameter for underlying gamma distribution of mu (:math:`\mu_{D_{\text{gene}}}`).
         |default| 0.04
-
     theta_k : number, optional
         Concentration/k parameter for underlying gamma distribution of theta (:math:`\theta_{D_\text{gene}}`).
         |default| 8
-
     theta_theta : number, optional
         Scale/theta parameter for underlying gamma distribution of theta (:math:`\theta_{D_\text{gene}}`).
         |default| 0.1
@@ -106,9 +130,10 @@ def _construct_generation_interval_gamma(
     Returns
     -------
     :
-        :math:`g(\tau)`
-
+        Sample from distribution of new, daily cases
     """
+
+    # Generate generation interval
     g = {}
 
     """ The Shape parameter k of generation interval distribution is
@@ -146,70 +171,7 @@ def _construct_generation_interval_gamma(
         generation distribution
     """
     g = gamma(tf.range(1, l, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
-    return g
 
-
-@tf.function(autograph=False, experimental_compile=True)
-def InfectionModel(N, I_0, R_t, C, g=None, l=16):
-    r"""
-    This function combines a variety of different steps:
-
-        #. Generates the generation interval with two underlying gamma distributions for mu and theta,
-           this can be see in :py:func:`_construct_generation_interval_gamma`.
-
-        #. Converts the given :math:`I_0` values  to an exponential distributed initial :math:`I_{0_t}` with an
-           length of :math:`l` this can be seen in :py:func:`_construct_I_0_t`.
-
-        #. Calculates :math:`R_{eff}` for each time step using the given contact matrix :math:`C`:
-
-            .. math::
-                R_{diag} &= \text{diag}(\sqrt{R}) \\
-                R_{eff}  &= R_{diag} \cdot C \cdot R_{diag}
-
-        #. Calculates the :math:`\tilde{I}` arrays i.e. new infectious for each age group and
-           country, with the efficient reproduction matrix :math:`R_{eff}`, the susceptible pool
-           :math:`S`, the population size :math:`N` and the generation interval :math:`g(\tau)`.
-           This is done recursive for every time step.
-
-            .. math::
-                    \tilde{I}(t) &= \frac{S(t)}{N} \cdot R_{eff} \cdot \sum_{\tau=0}^{t} \tilde{I}(t-1-\tau) g(\tau) \\
-                    S(t) &= S(t-1) - \tilde{I}(t-1)
-
-    TODO
-    ----
-    - rewrite while loop to tf.scan function
-    - Fix not used _construct_generation_interval_gamma function (Fix batch and even shapes)
-
-
-    Parameters
-    ----------
-    I_0:
-        Initial number of infectious.
-        |shape| batch_dims, country, age_group
-    R_t:
-        Reproduction number matrix.
-        |shape| time, batch_dims, country, age_group
-    g: optional
-        Generation interval
-    N:
-        Initial population
-    C:
-        inter-age-group Contact-Matrix (see 8)
-        |shape| country, age_group, age_group
-
-    l: number, optional
-        Length of generation interval i.e :math:`t` in the formula above
-        |default| 16
-
-    Returns
-    -------
-    :
-        Sample from distribution of new, daily cases
-    """
-
-    # Generate generation interval
-    # - TODO implement _construct_generation_interval_gamma()
-    g = gamma(tf.range(1, l, dtype="float32", name='gamma_range'), 4, 1 / 0.5)
     # Get the pdf and normalize
     g_p, norm = tf.linalg.normalize(g, 1)
 
@@ -218,6 +180,7 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
     # Clip in order to avoid infinities
     I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
 
+    #@tf.function(autograph=False)
     def new_infectious_cases_next_day(i, new_infections, S_t):
 
         # Internal state
@@ -268,7 +231,7 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
         start=l,
         limit=0.0,
         delta=-1.0,
-        dtype=g.dtype,
+        dtype=R_t.dtype,
         name='exp_range'
     )
     exp_d = tf.math.exp(exp_r)

@@ -94,8 +94,8 @@ def test_model(config):
     N = tf.convert_to_tensor([10e5, 10e5, 10e5, 10e5] * 2)
     N = tf.reshape(N, (num_countries, num_age_groups))
     log.info(f"N:\n{N}")
-    new_cases = covid19_npis.model.InfectionModel(
-        N=N, I_0=I_0, R_t=R_t, C=C, g=None, l=16  # default valueOp:AddV2
+    new_cases = yield covid19_npis.model.InfectionModel(
+        N=N, I_0=I_0, R_t=R_t, C=C, l=16  # default valueOp:AddV2
     )
     log.info(f"new_cases:\n{new_cases[0,:]}")  # dimensons=t,c,a
     # tf.print(f"new_cases tf:\n{new_cases[-1,0]}")

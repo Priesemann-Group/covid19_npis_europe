@@ -149,7 +149,7 @@ def _construct_generation_interval_gamma(
     return g
 
 
-#@tf.function(autograph=False)
+@tf.function(autograph=False, experimental_compile=True)
 def InfectionModel(N, I_0, R_t, C, g=None, l=16):
     r"""
     This function combines a variety of different steps:
@@ -218,7 +218,6 @@ def InfectionModel(N, I_0, R_t, C, g=None, l=16):
     # Clip in order to avoid infinities
     I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
 
-    #@tf.function(autograph=False)
     def new_infectious_cases_next_day(i, new_infections, S_t):
 
         # Internal state

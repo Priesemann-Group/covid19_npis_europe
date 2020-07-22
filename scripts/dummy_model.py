@@ -149,6 +149,6 @@ begin_time = time.time()
 #    num_chains=4,
 #    xla=True,
 #)
-benchmark(test_model(config), only_xla=True, iters=10, num_chains=(2,10), parallelize=True, n_evals=2000)
+benchmark(test_model(config), only_xla=False, iters=10, num_chains=(4,), parallelize=True, n_evals=100)
 end_time = time.time()
 print("running time: {:.1f}s".format(end_time - begin_time))

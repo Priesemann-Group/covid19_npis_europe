@@ -57,10 +57,10 @@ def simple_new_I(factor):
     I_t = np.array(I_t)
     df = pd.DataFrame()
     df["date"] = dates
-    df[(ts, "new_cases_agegroup_0")] = I_t[:, 0]
-    df[(ts, "new_cases_agegroup_1")] = I_t[:, 1]
-    df[(ts, "new_cases_agegroup_2")] = I_t[:, 2]
-    df[(ts, "new_cases_agegroup_3")] = I_t[:, 3]
+    df[(ts, "a0-10")] = I_t[:, 0]
+    df[(ts, "a10-20")] = I_t[:, 1]
+    df[(ts, "a20-30")] = I_t[:, 2]
+    df[(ts, "a30-99")] = I_t[:, 3]
 
     df = df.set_index("date")
     df.columns = pd.MultiIndex.from_tuples(df.columns, names=["country", "age group"])

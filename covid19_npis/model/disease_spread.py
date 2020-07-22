@@ -53,8 +53,50 @@ def _construct_I_0_t(I_0, l=16):
 
     return I_0_t
 
-def construct_generation_interval(mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 0.1, theta_theta=0.1, l=16):
-    # Generate generation interval
+
+def construct_generation_interval(
+    mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 0.1, theta_theta=0.1, l=16
+):
+    r"""
+    Generates the generation interval with two underlying gamma distributions for mu and theta
+        .. math::
+
+            g(\tau) = Gamma(\tau;
+            k = \frac{\mu_{D_{\text{gene}}}}{\theta_{D_\text{gene}}},
+            \theta=\theta_{D_\text{gene}})
+
+
+        whereby the underlying distribution are modeled as follows
+
+        .. math::
+
+            \mu_{D_{\text{gene}}} &\sim Gamma(k = 4.8/0.04, \theta=0.04) \\
+            \theta_{D_\text{gene}} &\sim Gamma(k = 0.8/0.1, \theta=0.1)
+
+    Parameters
+    ----------
+    mu_k : number, optional
+        Concentration/k parameter for underlying gamma distribution of mu (:math:`\mu_{D_{\text{gene}}}`).
+        |default| 120
+    mu_theta : number, optional
+        Scale/theta parameter for underlying gamma distribution of mu (:math:`\mu_{D_{\text{gene}}}`).
+        |default| 0.04
+    theta_k : number, optional
+        Concentration/k parameter for underlying gamma distribution of theta (:math:`\theta_{D_\text{gene}}`).
+        |default| 8
+    theta_theta : number, optional
+        Scale/theta parameter for underlying gamma distribution of theta (:math:`\theta_{D_\text{gene}}`).
+        |default| 0.1
+    l: number, optional
+        Length of generation interval i.e :math:`t` in the formula above
+        |default| 16
+
+    Returns
+    -------
+    :
+        Normalized generation interval pdf
+    """
+
     g = {}
 
     """ The Shape parameter k of generation interval distribution is
@@ -88,12 +130,14 @@ def construct_generation_interval(mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 
         conditionally_independent=True,
     )
 
+    # Avoid error related to possible batch dimensions
+    if len(g_theta.shape) > 0:
+        g_theta = tf.expand_dims(g_theta, axis=-1)
+        g_mu = tf.expand_dims(g_mu, axis=-1)
+
     """ Construct generation interval gamma distribution from underlying
         generation distribution
     """
-    if len(g_theta.shape)>0:
-        g_theta = tf.expand_dims(g_theta, axis=-1)
-        g_mu = tf.expand_dims(g_mu, axis=-1)
     g = gamma(tf.range(1, l, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
 
     # Get the pdf and normalize
@@ -105,25 +149,10 @@ def construct_generation_interval(mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 
     return g
 
 
-
+#@tf.function(autograph=False, experimental_compile=True)
 def InfectionModel(N, I_0, R_t, C, g_p):
     r"""
     This function combines a variety of different steps:
-
-        #. Generates the generation interval with two underlying gamma distributions for mu and theta
-            .. math::
-
-                g(\tau) = Gamma(\tau;
-                k = \frac{\mu_{D_{\text{gene}}}}{\theta_{D_\text{gene}}},
-                \theta=\theta_{D_\text{gene}})
-
-
-            whereby the underlying distribution are modeled as follows
-
-            .. math::
-
-                \mu_{D_{\text{gene}}} &\sim Gamma(k = 4.8/0.04, \theta=0.04) \\
-                \theta_{D_\text{gene}} &\sim Gamma(k = 0.8/0.1, \theta=0.1)
 
         #. Converts the given :math:`I_0` values  to an exponential distributed initial :math:`I_{0_t}` with an
            length of :math:`l` this can be seen in :py:func:`_construct_I_0_t`.
@@ -161,21 +190,9 @@ def InfectionModel(N, I_0, R_t, C, g_p):
     C:
         inter-age-group Contact-Matrix (see 8)
         |shape| country, age_group, age_group
-    l: number, optional
-        Length of generation interval i.e :math:`t` in the formula above
-        |default| 16
-    mu_k : number, optional
-        Concentration/k parameter for underlying gamma distribution of mu (:math:`\mu_{D_{\text{gene}}}`).
-        |default| 120
-    mu_theta : number, optional
-        Scale/theta parameter for underlying gamma distribution of mu (:math:`\mu_{D_{\text{gene}}}`).
-        |default| 0.04
-    theta_k : number, optional
-        Concentration/k parameter for underlying gamma distribution of theta (:math:`\theta_{D_\text{gene}}`).
-        |default| 8
-    theta_theta : number, optional
-        Scale/theta parameter for underlying gamma distribution of theta (:math:`\theta_{D_\text{gene}}`).
-        |default| 0.1
+    g_p:
+        Normalized PDF of the generation interval
+        |shape| batch_dims(?), l
 
     Returns
     -------
@@ -183,14 +200,15 @@ def InfectionModel(N, I_0, R_t, C, g_p):
         Sample from distribution of new, daily cases
     """
 
-    l = g_p.shape[-1]+1
+    # Number of days that we look into the past for our convolution
+    l = g_p.shape[-1] + 1
 
     # Generate exponential distributed intial I_0_t
     I_0_t = _construct_I_0_t(I_0, l)
     # Clip in order to avoid infinities
     I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
 
-    #@tf.function(autograph=False)
+    # @tf.function(autograph=False)
     def new_infectious_cases_next_day(i, new_infections, S_t):
 
         # Internal state
@@ -198,10 +216,9 @@ def InfectionModel(N, I_0, R_t, C, g_p):
         R = tf.gather(R_t, i, axis=0)
 
         # These are the infections over which the convolution is done
-        I_array = new_infections.stack(name='stack')[:-l:-1]
+        I_array = new_infections.stack(name="stack")[:-l:-1]
 
         # Calc "infectious" people, weighted by serial_p (country x age_group)
-        #I_array = tf.ones((15,2,4))
         infectious = tf.einsum("t...ca,...t->...ca", I_array, g_p)
 
         # Calculate effective R_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
@@ -216,6 +233,7 @@ def InfectionModel(N, I_0, R_t, C, g_p):
             "...cij,...cik,...ckl->...cil", R_diag, C, R_diag
         )  # Effective growth number
         # log.info(f"R_eff:\n{R_eff}")
+
         # Calculate new infections
         # log.info(f"infectious:\n{infectious}")
         # log.info(f"f:\n{f}")
@@ -237,13 +255,7 @@ def InfectionModel(N, I_0, R_t, C, g_p):
         - slope of exponenet should match R_0
     """
 
-    exp_r = tf.range(
-        start=l,
-        limit=0.0,
-        delta=-1.0,
-        dtype=R_t.dtype,
-        name='exp_range'
-    )
+    exp_r = tf.range(start=l, limit=0.0, delta=-1.0, dtype=R_t.dtype, name="exp_range")
     exp_d = tf.math.exp(exp_r)
     # exp_d = exp_d * g_p  # weight by serial_p
     exp_d, norm = tf.linalg.normalize(
@@ -252,19 +264,15 @@ def InfectionModel(N, I_0, R_t, C, g_p):
 
     log.info(f"I_0_t:\n{I_0_t}")
 
-
     log.info(f"R_t outside scan:\n{R_t}")
     total_days = R_t.shape[0]
 
-    #Create an Tensor array and initalize the first l elements
+    # Create an Tensor array and initalize the first l elements
     new_infections = tf.TensorArray(
-        dtype=R_t.dtype,
-        size=total_days,
-        element_shape=R_t.shape[1:]
+        dtype=R_t.dtype, size=total_days, element_shape=R_t.shape[1:]
     )
     for i in range(l):
         new_infections = new_infections.write(i, I_0_t[i])
-
 
     cond = lambda i, *_: i < total_days
 
@@ -274,12 +282,12 @@ def InfectionModel(N, I_0, R_t, C, g_p):
         cond,
         new_infectious_cases_next_day,
         (l, new_infections, S_initial),
-        maximum_iterations=total_days-l,
-        name='spreading_loop'
+        maximum_iterations=total_days - l,
+        name="spreading_loop",
     )
 
     daily_infections_final = daily_infections_final.stack()
     if len(daily_infections_final.shape) == 4:
-        daily_infections_final = tf.transpose(daily_infections_final, perm=(1,0,2,3))
-    #tf.print(f'daily infection: {daily_infections_final.shape} {type(daily_infections_final)}' )
-    return daily_infections_final # batch_dims x time x country x age
+        daily_infections_final = tf.transpose(daily_infections_final, perm=(1, 0, 2, 3))
+
+    return daily_infections_final  # batch_dims x time x country x age

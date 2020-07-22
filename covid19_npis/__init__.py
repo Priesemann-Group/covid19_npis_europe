@@ -10,3 +10,4 @@ log = logging.getLogger(__name__)
 from . import test_data
 from . import model
 from .config import Config
+from .data import convert_trace_to_pandas_list

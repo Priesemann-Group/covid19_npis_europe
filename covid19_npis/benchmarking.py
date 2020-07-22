@@ -3,11 +3,50 @@ import tensorflow as tf
 from timeit import timeit
 from timerit import Timerit
 import tensorflow_probability as tfp
-from multiprocessing.pool import ThreadPool
+from multiprocessing.pool import Pool
 import numpy as np
+
+
+@tf.function(autograph=True, experimental_compile=True)
+def chain_body(init, *params):
+    parallel_logpfn, n_evals = params
+    def body(i, x):
+        def randomize(x):
+            return x + tf.random.uniform(x.shape) * 0.1
+
+        init_rand = list(map(randomize, init))
+
+        return i + 1, x + tf.reduce_sum(parallel_logpfn(*init_rand)) + tf.cast(i, 'float32')
+
+    i = tf.constant(0)
+    c = lambda i, _: tf.less(i, n_evals)
+
+    _, result = tf.while_loop(c, body, [i, 0.], parallel_iterations=1)
+    return result
+
+global_params = None
+chain_body_func = None
+
+def initialize():
+    global chain_body_func
+    global global_params
+    def chain_body_local(x):
+        print('HI!!!!!')
+        if global_params is None:
+            print('ERROR!!!!')
+            return
+        return chain_body(x, *global_params)
+
+    chain_body_func=chain_body_local
+
+def func_for_pool(x):
+    return chain_body_func(x)
 
 def benchmark(model, num_chains=(2,20), use_auto_batching=False, only_xla=True, iters=5, n_evals=100, parallelize=False):
     data_dicts = []
+
+
+    # @tf.function(autograph=False, experimental_compile=False)
     for nchains in num_chains:
         (
             logpfn,
@@ -32,40 +71,33 @@ def benchmark(model, num_chains=(2,20), use_auto_batching=False, only_xla=True, 
             deterministics_callback = _deterministics_callback
             init_state = tile_init(init_state, nchains)
 
-        #@tf.function(autograph=False, experimental_compile=False)
+        global global_params
+        global_params = parallel_logpfn, n_evals
+        pool = Pool(processes=2, initializer=initialize)
+        if not parallelize:
+            initialize()
 
-        @tf.function(autograph=True, experimental_compile=True)
         def run_chains(init=init_state):
-            def chain_body(init):
 
-                def body(i, x):
-                    def randomize(x):
-                        return x + tf.random.uniform(x.shape)*0.1
-
-                    init_rand = list(map(randomize, init))
-
-                    return i + 1, x + tf.reduce_sum(parallel_logpfn(*init_rand)) + tf.cast(i, 'float32')
-
-                i = tf.constant(0)
-                c = lambda i, _: tf.less(i, n_evals)
-
-                _, result = tf.while_loop(c, body, [i, 0.], parallel_iterations=1)
-                return result
             if parallelize:
                 #pool = ThreadPool(processes=2)
                 #chain_body(next(zip(*init)))
-                #init = list(map(lambda x: tf.unstack(x), init))
+                init = list(map(lambda x: tf.unstack(x), init))
 
                 #results = []
                 #for init_chain in zip(*init):
                 #    results.append(chain_body(init_chain))
 
-                #results = pool.map(chain_body, zip(*init))
-                #pool.close()
-                #pool.join()
-                results = tf.map_fn(chain_body, init, fn_output_signature=tf.TensorSpec((), dtype=init[0].dtype))
+
+                results_proc = [pool.apply_async(func_for_pool, (init_chain, )) for init_chain in zip(*init)]
+                results = []
+                for res in results_proc:
+                    print(res)
+                    results.append(res.get(timeout=30))
+
+                #results = tf.map_fn(chain_body, init, fn_output_signature=tf.TensorSpec((), dtype=init[0].dtype))
             else:
-                results = chain_body(init)
+                results = chain_body_func(init)
 
             return results
 

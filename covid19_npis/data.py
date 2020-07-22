@@ -1,3 +1,8 @@
+import logging
+
+log = logging.getLogger(__name__)
+
+
 def convert_trace_to_pandas_list(model, trace, config):
     r"""
     Converts the pymc4 arviz trace to multiple pandas dataframes.
@@ -61,7 +66,6 @@ def convert_trace_to_pandas_list(model, trace, config):
                     level=i,
                     inplace=True,
                 )
-            print(df.index.names)
             # Rename country and age_group entries in index
             if r"country" in df.index.names:
                 df.index = df.index.set_levels(

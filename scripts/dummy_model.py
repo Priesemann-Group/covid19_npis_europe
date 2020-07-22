@@ -20,9 +20,9 @@ from covid19_npis.benchmarking import benchmark
 #    stack_height_limit=30, path_length_limit=50
 # )
 
-#tf.config.threading.set_inter_op_parallelism_threads(2)
-#tf.config.threading.set_intra_op_parallelism_threads(2)
-os.environ['XLA_FLAGS']="--xla_force_host_platform_device_count=2"
+# tf.config.threading.set_inter_op_parallelism_threads(2)
+# tf.config.threading.set_intra_op_parallelism_threads(2)
+os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=2"
 
 """ # Data Retrieval
     Retries some dum)my/test data
@@ -145,14 +145,42 @@ def test_model(config):
 
 # a = pm.sample_prior_predictive(test_model(data), sample_shape=1000, use_auto_batching=False)
 begin_time = time.time()
-#trace = pm.sample(
+# trace = pm.sample(
 #    test_model(config),
 #    num_samples=50,
 #    burn_in=50,
 #    use_auto_batching=False,
 #    num_chains=4,
 #    xla=True,
-#)
-benchmark(test_model(config), only_xla=False, iters=10, num_chains=(4,), parallelize=True, n_evals=100)
+# )
+benchmark(
+    test_model(config),
+    only_xla=False,
+    iters=10,
+    num_chains=(4,),
+    parallelize=True,
+    n_evals=100,
+)
 end_time = time.time()
 print("running time: {:.1f}s".format(end_time - begin_time))
+
+
+""" # Convert trace to nicely format (easier plotting)
+    Function returns list with samples for each distribution in the config
+    (see config.py)
+"""
+
+# posteriors = covid19_npis.convert_trace_to_pandas_list(test_model, trace, config)
+
+
+""" # Sample for prior plots and also covert to nice format
+"""
+trace_prior = pm.sample_prior_predictive(
+    test_model(config), sample_shape=1000, use_auto_batching=False
+)
+priors = covid19_npis.convert_trace_to_pandas_list(test_model, trace_prior, config)
+
+
+""" # Plot distributions
+
+"""

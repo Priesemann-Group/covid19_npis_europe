@@ -3,8 +3,25 @@ import logging
 import pymc4 as pm
 import tensorflow_probability as tfp
 
-log = logging.getLogger(__name__)
+# from covid19_npis.config import Config
 
+log = logging.getLogger(__name__)
+"""
+config = Config(I_new)
+
+def return_I_0(event_shape):
+    I_0 = yield pm.HalfCauchy(
+        name=config.distributions["I_0"]["name"],
+        loc=10.0,
+        scale=25,
+        conditionally_independent=True,
+        event_stack=event_shape,
+        transform=transformations.Log(reinterpreted_batch_ndims=len(event_shape)),
+    )
+    I_0 = tf.clip_by_value(I_0, 1e-9, 1e10)
+    log.info(f"I_0:\n{I_0}")
+    return I_0
+"""
 # Distribution pdf for generation interval
 def gamma(x, alpha, beta):
     return tf.math.pow(x, (alpha - 1)) * tf.exp(-beta * x)
@@ -223,7 +240,7 @@ def InfectionModel(N, I_0, R_t, C, g_p):
         # Calculate new infections
         new = tf.einsum("...ci,...cij,...cj->...cj", infectious, R_eff, f)
 
-        #log.info(f"new:\n{new}")
+        # log.info(f"new:\n{new}")
         new_infections = new_infections.write(i, new)
 
         S_t = S_t - new
@@ -237,7 +254,7 @@ def InfectionModel(N, I_0, R_t, C, g_p):
     I_0_t = _construct_I_0_t(I_0, l)
     # Clip in order to avoid infinities
     I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
-    #log.info(f"I_0_t:\n{I_0_t}")
+    # log.info(f"I_0_t:\n{I_0_t}")
 
     # TO DO: Documentation
     log.info(f"R_t outside scan:\n{R_t}")

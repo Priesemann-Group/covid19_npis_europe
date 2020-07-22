@@ -25,7 +25,7 @@ from covid19_npis.benchmarking import benchmark
 os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=2"
 
 """ # Data Retrieval
-    Retries some dum)my/test data
+    Retries some dummy/test data
 """
 # Fixed R matrix for now one country one age group
 I_new = covid19_npis.test_data.simple_new_I(0.35)
@@ -34,8 +34,8 @@ num_age_groups = 4
 num_countries = 2
 
 """ # Construct pymc4 model
-    We create our own config object which holds names of the distributions
-    ,shape label and the observed data. This is necessary for the data converter
+    We create our own config object which holds names of the distributions,
+    shape label and the observed data. This is necessary for the data converter
     later on.
 """
 
@@ -44,17 +44,20 @@ config = covid19_npis.Config(I_new)
 
 @pm.model
 def test_model(config):
+    event_shape = (num_countries, num_age_groups)
+
     # Create I_0
+    # I_0 = yield covid19_npis.model.disease_spread.return_I_0(event_shape)
     I_0 = yield pm.HalfCauchy(
         name=config.distributions["I_0"]["name"],
         loc=10.0,
         scale=25,
         conditionally_independent=True,
-        event_stack=(num_countries, num_age_groups),
-        transform=transformations.Log(reinterpreted_batch_ndims=2),
+        event_stack=event_shape,
+        transform=transformations.Log(reinterpreted_batch_ndims=len(event_shape)),
     )
     I_0 = tf.clip_by_value(I_0, 1e-9, 1e10)
-    log.info(f"I_0:\n{I_0}")
+    # log.info(f"I_0:\n{I_0}")
 
     # Create Reproduction Number for every age group
     R = yield pm.LogNormal(
@@ -62,15 +65,15 @@ def test_model(config):
         loc=1,
         scale=2.5,
         conditionally_independent=True,
-        event_stack=(num_countries, num_age_groups),
-        transform=transformations.Log(reinterpreted_batch_ndims=2),
+        event_stack=event_shape,
+        transform=transformations.Log(reinterpreted_batch_ndims=len(event_shape)),
     )
 
     R_t = tf.stack(
         [R] * 50
     )  # R_t has dimensions time x batch_dims x num_countries x num_age_groups
 
-    log.info(f"R:\n{R_t.shape}")
+    # log.info(f"R:\n{R_t.shape}")
 
     # Create Contact matrix
 
@@ -86,17 +89,17 @@ def test_model(config):
     )  # dimensions: batch_dims x num_countries x num_age_groups x num_age_groups
     C = tf.einsum("...ab,...ba->...ab", C, C)
 
-    log.info(f"C:\n{C}")
+    # log.info(f"C:\n{C}")
     # C, norm = tf.linalg.normalize(C, 1)
     # log.info(f"C:\n{C.shape}\n{C}")
 
     g_p = yield covid19_npis.model.construct_generation_interval()
 
-    log.info(f"g_p:\n{g_p}")
+    # log.info(f"g_p:\n{g_p}")
 
     # Create N tensor (vector) should be done earlier in the real model
     N = tf.convert_to_tensor([10e5, 10e5, 10e5, 10e5] * 2)
-    N = tf.reshape(N, (num_countries, num_age_groups))
+    N = tf.reshape(N, event_shape)
     log.info(f"N:\n{N}")
     new_cases = covid19_npis.model.InfectionModel(
         N=N, I_0=I_0, R_t=R_t, C=C, g_p=g_p  # default valueOp:AddV2

@@ -21,7 +21,9 @@ def convert_trace_to_pandas_list(model, trace, config):
         
     Returns
     -------
-    :array of
+    :list of pd.DataFrame
+        Multiindex dataframe containing all samples by chain and other dimensions
+        defined in config.py
 
     """
 

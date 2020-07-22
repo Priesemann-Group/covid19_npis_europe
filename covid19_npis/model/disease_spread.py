@@ -50,10 +50,12 @@ def _construct_I_0_t(I_0, l=16):
     I_0_t = tf.einsum("...ca,t->t...ca", I_0, exp)
     I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
 
-
     return I_0_t
 
-def construct_generation_interval(mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 0.1, theta_theta=0.1, l=16):
+
+def construct_generation_interval(
+    mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 0.1, theta_theta=0.1, l=16
+):
     r"""
     Generates the generation interval with two underlying gamma distributions for mu and theta
         .. math::
@@ -128,7 +130,7 @@ def construct_generation_interval(mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 
     )
 
     # Avoid error related to possible batch dimensions
-    if len(g_theta.shape)>0:
+    if len(g_theta.shape) > 0:
         g_theta = tf.expand_dims(g_theta, axis=-1)
         g_mu = tf.expand_dims(g_mu, axis=-1)
 
@@ -143,12 +145,10 @@ def construct_generation_interval(mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 
     return g_p
 
 
-#@tf.function(autograph=False, experimental_compile=True)
+# @tf.function(autograph=False, experimental_compile=True)
 def InfectionModel(N, I_0, R_t, C, g_p):
     r"""
     This function combines a variety of different steps:
-
-        #. Generates the generation interval with two underlying gamma distributions for mu and theta
 
         #. Converts the given :math:`I_0` values  to an exponential distributed initial :math:`I_{0_t}` with an
            length of :math:`l` this can be seen in :py:func:`_construct_I_0_t`.
@@ -197,14 +197,14 @@ def InfectionModel(N, I_0, R_t, C, g_p):
     """
 
     # Number of days that we look into the past for our convolution
-    l = g_p.shape[-1]+1
+    l = g_p.shape[-1] + 1
 
     # Generate exponential distributed intial I_0_t
     I_0_t = _construct_I_0_t(I_0, l)
     # Clip in order to avoid infinities
     I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
 
-    #@tf.function(autograph=False)
+    # @tf.function(autograph=False)
     def new_infectious_cases_next_day(i, new_infections, S_t):
 
         # Internal state
@@ -212,7 +212,7 @@ def InfectionModel(N, I_0, R_t, C, g_p):
         R = tf.gather(R_t, i, axis=0)
 
         # These are the infections over which the convolution is done
-        I_array = new_infections.stack(name='stack')[:-l:-1]
+        I_array = new_infections.stack(name="stack")[:-l:-1]
 
         # Calc "infectious" people, weighted by serial_p (country x age_group)
         infectious = tf.einsum("t...ca,...t->...ca", I_array, g_p)
@@ -229,7 +229,7 @@ def InfectionModel(N, I_0, R_t, C, g_p):
             "...cij,...cik,...ckl->...cil", R_diag, C, R_diag
         )  # Effective growth number
         # log.info(f"R_eff:\n{R_eff}")
-        
+
         # Calculate new infections
         # log.info(f"infectious:\n{infectious}")
         # log.info(f"f:\n{f}")
@@ -251,13 +251,7 @@ def InfectionModel(N, I_0, R_t, C, g_p):
         - slope of exponenet should match R_0
     """
 
-    exp_r = tf.range(
-        start=l,
-        limit=0.0,
-        delta=-1.0,
-        dtype=R_t.dtype,
-        name='exp_range'
-    )
+    exp_r = tf.range(start=l, limit=0.0, delta=-1.0, dtype=R_t.dtype, name="exp_range")
     exp_d = tf.math.exp(exp_r)
     # exp_d = exp_d * g_p  # weight by serial_p
     exp_d, norm = tf.linalg.normalize(
@@ -266,19 +260,15 @@ def InfectionModel(N, I_0, R_t, C, g_p):
 
     log.info(f"I_0_t:\n{I_0_t}")
 
-
     log.info(f"R_t outside scan:\n{R_t}")
     total_days = R_t.shape[0]
 
-    #Create an Tensor array and initalize the first l elements
+    # Create an Tensor array and initalize the first l elements
     new_infections = tf.TensorArray(
-        dtype=R_t.dtype,
-        size=total_days,
-        element_shape=R_t.shape[1:]
+        dtype=R_t.dtype, size=total_days, element_shape=R_t.shape[1:]
     )
     for i in range(l):
         new_infections = new_infections.write(i, I_0_t[i])
-
 
     cond = lambda i, *_: i < total_days
 
@@ -288,12 +278,12 @@ def InfectionModel(N, I_0, R_t, C, g_p):
         cond,
         new_infectious_cases_next_day,
         (l, new_infections, S_initial),
-        maximum_iterations=total_days-l,
-        name='spreading_loop'
+        maximum_iterations=total_days - l,
+        name="spreading_loop",
     )
 
     daily_infections_final = daily_infections_final.stack()
     if len(daily_infections_final.shape) == 4:
-        daily_infections_final = tf.transpose(daily_infections_final, perm=(1,0,2,3))
+        daily_infections_final = tf.transpose(daily_infections_final, perm=(1, 0, 2, 3))
 
-    return daily_infections_final # batch_dims x time x country x age
+    return daily_infections_final  # batch_dims x time x country x age

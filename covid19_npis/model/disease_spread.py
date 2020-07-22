@@ -54,7 +54,46 @@ def _construct_I_0_t(I_0, l=16):
     return I_0_t
 
 def construct_generation_interval(mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 0.1, theta_theta=0.1, l=16):
-    # Generate generation interval
+    r"""
+    Generates the generation interval with two underlying gamma distributions for mu and theta
+        .. math::
+
+            g(\tau) = Gamma(\tau;
+            k = \frac{\mu_{D_{\text{gene}}}}{\theta_{D_\text{gene}}},
+            \theta=\theta_{D_\text{gene}})
+
+
+        whereby the underlying distribution are modeled as follows
+
+        .. math::
+
+            \mu_{D_{\text{gene}}} &\sim Gamma(k = 4.8/0.04, \theta=0.04) \\
+            \theta_{D_\text{gene}} &\sim Gamma(k = 0.8/0.1, \theta=0.1)
+
+    Parameters
+    ----------
+    mu_k : number, optional
+        Concentration/k parameter for underlying gamma distribution of mu (:math:`\mu_{D_{\text{gene}}}`).
+        |default| 120
+    mu_theta : number, optional
+        Scale/theta parameter for underlying gamma distribution of mu (:math:`\mu_{D_{\text{gene}}}`).
+        |default| 0.04
+    theta_k : number, optional
+        Concentration/k parameter for underlying gamma distribution of theta (:math:`\theta_{D_\text{gene}}`).
+        |default| 8
+    theta_theta : number, optional
+        Scale/theta parameter for underlying gamma distribution of theta (:math:`\theta_{D_\text{gene}}`).
+        |default| 0.1
+    l: number, optional
+        Length of generation interval i.e :math:`t` in the formula above
+        |default| 16
+
+    Returns
+    -------
+    :
+        Normalized generation interval pdf
+    """
+
     g = {}
 
     """ The Shape parameter k of generation interval distribution is
@@ -88,16 +127,19 @@ def construct_generation_interval(mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 
         conditionally_independent=True,
     )
 
-    """ Construct generation interval gamma distribution from underlying
-        generation distribution
-    """
+    # Avoid error related to possible batch dimensions
     if len(g_theta.shape)>0:
         g_theta = tf.expand_dims(g_theta, axis=-1)
         g_mu = tf.expand_dims(g_mu, axis=-1)
+
+    """ Construct generation interval gamma distribution from underlying
+        generation distribution
+    """
     g = gamma(tf.range(1, l, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
 
     # Get the pdf and normalize
     g_p, norm = tf.linalg.normalize(g, 1)
+
     return g_p
 
 
@@ -107,19 +149,6 @@ def InfectionModel(N, I_0, R_t, C, g_p):
     This function combines a variety of different steps:
 
         #. Generates the generation interval with two underlying gamma distributions for mu and theta
-            .. math::
-
-                g(\tau) = Gamma(\tau;
-                k = \frac{\mu_{D_{\text{gene}}}}{\theta_{D_\text{gene}}},
-                \theta=\theta_{D_\text{gene}})
-
-
-            whereby the underlying distribution are modeled as follows
-
-            .. math::
-
-                \mu_{D_{\text{gene}}} &\sim Gamma(k = 4.8/0.04, \theta=0.04) \\
-                \theta_{D_\text{gene}} &\sim Gamma(k = 0.8/0.1, \theta=0.1)
 
         #. Converts the given :math:`I_0` values  to an exponential distributed initial :math:`I_{0_t}` with an
            length of :math:`l` this can be seen in :py:func:`_construct_I_0_t`.
@@ -157,21 +186,9 @@ def InfectionModel(N, I_0, R_t, C, g_p):
     C:
         inter-age-group Contact-Matrix (see 8)
         |shape| country, age_group, age_group
-    l: number, optional
-        Length of generation interval i.e :math:`t` in the formula above
-        |default| 16
-    mu_k : number, optional
-        Concentration/k parameter for underlying gamma distribution of mu (:math:`\mu_{D_{\text{gene}}}`).
-        |default| 120
-    mu_theta : number, optional
-        Scale/theta parameter for underlying gamma distribution of mu (:math:`\mu_{D_{\text{gene}}}`).
-        |default| 0.04
-    theta_k : number, optional
-        Concentration/k parameter for underlying gamma distribution of theta (:math:`\theta_{D_\text{gene}}`).
-        |default| 8
-    theta_theta : number, optional
-        Scale/theta parameter for underlying gamma distribution of theta (:math:`\theta_{D_\text{gene}}`).
-        |default| 0.1
+    g_p:
+        Normalized PDF of the generation interval
+        |shape| batch_dims(?), l
 
     Returns
     -------
@@ -179,6 +196,7 @@ def InfectionModel(N, I_0, R_t, C, g_p):
         Sample from distribution of new, daily cases
     """
 
+    # Number of days that we look into the past for our convolution
     l = g_p.shape[-1]+1
 
     # Generate exponential distributed intial I_0_t
@@ -197,7 +215,6 @@ def InfectionModel(N, I_0, R_t, C, g_p):
         I_array = new_infections.stack(name='stack')[:-l:-1]
 
         # Calc "infectious" people, weighted by serial_p (country x age_group)
-        #I_array = tf.ones((15,2,4))
         infectious = tf.einsum("t...ca,...t->...ca", I_array, g_p)
 
         # Calculate effective R_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
@@ -212,6 +229,7 @@ def InfectionModel(N, I_0, R_t, C, g_p):
             "...cij,...cik,...ckl->...cil", R_diag, C, R_diag
         )  # Effective growth number
         # log.info(f"R_eff:\n{R_eff}")
+        
         # Calculate new infections
         # log.info(f"infectious:\n{infectious}")
         # log.info(f"f:\n{f}")

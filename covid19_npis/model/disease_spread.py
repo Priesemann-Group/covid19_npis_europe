@@ -32,7 +32,7 @@ def _construct_I_0_t(I_0, l=16):
         I_0:
             Tensor of initial I_0 values.
         l: number,optional
-            Number of time steps we need into the past
+            Number of time steps we need to go into the past
             |default| 16
     Returns
     -------
@@ -140,7 +140,7 @@ def construct_generation_interval(
     g = gamma(tf.range(1, l, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
 
     # Get the pdf and normalize
-    #g_p, norm = tf.linalg.normalize(g, 1)
+    # g_p, norm = tf.linalg.normalize(g, 1)
     if len(g.shape) > 1:
         g = g / tf.expand_dims(tf.reduce_sum(g, axis=-1), axis=-1)
     else:
@@ -148,7 +148,7 @@ def construct_generation_interval(
     return g
 
 
-#@tf.function(autograph=False, experimental_compile=True)
+# @tf.function(autograph=False, experimental_compile=True)
 def InfectionModel(N, I_0, R_t, C, g_p):
     r"""
     This function combines a variety of different steps:
@@ -214,24 +214,16 @@ def InfectionModel(N, I_0, R_t, C, g_p):
         infectious = tf.einsum("t...ca,...t->...ca", I_array, g_p)
 
         # Calculate effective R_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
-        # log.info(f"R_t inside scan:\n{R}")
-        # log.info(f"I_t inside scan:\n{I_array}")
         R_sqrt = tf.math.sqrt(R)
-        # log.info(f"R_sqrt:\n{R_sqrt}")
         R_diag = tf.linalg.diag(R_sqrt)
-        # log.info(f"R_diag:\n{R_diag}")
-        # log.info(f"C:\n{C}")
         R_eff = tf.einsum(
             "...cij,...cik,...ckl->...cil", R_diag, C, R_diag
         )  # Effective growth number
-        # log.info(f"R_eff:\n{R_eff}")
 
         # Calculate new infections
-        # log.info(f"infectious:\n{infectious}")
-        # log.info(f"f:\n{f}")
         new = tf.einsum("...ci,...cij,...cj->...cj", infectious, R_eff, f)
 
-        log.info(f"new:\n{new}")
+        #log.info(f"new:\n{new}")
         new_infections = new_infections.write(i, new)
 
         S_t = S_t - new
@@ -245,7 +237,7 @@ def InfectionModel(N, I_0, R_t, C, g_p):
     I_0_t = _construct_I_0_t(I_0, l)
     # Clip in order to avoid infinities
     I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
-    log.info(f"I_0_t:\n{I_0_t}")
+    #log.info(f"I_0_t:\n{I_0_t}")
 
     # TO DO: Documentation
     log.info(f"R_t outside scan:\n{R_t}")

@@ -127,7 +127,7 @@ def convert_trace_to_dataframe(trace, config, key):
     # Check key value
     assert key in [
         config.distributions[dist]["name"] for dist in config.distributions
-    ], f"Key '{key}' not found!"
+    ], f"Key '{key}' not found! Is it added to config.py?"
 
     # Get distribution
     dist = config.get_distribution_by_name(key)

@@ -84,6 +84,20 @@ class Config(object):
                 "shape_label": ("likelihood scale"),
                 "math": r"\sigma",
             },
+            "g_mu": {
+                "name": "g_mu",
+                "long_name": "long_name g_mu",
+                "shape": (1),
+                "shape_label": ("g_mu"),
+                "math": r"g_{\mu}",
+            },
+            "g_theta": {
+                "name": "g_theta",
+                "long_name": "long_name g_theta",
+                "shape": (1),
+                "shape_label": ("g_theta"),
+                "math": r"g_{\theta}",
+            },
         }
 
         return distributions

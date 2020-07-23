@@ -1,8 +1,12 @@
-from scipy import stats
-import matplotlib.pyplot as plt
 from .rcParams import *
 from ..data import convert_trace_to_dataframe
+
 import numpy as np
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import matplotlib.patches
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from scipy import stats
 
 import logging
 
@@ -121,79 +125,107 @@ def distribution(trace_posterior, trace_prior, config, key):
     prior = convert_trace_to_dataframe(trace_prior, config, key)
 
     dist = config.get_distribution_by_name(key)
-    shape_label = dist["shape_label"]
-    additional_dimensions = len(dist["shape_label"]) - 1  # -1 because of country
 
-    figures = []
-    for country in posterior.index.get_level_values("country").unique():
-        # Case one additional dimension
-        if additional_dimensions == 1:
-            rows = dist["shape"][1]
-            cols = 1
-            fig, axes = plt.subplots(
-                rows, cols, figsize=(4.5 / 3 * cols, rows), constrained_layout=True
-            )
-            for i, key_i in enumerate(
-                posterior.index.get_level_values(dist["shape_label"][1]).unique()
-            ):  # rows
-                axes[i] = _distribution(
-                    posterior,
-                    prior,
-                    config,
-                    country,
-                    ax=axes[i],
-                    **{dist["shape_label"][1]: key_i},
+    # Get ndim of distribution i.e. event stack ndim
+    if isinstance(dist["shape"], int):
+        ndim = 1
+    else:
+        ndim = len(dist["shape"])
+
+    def dist_ndim_1():
+        # E.g. only age groups or only one value over all age groups
+        rows = dist["shape"]
+        cols = 1
+        label1 = dist["shape_label"]
+
+        fig, ax = plt.subplots(rows, cols, figsize=(4.5 / 3 * cols, rows * 1))
+        if rows == 1:
+            # Flatten chains and other sampling dimensions of df into one array
+            array_posterior = posterior.to_numpy().flatten()
+            array_prior = prior.to_numpy().flatten()
+            return _distribution(array_posterior, array_prior, dist, ax=ax)
+        else:
+            for i, value in enumerate(
+                posterior.index.get_level_values(label1).unique()
+            ):
+                # Flatten chains and other sampling dimensions of df into one array
+                array_posterior = posterior.xs(value, level=label1).to_numpy().flatten()
+                array_prior = prior.xs(value, level=label1).to_numpy().flatten()
+                ax[i] = _distribution(array_posterior, array_prior, dist, ax=ax[i])
+            return ax
+
+    def dist_ndim_2():
+
+        # In the default case: label1 should be country and label2 should age_group
+        label2, label1 = dist["shape_label"]
+
+        # First label is rows
+        # Second label is columns
+        cols, rows = dist["shape"]
+
+        fig, ax = plt.subplots(
+            rows, cols, figsize=(4.5 / 3 * cols, rows * 1), constrained_layout=True,
+        )
+        for i, value1 in enumerate(posterior.index.get_level_values(label1).unique()):
+            # Select first level
+            temp_posterior = posterior.xs(value1, level=label1)
+            temp_prior = prior.xs(value1, level=label1)
+            for j, value2 in enumerate(
+                posterior.index.get_level_values(label2).unique()
+            ):
+                # Select second level and convert to numpy array
+                array_posterior = (
+                    temp_posterior.xs(value2, level=label2).to_numpy().flatten()
                 )
-        # Case two additional dimensions
-        elif additional_dimensions == 2:
-            rows = dist["shape"][1]
-            cols = dist["shape"][2]
-            fig, axes = plt.subplots(rows, cols, figsize=(4.5 / 3 * cols, rows))
-            for i, key_i in enumerate(
-                posterior.index.get_level_values(dist["shape_label"][1]).unique()
-            ):  # y
-                for j, key_j in enumerate(
-                    posterior.index.get_level_values(dist["shape_label"][2]).unique()
-                ):  # x
-                    axes[i][j] = _distribution(
-                        posterior,
-                        prior,
-                        config,
-                        country,
-                        ax=axes[i][j],
-                        **{
-                            dist["shape_label"][1]: key_i,
-                            dist["shape_label"][2]: key_j,
-                        },
-                    )
-        # Append figure to list
-        figures.append(fig)
-    return figures
+                array_prior = temp_prior.xs(value2, level=label2).to_numpy().flatten()
+
+                ax[i][j] = _distribution(
+                    array_posterior, array_prior, dist, ax=ax[i][j],
+                )
+
+        # Set labels on y-axis
+        for i in range(rows):
+            ax[i, 0].set_ylabel(posterior.index.get_level_values(label1).unique()[i])
+        # Set labels on x-axis
+        for i in range(cols):
+            ax[0, i].set_xlabel(posterior.index.get_level_values(label1).unique()[i])
+
+        return ax
+
+    def dist_ndim_3():
+        return "TODO"
+
+    # ------------------------------------------------------------------------------ #
+    # CASES
+    # ------------------------------------------------------------------------------ #
+    if ndim == 1:
+        return dist_ndim_1()
+    elif ndim == 2:
+        return dist_ndim_2()
+    elif ndim == 3:
+        return dist_ndim_3()
 
 
-def _distribution(df_posterior, df_prior, config, country, ax=None, **dimensions):
+def _distribution(array_posterior, array_prior, distribution_dict, suffix="", ax=None):
     """
-    Plots a single distribution from a give country and additional dimensions (e.g. aga_groups),
-    if no dimension is given the function uses all available samples in the dataframes
-    to create the plot.
-    
+    Low level function to plots posterior and prior from arrays.
 
     Parameters
     ----------
-    df_posterior:
+    array_posterior,array_prior : array
+        Sampling data as array, should be filtered beforehand.
 
-    df_prior:
-
-    country: str
+    distribution_dict: dict
+        Config.distibution["name"] dictionary, get via config.get_distribution_by_name("name")
+    
+    suffix: str,optional
+        Suffix for the plot title e.g. "age_group_1"
+        |default| ""
 
     ax : mpl axes element, optional
         Plot into an existing axes element
         |default| :code:`None`
-
-    dimensions: str, optional, kwarg
-        Use with care there is no value checks for this,
-        e.g. :code:`age_group="a0-10"`. See config shape_label
-        for possibilities.
+    
 
     Example
     -------
@@ -214,24 +246,7 @@ def _distribution(df_posterior, df_prior, config, country, ax=None, **dimensions
 
 
     """
-
-    # ------------------------------------------------------------------------------ #
-    # Filter data
-    # ------------------------------------------------------------------------------ #
-
-    # Get country and other dimensions
-    df_posterior = df_posterior.xs(country, level="country")
-    df_prior = df_prior.xs(country, level="country")
-    suffix = ""
-    for level, key in dimensions.items():
-        df_posterior = df_posterior.xs(key, level=level)
-        df_prior = df_prior.xs(key, level=level)
-        suffix += r"$_{" + key + "}$"
-
-    data_posterior = df_posterior.to_numpy().flatten()
-    data_prior = df_prior.to_numpy().flatten()
-
-    dist = config.get_distribution_by_name(df_posterior.columns[0])
+    dist = distribution_dict
 
     if ax is None:
         fig, ax = plt.subplots(figsize=(4.5 / 3, 1))
@@ -239,13 +254,15 @@ def _distribution(df_posterior, df_prior, config, country, ax=None, **dimensions
     # ------------------------------------------------------------------------------ #
     # Plot
     # ------------------------------------------------------------------------------ #
+    ax = _plot_posterior(x=array_posterior, ax=ax)
+    ax = _plot_prior(x=array_prior, ax=ax)
 
-    ax = _plot_posterior(x=data_posterior, ax=ax)
-    ax = _plot_prior(x=data_prior, ax=ax)
-
+    # ------------------------------------------------------------------------------ #
+    # Annotations
+    # ------------------------------------------------------------------------------ #
     # add the overlay with median and CI values. these are two strings
-    text_md, text_ci = _string_median_CI(data_posterior, prec=2)
-    test_md = f"${dist['math']}={text_md}$"
+    text_md, text_ci = _string_median_CI(array_posterior, prec=2)
+    text_md = f"${dist['math']}={text_md}$"
 
     # create the inset text elements, and we want a bounding box around the compound
     try:
@@ -274,17 +291,19 @@ def _distribution(df_posterior, df_prior, config, country, ax=None, **dimensions
             [tel_md, tel_ci], ax, facecolor="white", alpha=0.5, zorder=99,
         )
     except Exception as e:
-        log.debug(f"Unable to create inset with {dist['name']} value: {e}")
+        log.info(f"Unable to create inset with {dist['name']} value: {e}")
 
-    # finalize
+    # ------------------------------------------------------------------------------ #
+    # Additional plotting settings
+    # ------------------------------------------------------------------------------ #
+    ax.xaxis.set_label_position("top")
+    # ax.set_xlabel(dist["name"] + suffix)
+    ax.set_xlim(0)
+
     ax.tick_params(labelleft=False)
     ax.set_rasterization_zorder(rcParams.rasterization_zorder)
     ax.spines["right"].set_visible(False)
     ax.spines["top"].set_visible(False)
-
-    ax.set_xlabel(dist["name"] + suffix)
-    ax.xaxis.set_label_position("top")
-    ax.set_xlim(0)
 
     return ax
 

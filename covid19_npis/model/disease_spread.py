@@ -3,28 +3,16 @@ import logging
 import pymc4 as pm
 import tensorflow_probability as tfp
 
-# from covid19_npis.config import Config
 
 log = logging.getLogger(__name__)
-"""
-config = Config(I_new)
 
-def return_I_0(event_shape):
-    I_0 = yield pm.HalfCauchy(
-        name=config.distributions["I_0"]["name"],
-        loc=10.0,
-        scale=25,
-        conditionally_independent=True,
-        event_stack=event_shape,
-        transform=transformations.Log(reinterpreted_batch_ndims=len(event_shape)),
-    )
-    I_0 = tf.clip_by_value(I_0, 1e-9, 1e10)
-    log.info(f"I_0:\n{I_0}")
-    return I_0
-"""
-# Distribution pdf for generation interval
+# Un-normalized distribution pdf for generation interval
 def gamma(x, alpha, beta):
     return tf.math.pow(x, (alpha - 1)) * tf.exp(-beta * x)
+
+# Un-normalized distribution pdf for generation interval
+def weibull(x, alpha, beta):
+    return tf.math.pow(x, (alpha - 1)) * tf.exp(-tf.math.pow(beta * x, alpha))
 
 
 def _construct_I_0_t(I_0, l=16):
@@ -155,6 +143,7 @@ def construct_generation_interval(
         generation distribution
     """
     g = gamma(tf.range(1, l, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
+    #g = weibull(tf.range(1, l, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
 
     # Get the pdf and normalize
     # g_p, norm = tf.linalg.normalize(g, 1)
@@ -257,7 +246,7 @@ def InfectionModel(N, I_0, R_t, C, g_p):
     # log.info(f"I_0_t:\n{I_0_t}")
 
     # TO DO: Documentation
-    log.info(f"R_t outside scan:\n{R_t}")
+    #log.info(f"R_t outside scan:\n{R_t}")
     total_days = R_t.shape[0]
 
     # Create an Tensor array and initalize the first l elements

@@ -99,7 +99,12 @@ def _plot_posterior(x, bins=50, ax=None, **kwargs):
 
 def distribution(trace_posterior, trace_prior, config, key):
     """
-    High level function for creating plot overview for a variable.
+    High level function for creating plot overview for a variable. Works for
+    one and two dimensional variable at the moment.
+
+    TODO
+    ----
+    - ndim=3
     
 
     Parameters
@@ -138,7 +143,9 @@ def distribution(trace_posterior, trace_prior, config, key):
         cols = 1
         label1 = dist["shape_label"]
 
-        fig, ax = plt.subplots(rows, cols, figsize=(4.5 / 3 * cols, rows * 1))
+        fig, ax = plt.subplots(
+            rows, cols, figsize=(4.5 / 3 * cols, rows * 1), constrained_layout=True
+        )
         if rows == 1:
             # Flatten chains and other sampling dimensions of df into one array
             array_posterior = posterior.to_numpy().flatten()
@@ -151,7 +158,9 @@ def distribution(trace_posterior, trace_prior, config, key):
                 # Flatten chains and other sampling dimensions of df into one array
                 array_posterior = posterior.xs(value, level=label1).to_numpy().flatten()
                 array_prior = prior.xs(value, level=label1).to_numpy().flatten()
-                ax[i] = _distribution(array_posterior, array_prior, dist, ax=ax[i])
+                ax[i] = _distribution(
+                    array_posterior, array_prior, dist, ax=ax[i], suffix=f"{i}"
+                )
             return ax
 
     def dist_ndim_2():
@@ -180,7 +189,7 @@ def distribution(trace_posterior, trace_prior, config, key):
                 array_prior = temp_prior.xs(value2, level=label2).to_numpy().flatten()
 
                 ax[i][j] = _distribution(
-                    array_posterior, array_prior, dist, ax=ax[i][j],
+                    array_posterior, array_prior, dist, ax=ax[i][j], suffix=f"{i},{j}"
                 )
 
         # Set labels on y-axis
@@ -249,7 +258,7 @@ def _distribution(array_posterior, array_prior, distribution_dict, suffix="", ax
     dist = distribution_dict
 
     if ax is None:
-        fig, ax = plt.subplots(figsize=(4.5 / 3, 1))
+        fig, ax = plt.subplots(figsize=(4.5 / 3, 1), constrained_layout=True)
 
     # ------------------------------------------------------------------------------ #
     # Plot
@@ -262,7 +271,7 @@ def _distribution(array_posterior, array_prior, distribution_dict, suffix="", ax
     # ------------------------------------------------------------------------------ #
     # add the overlay with median and CI values. these are two strings
     text_md, text_ci = _string_median_CI(array_posterior, prec=2)
-    text_md = f"${dist['math']}={text_md}$"
+    text_md = f"${dist['math']}^{{{suffix}}}={text_md}$"
 
     # create the inset text elements, and we want a bounding box around the compound
     try:

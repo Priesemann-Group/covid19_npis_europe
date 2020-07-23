@@ -7,6 +7,8 @@ import os
 
 import logging
 
+logging.basicConfig(level=logging.DEBUG)
+
 log = logging.getLogger(__name__)
 
 sys.path.append("../")
@@ -66,6 +68,7 @@ def test_model(config):
         event_stack=event_shape,
         transform=transformations.Log(reinterpreted_batch_ndims=len(event_shape)),
     )
+    log.debug(f"R:\n{R}")
 
     R_t = tf.stack(
         [R] * 50
@@ -87,17 +90,18 @@ def test_model(config):
 
     # Create normalized pdf of generation interval
     g_p = yield covid19_npis.model.construct_generation_interval()
+    log.debug(f"g_p:\n{g_p}")
 
     # Create N tensor (vector)
     # should be done earlier in the real model
     N = tf.convert_to_tensor([10e5, 10e5, 10e5, 10e5] * 2)
     N = tf.reshape(N, event_shape)
-    # log.info(f"N:\n{N}")
+    # log.debug(f"N:\n{N}")
     # Calculate new cases
     new_cases = covid19_npis.model.InfectionModel(
         N=N, I_0=I_0, R_t=R_t, C=C, g_p=g_p  # default valueOp:AddV2
     )
-    # log.info(f"new_cases:\n{new_cases[0,:]}")  # dimensons=t,c,a
+    # log.debug(f"new_cases:\n{new_cases[0,:]}")  # dimensons=t,c,a
 
     # Clip in order to avoid infinities
     new_cases = tf.clip_by_value(new_cases, 1e-7, 1e9)
@@ -134,7 +138,7 @@ def test_model(config):
         return tf.clip_by_value(p, 1e-9, 1.0)
 
     p = convert(new_cases, psi)
-    log.info(f"r:{p}")
+    log.debug(f"r:{p}")
     p = yield pm.Deterministic(name="new_cases", value=p)
     likelihood = yield pm.NegativeBinomial(
         name="like",
@@ -155,7 +159,7 @@ trace = pm.sample(
     num_samples=50,
     burn_in=50,
     use_auto_batching=False,
-    num_chains=4,
+    num_chains=2,
     xla=True,
 )
 """
@@ -169,7 +173,7 @@ benchmark(
 )
 """
 end_time = time.time()
-print("running time: {:.1f}s".format(end_time - begin_time))
+log.info("running time: {:.1f}s".format(end_time - begin_time))
 
 
 """ # Convert trace to nicely format (easier plotting)

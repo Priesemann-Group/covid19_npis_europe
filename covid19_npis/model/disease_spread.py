@@ -135,6 +135,9 @@ def construct_generation_interval(
         conditionally_independent=True,
     )
 
+    log.debug(f"g_mu:\n{g_mu}")
+    log.debug(f"g_mu:\n{g_theta}")
+
     # Avoid error related to possible batch dimensions
     if len(g_theta.shape) > 0:
         g_theta = tf.expand_dims(g_theta, axis=-1)
@@ -143,6 +146,7 @@ def construct_generation_interval(
     """ Construct generation interval gamma distribution from underlying
         generation distribution
     """
+
     g = gamma(tf.range(1, l, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
     # g = weibull(tf.range(1, l, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
 
@@ -215,7 +219,9 @@ def InfectionModel(N, I_0, R_t, C, g_p):
         R = tf.gather(R_t, i, axis=0)
 
         # These are the infections over which the convolution is done
-        I_array = new_infections.stack(name="stack")[:-l:-1]
+        log.debug(f"new_infections: {new_infections}")
+        I_array = new_infections.stack()[:-l:-1]
+        log.debug(f"I_array: {I_array}")
 
         # Calc "infectious" people, weighted by serial_p (country x age_group)
         infectious = tf.einsum("t...ca,...t->...ca", I_array, g_p)
@@ -227,10 +233,13 @@ def InfectionModel(N, I_0, R_t, C, g_p):
             "...cij,...cik,...ckl->...cil", R_diag, C, R_diag
         )  # Effective growth number
 
+        log.debug(f"infectious: {infectious}")
+        log.debug(f"R_eff:\n{R_eff}")
+        log.debug(f"f:\n{f}")
+
         # Calculate new infections
         new = tf.einsum("...ci,...cij,...cj->...cj", infectious, R_eff, f)
-
-        # log.info(f"new:\n{new}")
+        log.debug(f"new:\n{new}")
         new_infections = new_infections.write(i, new)
 
         S_t = S_t - new
@@ -244,7 +253,7 @@ def InfectionModel(N, I_0, R_t, C, g_p):
     I_0_t = _construct_I_0_t(I_0, l)
     # Clip in order to avoid infinities
     I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
-    # log.info(f"I_0_t:\n{I_0_t}")
+    log.debug(f"I_0_t:\n{I_0_t}")
 
     # TO DO: Documentation
     # log.info(f"R_t outside scan:\n{R_t}")

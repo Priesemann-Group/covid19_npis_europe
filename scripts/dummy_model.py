@@ -92,12 +92,12 @@ def test_model(config):
     # should be done earlier in the real model
     N = tf.convert_to_tensor([10e5, 10e5, 10e5, 10e5] * 2)
     N = tf.reshape(N, event_shape)
-    #log.info(f"N:\n{N}")
+    # log.info(f"N:\n{N}")
     # Calculate new cases
     new_cases = covid19_npis.model.InfectionModel(
         N=N, I_0=I_0, R_t=R_t, C=C, g_p=g_p  # default valueOp:AddV2
     )
-    #log.info(f"new_cases:\n{new_cases[0,:]}")  # dimensons=t,c,a
+    # log.info(f"new_cases:\n{new_cases[0,:]}")  # dimensons=t,c,a
 
     # Clip in order to avoid infinities
     new_cases = tf.clip_by_value(new_cases, 1e-7, 1e9)

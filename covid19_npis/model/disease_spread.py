@@ -10,6 +10,7 @@ log = logging.getLogger(__name__)
 def gamma(x, alpha, beta):
     return tf.math.pow(x, (alpha - 1)) * tf.exp(-beta * x)
 
+
 # Un-normalized distribution pdf for generation interval
 def weibull(x, alpha, beta):
     return tf.math.pow(x, (alpha - 1)) * tf.exp(-tf.math.pow(beta * x, alpha))
@@ -143,7 +144,7 @@ def construct_generation_interval(
         generation distribution
     """
     g = gamma(tf.range(1, l, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
-    #g = weibull(tf.range(1, l, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
+    # g = weibull(tf.range(1, l, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
 
     # Get the pdf and normalize
     # g_p, norm = tf.linalg.normalize(g, 1)
@@ -246,7 +247,7 @@ def InfectionModel(N, I_0, R_t, C, g_p):
     # log.info(f"I_0_t:\n{I_0_t}")
 
     # TO DO: Documentation
-    #log.info(f"R_t outside scan:\n{R_t}")
+    # log.info(f"R_t outside scan:\n{R_t}")
     total_days = R_t.shape[0]
 
     # Create an Tensor array and initalize the first l elements

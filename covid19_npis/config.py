@@ -45,6 +45,12 @@ class Config(object):
     def get_data(self):
         return self.df
 
+    def get_distribution_by_name(self, name):
+        for dist, value in self.distributions.items():
+            if value["name"] == name:
+                this_dist = dist
+        return self.distributions[this_dist]
+
     def __get_default_dist_config(self, num_countries, num_age_groups):
         """
             Get default values of config dicts.
@@ -55,24 +61,28 @@ class Config(object):
                 "long_name": "Initial infectious people",
                 "shape": (num_countries, num_age_groups),
                 "shape_label": ("country", "age_group"),
+                "math": "I_0",
             },
             "R": {
                 "name": "R",
                 "long_name": "Reproduction number",
                 "shape": (num_countries, num_age_groups),
                 "shape_label": ("country", "age_group"),
+                "math": "R",
             },
             "C": {
                 "name": "C",
                 "long_name": "Contact matrix",
                 "shape": (num_countries, num_age_groups, num_age_groups),
                 "shape_label": ("country", "age_group_i", "age_group_j"),
+                "math": "C",
             },
             "sigma": {
                 "name": "sigma",
                 "long_name": "likelihood scale",
                 "shape": (1),
                 "shape_label": ("likelihood scale"),
+                "math": r"\sigma",
             },
         }
 

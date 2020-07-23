@@ -25,7 +25,7 @@ from covid19_npis.benchmarking import benchmark
 os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=2"
 
 """ # Data Retrieval
-    Retries some dummy/test data
+    Retrieves some dummy/test data
 """
 # Fixed R matrix for now one country one age group
 I_new = covid19_npis.test_data.simple_new_I(0.35)
@@ -142,14 +142,15 @@ def test_model(config):
 
 # a = pm.sample_prior_predictive(test_model(data), sample_shape=1000, use_auto_batching=False)
 begin_time = time.time()
-# trace = pm.sample(
-#    test_model(config),
-#    num_samples=50,
-#    burn_in=50,
-#    use_auto_batching=False,
-#    num_chains=4,
-#    xla=True,
-# )
+trace = pm.sample(
+    test_model(config),
+    num_samples=50,
+    burn_in=50,
+    use_auto_batching=False,
+    num_chains=4,
+    xla=True,
+)
+"""
 benchmark(
     test_model(config),
     only_xla=False,
@@ -158,6 +159,7 @@ benchmark(
     parallelize=True,
     n_evals=100,
 )
+"""
 end_time = time.time()
 print("running time: {:.1f}s".format(end_time - begin_time))
 
@@ -175,9 +177,10 @@ print("running time: {:.1f}s".format(end_time - begin_time))
 trace_prior = pm.sample_prior_predictive(
     test_model(config), sample_shape=1000, use_auto_batching=False
 )
-priors = covid19_npis.convert_trace_to_pandas_list(test_model, trace_prior, config)
-
 
 """ # Plot distributions
-
+    Function returns a list of figures which can be shown by fig[i].show() each figure beeing one country.
 """
+figs = covid19_npis.plot.distributions.distribution(
+    trace, trace_prior, config=config, key="R"
+)

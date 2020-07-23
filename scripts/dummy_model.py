@@ -101,11 +101,12 @@ def test_model(config):
 
     # Clip in order to avoid infinities
     new_cases = tf.clip_by_value(new_cases, 1e-7, 1e9)
-
+    """
     # Get scale of likelihood
     sigma = yield pm.HalfCauchy(name=config.distributions["sigma"]["name"], scale=50)
     for i in range(3):
         sigma = tf.expand_dims(sigma, axis=-1)
+    
 
     # Likelihood of the data
     likelihood = yield pm.StudentT(
@@ -116,27 +117,34 @@ def test_model(config):
         observed=config.get_data().to_numpy().astype("float32").reshape((50, 2, 4)),
         reinterpreted_batch_ndims=3,
     )
+    """
 
-    """ UNUSED NEGATIVE BINOMIAL CODE
-    def convert(mu, var):
-        r = 1 / var
-        p = mu / (mu + r)
-        return r, p
+    psi = yield pm.HalfCauchy(
+        name=config.distributions["sigma"]["name"],
+        scale=5.0,
+        event_stack=(1, num_countries),  # same across time
+        conditionally_independent=True,
+        transform=transformations.SoftPlus(reinterpreted_batch_ndims=2),
+    )
 
-    r, p = convert(new_cases, 0.2)
+    psi = psi[..., tf.newaxis]  # same across age groups
 
-    log.info(f"r:{r}")
-    log.info(f"p:{p}")
-    log.info(f"data:{data.shape}")
+    def convert(mu, psi):
+        p = mu / (mu + psi)
+        return tf.clip_by_value(p, 1e-9, 1.0)
+
+    p = convert(new_cases, psi)
+    log.info(f"r:{p}")
+    p = yield pm.Deterministic(name="new_cases", value=p)
     likelihood = yield pm.NegativeBinomial(
         name="like",
-        total_count=r,
+        total_count=psi,
         probs=p,
-        observed=data.astype("float32"),
+        observed=config.get_data().to_numpy().astype("float32").reshape((50, 2, 4)),
         allow_nan_stats=True,
-        reinterpreted_batch_ndims=3
+        reinterpreted_batch_ndims=3,
     )
-    """
+
     return likelihood
 
 

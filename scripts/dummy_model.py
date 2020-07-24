@@ -22,20 +22,20 @@ from covid19_npis.benchmarking import benchmark
 #    stack_height_limit=30, path_length_limit=50
 # )
 
-""" Force GPU
+""" Force CPU
 """
-# my_devices = tf.config.experimental.list_physical_devices(device_type="CPU")
-# tf.config.experimental.set_visible_devices(devices=my_devices, device_type="CPU")
-# tf.config.set_visible_devices([], "GPU")
+my_devices = tf.config.experimental.list_physical_devices(device_type="CPU")
+tf.config.experimental.set_visible_devices(devices=my_devices, device_type="CPU")
+tf.config.set_visible_devices([], "GPU")
 
-os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=2"
+# os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=2"
 
 """ # Data Retrieval
     Retrieves some dummy/test data
 """
 # Fixed R matrix for now one country one age group
-I_new = covid19_npis.test_data.simple_new_I(0.3)
-I_new = I_new.join(covid19_npis.test_data.simple_new_I(0.3))
+I_new = covid19_npis.test_data.simple_new_I(1)
+I_new = I_new.join(covid19_npis.test_data.simple_new_I(1))
 num_age_groups = 4
 num_countries = 2
 
@@ -82,7 +82,7 @@ def test_model(config):
 
     # Use Cholesky version as the non Cholesky version uses tf.linalg.slogdet which isn't implemented in JAX
     C = yield pm.LKJCholesky(
-        name=config.distributions["C"]["name"],
+        name="C_cholesky",
         dimension=num_age_groups,
         concentration=2,  # eta
         conditionally_independent=True,
@@ -90,7 +90,10 @@ def test_model(config):
         # event_stack = num_countries,
         # batch_stack=batch_stack
     )  # dimensions: batch_dims x num_countries x num_age_groups x num_age_groups
-    C = tf.einsum("...ab,...ba->...ab", C, C)
+    C = yield pm.Deterministic(
+        name=config.distributions["C"]["name"],
+        value=tf.einsum("...ab,...ba->...ab", C, C),
+    )
 
     # Create normalized pdf of generation interval
     g_p = yield covid19_npis.model.construct_generation_interval()

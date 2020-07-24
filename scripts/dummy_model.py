@@ -105,13 +105,17 @@ def test_model(config):
 
     # Clip in order to avoid infinities
     new_cases = tf.clip_by_value(new_cases, 1e-7, 1e9)
-    """
-    # Get scale of likelihood
-    sigma = yield pm.HalfCauchy(name=config.distributions["sigma"]["name"], scale=50)
-    for i in range(3):
-        sigma = tf.expand_dims(sigma, axis=-1)
-    
 
+    # Get scale of likelihood
+    sigma = yield pm.HalfCauchy(
+        name=config.distributions["sigma"]["name"],
+        scale=50.0,
+        event_stack=(1, num_countries),
+        conditionally_independent=True,
+        transform=transformations.SoftPlus(reinterpreted_batch_ndims=2),
+    )
+    sigma = sigma[..., tf.newaxis]  # same across age groups
+    new_cases = yield pm.Deterministic(name="new_cases", value=new_cases)
     # Likelihood of the data
     likelihood = yield pm.StudentT(
         name="like",
@@ -125,7 +129,7 @@ def test_model(config):
 
     psi = yield pm.HalfCauchy(
         name=config.distributions["sigma"]["name"],
-        scale=5.0,
+        scale=50.0,
         event_stack=(1, num_countries),  # same across time
         conditionally_independent=True,
         transform=transformations.SoftPlus(reinterpreted_batch_ndims=2),
@@ -139,7 +143,7 @@ def test_model(config):
 
     p = convert(new_cases, psi)
     log.debug(f"r:{p}")
-    p = yield pm.Deterministic(name="new_cases", value=p)
+    new_cases = yield pm.Deterministic(name="new_cases", value=new_cases)
     likelihood = yield pm.NegativeBinomial(
         name="like",
         total_count=psi,
@@ -148,6 +152,7 @@ def test_model(config):
         allow_nan_stats=True,
         reinterpreted_batch_ndims=3,
     )
+    """
 
     return likelihood
 

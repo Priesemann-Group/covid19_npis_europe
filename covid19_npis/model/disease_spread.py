@@ -246,7 +246,7 @@ def InfectionModel(N, I_0, R_t, C, g_p):
 
         S_t = S_t - new
 
-        return new, I_nextv, S_t - new
+        return new, I_nextv, S_t
 
     # Number of days that we look into the past for our convolution
     l = g_p.shape[-1] + 1

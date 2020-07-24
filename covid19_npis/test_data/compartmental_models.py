@@ -63,6 +63,6 @@ def simple_new_I(factor):
     df[(ts, "a30-99")] = I_t[:, 3]
 
     df = df.set_index("date")
-    df.columns = pd.MultiIndex.from_tuples(df.columns, names=["country", "age group"])
+    df.columns = pd.MultiIndex.from_tuples(df.columns, names=["country", "age_group"])
 
     return df

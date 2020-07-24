@@ -32,15 +32,15 @@ class Config(object):
         num_countries = len(data.columns.levels[0])
         num_age_groups = len(data.columns.levels[1])
 
+        # Data object
+        self.df = data
+
         # Configs for distribution
         self.distributions = self.__get_default_dist_config(
             num_countries, num_age_groups
         )
         # Config for input data
         self.data = self.__get_default_data_config(data)
-
-        # Data object
-        self.df = data
 
     def get_data(self):
         return self.df
@@ -53,7 +53,7 @@ class Config(object):
 
     def __get_default_dist_config(self, num_countries, num_age_groups):
         """
-            Get default values of config dicts.
+            Get default values of distribution dict.
         """
         distributions = {
             "I_0": {
@@ -97,6 +97,12 @@ class Config(object):
                 "shape": (1),
                 "shape_label": ("g_theta"),
                 "math": r"g_{\theta}",
+            },
+            "new_cases": {
+                "name": "new_cases",
+                "long_name": "Daily new infectious cases",
+                "shape": (len(self.df), num_countries, num_age_groups),
+                "shape_label": ("time", "country", "age_group"),
             },
         }
 

@@ -22,15 +22,19 @@ from covid19_npis.benchmarking import benchmark
 #    stack_height_limit=30, path_length_limit=50
 # )
 
-# tf.config.threading.set_inter_op_parallelism_threads(2)
-# tf.config.threading.set_intra_op_parallelism_threads(2)
+""" Force GPU
+"""
+# my_devices = tf.config.experimental.list_physical_devices(device_type="CPU")
+# tf.config.experimental.set_visible_devices(devices=my_devices, device_type="CPU")
+# tf.config.set_visible_devices([], "GPU")
+
 os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=2"
 
 """ # Data Retrieval
     Retrieves some dummy/test data
 """
 # Fixed R matrix for now one country one age group
-I_new = covid19_npis.test_data.simple_new_I(0.35)
+I_new = covid19_npis.test_data.simple_new_I(0.3)
 I_new = I_new.join(covid19_npis.test_data.simple_new_I(0.3))
 num_age_groups = 4
 num_countries = 2
@@ -161,8 +165,8 @@ def test_model(config):
 begin_time = time.time()
 trace = pm.sample(
     test_model(config),
-    num_samples=50,
-    burn_in=50,
+    num_samples=1000,
+    burn_in=1000,
     use_auto_batching=False,
     num_chains=2,
     xla=True,
@@ -198,6 +202,15 @@ trace_prior = pm.sample_prior_predictive(
 """ # Plot distributions
     Function returns a list of figures which can be shown by fig[i].show() each figure beeing one country.
 """
-figs = covid19_npis.plot.distributions.distribution(
-    trace, trace_prior, config=config, key="R"
-)
+fig_R = covid19_npis.plot.distribution(trace, trace_prior, config=config, key="R")
+fig_new_cases = covid19_npis.plot.timeseries(trace, config=config, key="new_cases")
+
+# plot data onto axes of new_cases
+for i, c in enumerate(config.data["countries"]):
+    for j, a in enumerate(config.data["age_groups"]):
+        fig_new_cases[j][i] = covid19_npis.plot.time_series._timeseries(
+            config.df.index,
+            config.df[(c, a)].to_numpy(),
+            ax=fig_new_cases[j][i],
+            alpha=0.5,
+        )

@@ -1,5 +1,5 @@
 from .rcParams import *
-from ..data import convert_trace_to_dataframe
+from ..data import convert_trace_to_dataframe, select_from_dataframe
 
 import numpy as np
 import matplotlib as mpl
@@ -166,7 +166,7 @@ def distribution(trace_posterior, trace_prior, config, key):
     def dist_ndim_2():
 
         # In the default case: label1 should be country and label2 should age_group
-        label2, label1 = dist["shape_label"]
+        label1, label2 = dist["shape_label"]
 
         # First label is rows
         # Second label is columns
@@ -176,28 +176,31 @@ def distribution(trace_posterior, trace_prior, config, key):
             rows, cols, figsize=(4.5 / 3 * cols, rows * 1), constrained_layout=True,
         )
         for i, value1 in enumerate(posterior.index.get_level_values(label1).unique()):
-            # Select first level
-            temp_posterior = posterior.xs(value1, level=label1)
-            temp_prior = prior.xs(value1, level=label1)
             for j, value2 in enumerate(
                 posterior.index.get_level_values(label2).unique()
             ):
-                # Select second level and convert to numpy array
-                array_posterior = (
-                    temp_posterior.xs(value2, level=label2).to_numpy().flatten()
+                # Select values from datafram
+                arry_posterior = (
+                    select_from_dataframe(posterior, **{label1: value1, label2: value2})
+                    .to_numpy()
+                    .flatten()
                 )
-                array_prior = temp_prior.xs(value2, level=label2).to_numpy().flatten()
+                array_prior = (
+                    select_from_dataframe(prior, **{label1: value1, label2: value2})
+                    .to_numpy()
+                    .flatten()
+                )
 
-                ax[i][j] = _distribution(
-                    array_posterior, array_prior, dist, ax=ax[i][j], suffix=f"{i},{j}"
+                ax[j][i] = _distribution(
+                    arry_posterior, array_prior, dist, ax=ax[j][i], suffix=f"{i},{j}"
                 )
 
         # Set labels on y-axis
-        for i in range(rows):
-            ax[i, 0].set_ylabel(posterior.index.get_level_values(label1).unique()[i])
-        # Set labels on x-axis
         for i in range(cols):
-            ax[0, i].set_xlabel(posterior.index.get_level_values(label2).unique()[i])
+            ax[0, i].set_ylabel(posterior.index.get_level_values(label1).unique()[i])
+        # Set labels on x-axis
+        for i in range(rows):
+            ax[i, 0].set_xlabel(posterior.index.get_level_values(label2).unique()[i])
 
         return ax
 

@@ -32,3 +32,7 @@ Distribution
 
 Time series
 ^^^^^^^^^^^
+
+.. automodule:: covid19_npis.plot.time_series
+    :members:
+    :private-members:

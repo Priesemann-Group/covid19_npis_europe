@@ -197,7 +197,7 @@ def distribution(trace_posterior, trace_prior, config, key):
             ax[i, 0].set_ylabel(posterior.index.get_level_values(label1).unique()[i])
         # Set labels on x-axis
         for i in range(cols):
-            ax[0, i].set_xlabel(posterior.index.get_level_values(label1).unique()[i])
+            ax[0, i].set_xlabel(posterior.index.get_level_values(label2).unique()[i])
 
         return ax
 

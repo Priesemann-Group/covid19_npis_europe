@@ -165,8 +165,8 @@ def test_model(config):
 begin_time = time.time()
 trace = pm.sample(
     test_model(config),
-    num_samples=1000,
-    burn_in=1000,
+    num_samples=50,
+    burn_in=50,
     use_auto_batching=False,
     num_chains=2,
     xla=True,

@@ -62,7 +62,10 @@ def match_axes(tensor, target_axes, ndim=None):
     if ndim is None:
         ndim = ndim_inferred
     else:
-        assert ndim >= max(max(target_axes) + 1, max(-np.array(target_axes)))
+        assert ndim >= max(
+            max(target_axes) + 1, max(-np.array(target_axes))
+        ), "ndim is smaller then the number of inferred axes from target_axes"
+
     target_axes = np.array(positive_axes(target_axes, ndim))
     if not len(set(target_axes)) == len(target_axes):
         raise RuntimeError(f"An axis is doubly targeted: {target_axes}")
@@ -74,11 +77,12 @@ def match_axes(tensor, target_axes, ndim=None):
 
     ### Permutation part:
     perm = target_axes - np.cumsum(lacking_dims)[i_sorted_inv]
-    tensor = tf.transpose(tensor, perm=perm)
+    tensor = tf.transpose(tensor, perm=np.argsort(perm))
 
     ### Expansion part:
-    # if len(lacking_dims) < ndim:
-    #    lacking_dims = np.concatenate([lacking_dims, [ndim - len(lacking_dims)]])
+    append_to_end = ndim - sum(lacking_dims) - len(tensor.shape)
+    lacking_dims = np.concatenate([lacking_dims, [append_to_end]])
+
     pos_dims_lacking = np.where(lacking_dims > 0)[0]
     for pos in pos_dims_lacking[::-1]:
         num_missing = lacking_dims[pos]
@@ -119,12 +123,12 @@ def einsum_indexed(
     targ_outer1 : int or list
         The axes indices in the result where the outer product axes of tensor 1 is
         mapped to. If omitted, the position is inferred such that the order stays the
-        same, and the indices of tensor 1 are to the left of the indices of tensor2 for
+        same, and, if equal, the indices of tensor 1 are to the left of the indices of tensor2 for
         outer products.
-    targ_outer2
+    targ_outer2 : int or list
         The axes indices in the result where the outer product axes of tensor 2 is
         mapped to. If omitted, the position is inferred such that the order stays the
-        same, and the indices of tensor 1 are to the left of the indices of tensor2 for
+        same, and, if equal, the indices of tensor 1 are to the left of the indices of tensor2 for
         outer products.
 
     Returns
@@ -181,8 +185,20 @@ def einsum_indexed(
 
     broadcasting_letter = ""
     broadcasting_tensor = 0
+    broadcasting_index = None
     outer_tensor = 0
+    tensor1_broadcast_to = [None for _ in range(len(tensor1.shape))]
+    tensor2_broadcast_to = [None for _ in range(len(tensor2.shape))]
+
+    print(ind_inputs1)
+    print(ind_inputs2)
+
     for i in range(1, max(len(tensor1.shape), len(tensor2.shape)) + 1):
+        if ind_inputs2[-i].isalpha():
+            tensor2_broadcast_to[-i] = tensor2.shape[-i]
+        if ind_inputs1[-i].isalpha():
+            tensor1_broadcast_to[-i] = tensor1.shape[-i]
+
         if ind_inputs2[-i] == "!":
             if not outer_tensor:
                 outer_tensor = 1
@@ -192,6 +208,7 @@ def einsum_indexed(
                 ind_inputs2[-i] = letters_broadcasting.pop(0)
             else:
                 raise RuntimeError("Wrong parametrization of einsum")
+            tensor2_broadcast_to[-i] = tensor2.shape[-i]
 
         if ind_inputs1[-i] == "!":
             if not outer_tensor:
@@ -202,15 +219,25 @@ def einsum_indexed(
                 ind_inputs1[-i] = letters_broadcasting.pop(0)
             else:
                 raise RuntimeError("Wrong parametrization of einsum")
+            tensor1_broadcast_to[-i] = tensor1.shape[-i]
 
         if ind_inputs2[-i] == "-":
             if broadcasting_tensor == 0:
                 broadcasting_tensor = 1
                 broadcasting_letter = letters_broadcasting.pop(0)
+                broadcasting_index = -i
                 ind_inputs2[-i] = broadcasting_letter
             elif broadcasting_tensor == 2:
                 broadcasting_tensor = 0
                 ind_inputs2[-i] = broadcasting_letter
+                broadcast_dim = max(
+                    tensor2.shape[-i], tensor1.shape[broadcasting_index]
+                )
+                print(broadcast_dim)
+                tensor2_broadcast_to[-i] = broadcast_dim
+                tensor1_broadcast_to[broadcasting_index] = broadcast_dim
+
+                broadcasting_index = None
                 broadcasting_letter = ""
             else:
                 raise RuntimeError("Wrong parametrization of einsum")
@@ -219,10 +246,18 @@ def einsum_indexed(
             if broadcasting_tensor == 0:
                 broadcasting_tensor = 2
                 broadcasting_letter = letters_broadcasting.pop(0)
+                broadcasting_index = -i
                 ind_inputs1[-i] = broadcasting_letter
             elif broadcasting_tensor == 1:
                 broadcasting_tensor = 0
                 ind_inputs1[-i] = broadcasting_letter
+                broadcast_dim = max(
+                    tensor1.shape[-i], tensor2.shape[broadcasting_index]
+                )
+                tensor1_broadcast_to[-i] = broadcast_dim
+                tensor2_broadcast_to[broadcasting_index] = broadcast_dim
+
+                broadcasting_index = None
                 broadcasting_letter = ""
             else:
                 raise RuntimeError("Wrong parametrization of einsum")
@@ -232,12 +267,23 @@ def einsum_indexed(
     if "!" in ind_inputs1 or "!" in ind_inputs2:
         raise RuntimeError("Wrong parametrization of einsum")
 
+    # Necessary because tf.einsum doesn't accept size 1 and n axes, when not doing
+    # broadcasting with ellipsis
+
+    print(tensor1.shape)
+    print(tensor2.shape)
+
+    tensor1 = tf.broadcast_to(tensor1, tensor1_broadcast_to)
+    tensor2 = tf.broadcast_to(tensor2, tensor2_broadcast_to)
+
+    print(tensor1.shape)
+    print(tensor2.shape)
+
     string_einsum = (
         "".join(ind_inputs1) + "," + "".join(ind_inputs2) + "->" + "".join(ind_output)
     )
 
     log.debug(string_einsum)
-    print(string_einsum)
 
     return tf.einsum(string_einsum, tensor1, tensor2)
 
@@ -266,37 +312,84 @@ def concatenate_axes(tensor, axis1, axis2):
     )
 
 
-def convolution_with_fixed_kernel(
-    data, kernel, data_time_axis=0, conv_axes_data=(), padding=None
-):
+def slice_of_axis(tensor, axis, begin, end):
     """
-
+    Returns the tensor where the axis `axis` is sliced from `begin` to `end`
     Parameters
     ----------
-    data
-    kernel : time x conv_axes
-    data_time_axis : has to be to the left of the conv_axes
-    conv_axes_data :
-    padding
+    tensor : tensor
+    axis : int
+    begin : int
+    end : int
 
     Returns
     -------
+    sliced tensor
 
     """
-    len_kernel = kernel.shape[0]
+
+    begin_axis = begin % tensor.shape[axis]
+    size_axis = (end - begin) % tensor.shape[axis]
+
+    begin_arr = np.zeros(len(tensor.shape), dtype="int")
+    size_arr = np.array(tensor.shape)
+
+    begin_arr[axis] = begin_axis
+    size_arr[axis] = size_axis
+
+    return tf.slice(tensor, begin=begin_arr, size=size_arr)
+
+
+def convolution_with_fixed_kernel(
+    data, kernel, data_time_axis, filter_axes_data=(), padding=None
+):
+    """
+    Convolve data with a time independent kernel. The returned shape is equal to the shape
+    of data. In order avoid constructing a time_length x time_length kernel, the data
+    is decomposed in overlapping frames, with a stride of `padding`, allowing to construct
+    a only padding x time_lenght sized kernel.
+
+    Parameters
+    ----------
+    data : tensor
+        The input tensor
+    kernel : tensor
+        Has as shape filter_axes x time. filter_axes can be several axes, where in each
+        dimension a difference kernel is located
+    data_time_axis : int
+        the axis of data which corresponds to the time axis
+    filter_axes_data : tuple
+        the axes of `data`, to which the `filter_axes` of `kernel` should be mapped to.
+        Each of this dimension is therefore subject to a different filter
+    padding : int
+        By default, the padding is set to length of data_time_axis divided by 4.
+    Returns
+    -------
+    A convolved tensor with the same shape as data.
+    """
+    len_kernel = kernel.shape[-1]
+    len_time = data.shape[data_time_axis]
+
     data_time_axis = positive_axes(data_time_axis, ndim=len(data.shape))
 
     if padding is None:
-        padding = len_kernel
+        padding = np.ceil(len_time / 4).astype("int")
 
     kernel_for_frame = tf.repeat(kernel[..., tf.newaxis], repeats=padding, axis=-1)
+
     kernel_for_frame = tf.linalg.diag(
         kernel_for_frame, k=(-len_kernel + 1, 0), num_rows=len_kernel + padding - 1
-    )  # dimensions: copies for frame (padding) x time x conv_axes
+    )  # dimensions: conv_axes x copies for frame (padding) x time
 
+    filter_axes_data = positive_axes(
+        filter_axes_data, np.array(data.shape)[np.array(filter_axes_data)]
+    )
+    filter_axes_data_for_frame = filter_axes_data
+    filter_axes_data_for_frame[filter_axes_data_for_frame > data_time_axis] += 1
     kernel_for_frame = match_axes(
         kernel_for_frame,
-        target_axes=[data_time_axis, data_time_axis + 1] + list(conv_axes_data),
+        target_axes=list(filter_axes_data_for_frame)
+        + [data_time_axis, data_time_axis + 1],
         ndim=len(data.shape) + 1,
     )
 
@@ -318,5 +411,7 @@ def convolution_with_fixed_kernel(
     )
 
     result = concatenate_axes(result, data_time_axis, data_time_axis + 1)
+
+    result = slice_of_axis(result, data_time_axis, begin=0, end=len_time)
 
     return result

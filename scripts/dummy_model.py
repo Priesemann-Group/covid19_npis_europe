@@ -195,7 +195,6 @@ log.info("running time: {:.1f}s".format(end_time - begin_time))
 
 # posteriors = covid19_npis.convert_trace_to_pandas_list(test_model, trace, config)
 
-
 """ # Sample for prior plots and also covert to nice format
 """
 trace_prior = pm.sample_prior_predictive(

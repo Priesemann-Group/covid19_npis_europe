@@ -1,19 +1,11 @@
 import tensorflow as tf
 import logging
 import pymc4 as pm
+from .utils import gamma
 import tensorflow_probability as tfp
 
 
 log = logging.getLogger(__name__)
-
-# Un-normalized distribution pdf for generation interval
-def gamma(x, alpha, beta):
-    return tf.math.pow(x, (alpha - 1)) * tf.exp(-beta * x)
-
-
-# Un-normalized distribution pdf for generation interval
-def weibull(x, alpha, beta):
-    return tf.math.pow(x, (alpha - 1)) * tf.exp(-tf.math.pow(beta * x, alpha))
 
 
 def _construct_I_0_t(I_0, l=16):
@@ -159,7 +151,7 @@ def construct_generation_interval(
     return g
 
 
-# @tf.function(autograph=False, experimental_compile=True)
+@tf.function(autograph=False, experimental_compile=True)
 def InfectionModel(N, I_0, R_t, C, g_p):
     r"""
     This function combines a variety of different steps:

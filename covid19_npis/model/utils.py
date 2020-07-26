@@ -98,13 +98,17 @@ def einsum_indexed(
     inner2=(),
     outer1=(),
     outer2=(),
+    vec1=(),
+    vec2=(),
     targ_outer1=(),
     targ_outer2=(),
 ):
     """
     Calling tf.einsum with indices instead of a string. For example
     einsum_indexed(t1, t2, inner1=1, inner2=0, outer1=0, outer2=1) corresponds to the
-    `tf.einsum` string "ab...,bc...->ac...".
+    `tf.einsum` string "ab...,bc...->ac..." (Matrix product) and a matrix vector product
+    "...ab,...b,->...a" is parameterized by
+    einsum_indexed(t1, t2, inner1=-1, inner2=-1, vec1=-2)
 
     Parameters
     ----------
@@ -120,6 +124,12 @@ def einsum_indexed(
         The axes indices in tensor 1 over which a outer product is taken
     outer2 : int or list
         The axes indices in tensor 2 over which a outer product is taken
+    vec1 : int or list
+        The axes indices of the matrix in a matrix-vector product which are "staying"
+        in the result. This is for the case where tensor1 corresponds to the matrix.
+    vec2 : int or list
+        The axes indices of the matrix in a matrix-vector product which are "staying"
+        in the result. This is for the case where tensor2 corresponds to the matrix.
     targ_outer1 : int or list
         The axes indices in the result where the outer product axes of tensor 1 is
         mapped to. If omitted, the position is inferred such that the order stays the
@@ -147,6 +157,8 @@ def einsum_indexed(
     inner2 = normalize_input(inner2)
     outer1 = normalize_input(outer1)
     outer2 = normalize_input(outer2)
+    vec1 = normalize_input(vec1)
+    vec2 = normalize_input(vec2)
     targ_outer1 = normalize_input(targ_outer1)
     targ_outer2 = normalize_input(targ_outer2)
 
@@ -154,8 +166,19 @@ def einsum_indexed(
     assert len(outer1) == len(outer2)
     assert len(targ_outer1) == len(targ_outer2)
 
-    len_output = max(len(tensor1.shape), len(tensor1.shape)) + len(outer1) - len(inner1)
+    len_output = (
+        min(len(tensor1.shape), len(tensor2.shape))
+        + len(outer1)
+        - len(inner1)
+        + len(vec1)
+        + len(vec2)
+    )
     ind_output = ["-" for _ in range(len_output)]
+
+    print(ind_inputs1)
+    print(ind_inputs2)
+    print(inner1)
+    print(inner2)
 
     for pos1, pos2 in zip(inner1, inner2):
         ind_inputs1[pos1] = alphabet[0]
@@ -176,6 +199,11 @@ def einsum_indexed(
         else:
             ind_inputs2[pos2] = "!"
 
+    for pos in vec1:
+        ind_inputs1[pos] = "*"
+    for pos in vec2:
+        ind_inputs2[pos] = "*"
+
     letters_broadcasting = []
     for i in range(len_output - 1, -1, -1):
         if ind_output[i] == "-":
@@ -194,12 +222,22 @@ def einsum_indexed(
     print(ind_inputs2)
 
     for i in range(1, max(len(tensor1.shape), len(tensor2.shape)) + 1):
-        if ind_inputs2[-i].isalpha():
+        input1_end = i > len(tensor1.shape)
+        input2_end = i > len(tensor2.shape)
+
+        if not input2_end and ind_inputs2[-i].isalpha():
             tensor2_broadcast_to[-i] = tensor2.shape[-i]
-        if ind_inputs1[-i].isalpha():
+        if not input1_end and ind_inputs1[-i].isalpha():
             tensor1_broadcast_to[-i] = tensor1.shape[-i]
 
-        if ind_inputs2[-i] == "!":
+        if not input2_end and ind_inputs2[-i] == "*":
+            ind_inputs2[-i] = letters_broadcasting.pop(0)
+            tensor2_broadcast_to[-i] = tensor2.shape[-i]
+        if not input1_end and ind_inputs1[-i] == "*":
+            ind_inputs1[-i] = letters_broadcasting.pop(0)
+            tensor1_broadcast_to[-i] = tensor1.shape[-i]
+
+        if not input2_end and ind_inputs2[-i] == "!":
             if not outer_tensor:
                 outer_tensor = 1
                 ind_inputs2[-i] = letters_broadcasting.pop(0)
@@ -210,7 +248,7 @@ def einsum_indexed(
                 raise RuntimeError("Wrong parametrization of einsum")
             tensor2_broadcast_to[-i] = tensor2.shape[-i]
 
-        if ind_inputs1[-i] == "!":
+        if not input1_end and ind_inputs1[-i] == "!":
             if not outer_tensor:
                 outer_tensor = 2
                 ind_inputs1[-i] = letters_broadcasting.pop(0)
@@ -221,7 +259,7 @@ def einsum_indexed(
                 raise RuntimeError("Wrong parametrization of einsum")
             tensor1_broadcast_to[-i] = tensor1.shape[-i]
 
-        if ind_inputs2[-i] == "-":
+        if not input2_end and ind_inputs2[-i] == "-":
             if broadcasting_tensor == 0:
                 broadcasting_tensor = 1
                 broadcasting_letter = letters_broadcasting.pop(0)
@@ -242,7 +280,7 @@ def einsum_indexed(
             else:
                 raise RuntimeError("Wrong parametrization of einsum")
 
-        if ind_inputs1[-i] == "-":
+        if not input1_end and ind_inputs1[-i] == "-":
             if broadcasting_tensor == 0:
                 broadcasting_tensor = 2
                 broadcasting_letter = letters_broadcasting.pop(0)
@@ -270,20 +308,14 @@ def einsum_indexed(
     # Necessary because tf.einsum doesn't accept size 1 and n axes, when not doing
     # broadcasting with ellipsis
 
-    print(tensor1.shape)
-    print(tensor2.shape)
-
     tensor1 = tf.broadcast_to(tensor1, tensor1_broadcast_to)
     tensor2 = tf.broadcast_to(tensor2, tensor2_broadcast_to)
-
-    print(tensor1.shape)
-    print(tensor2.shape)
 
     string_einsum = (
         "".join(ind_inputs1) + "," + "".join(ind_inputs2) + "->" + "".join(ind_output)
     )
 
-    log.debug(string_einsum)
+    log.debug("inferred einsum string: :", string_einsum)
 
     return tf.einsum(string_einsum, tensor1, tensor2)
 
@@ -381,11 +413,17 @@ def convolution_with_fixed_kernel(
         kernel_for_frame, k=(-len_kernel + 1, 0), num_rows=len_kernel + padding - 1
     )  # dimensions: conv_axes x copies for frame (padding) x time
 
-    filter_axes_data = positive_axes(
-        filter_axes_data, np.array(data.shape)[np.array(filter_axes_data)]
-    )
-    filter_axes_data_for_frame = filter_axes_data
-    filter_axes_data_for_frame[filter_axes_data_for_frame > data_time_axis] += 1
+    # if a filter_axis is larger then the data_time_axis, it has to be increased by one, as
+    # the kernel gained a dimension:
+    if filter_axes_data:
+        filter_axes_data = positive_axes(
+            filter_axes_data, np.array(data.shape)[np.array(filter_axes_data)]
+        )
+        filter_axes_data_for_frame = filter_axes_data
+        filter_axes_data_for_frame[filter_axes_data_for_frame > data_time_axis] += 1
+    else:
+        filter_axes_data_for_frame = ()
+
     kernel_for_frame = match_axes(
         kernel_for_frame,
         target_axes=list(filter_axes_data_for_frame)
@@ -414,4 +452,68 @@ def convolution_with_fixed_kernel(
 
     result = slice_of_axis(result, data_time_axis, begin=0, end=len_time)
 
+    return result
+
+
+def convolution_with_varying_kernel(data, kernel, data_time_axis, filter_axes_data=()):
+    """
+    Convolve data with a time dependent kernel. The returned shape is equal to the shape
+    of data. In this implementation, the kernel will be augmented by a time_data axis,
+    and then the inner product with the date will be taken. This is not an optimal
+    implementation, as the most of the entries of the kernel inner product
+    matrix will be zero.
+
+    Parameters
+    ----------
+    data : tensor
+        The input tensor
+    kernel : tensor
+        Has as shape filter_axes x time_kernel x time_data. filter_axes can be several axes, where in each
+        dimension a difference kernel is located
+    data_time_axis : int
+        the axis of data which corresponds to the time axis
+    filter_axes_data : tuple
+        the axes of `data`, to which the `filter_axes` of `kernel` should be mapped to.
+        Each of this dimension is therefore subject to a different filter
+    Returns
+    -------
+    A convolved tensor with the same shape as data.
+    """
+    len_kernel = kernel.shape[-2]
+    len_time = data.shape[data_time_axis]
+    assert (
+        len_time == kernel.shape[-1]
+    ), "kernel time axis is not equal to data time axis"
+
+    data_time_axis = positive_axes(data_time_axis, ndim=len(data.shape))
+
+    kernel = tf.linalg.diag(
+        kernel, k=(-len_kernel + 1, 0), num_rows=len_time
+    )  # dimensions: conv_axes x copies for frame (padding) x time
+
+    # if a filter_axis is larger then the data_time_axis, it has to be increased by one, as
+    # the kernel gained a dimension:
+    if filter_axes_data:
+        filter_axes_data = positive_axes(
+            filter_axes_data, np.array(data.shape)[np.array(filter_axes_data)]
+        )
+        filter_axes_data_for_conv = filter_axes_data
+        filter_axes_data_for_conv[filter_axes_data_for_conv > data_time_axis] += 1
+    else:
+        filter_axes_data_for_conv = ()
+
+    kernel = match_axes(
+        kernel,
+        target_axes=list(filter_axes_data_for_conv)
+        + [data_time_axis, data_time_axis + 1],
+        ndim=len(data.shape) + 1,
+    )
+
+    result = einsum_indexed(
+        data,
+        kernel,
+        inner1=data_time_axis,
+        inner2=data_time_axis + 1,
+        vec2=data_time_axis,
+    )
     return result

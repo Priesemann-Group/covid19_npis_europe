@@ -126,7 +126,10 @@ def test_model(config):
         loc=new_cases,
         scale=sigma * tf.sqrt(new_cases) + 1,
         df=4,
-        observed=config.get_data().to_numpy().astype("float32").reshape((50, 2, 4)),
+        observed=config.get_data()
+        .to_numpy()
+        .astype("float32")
+        .reshape((50, 2, 4))[16:],
         reinterpreted_batch_ndims=3,
     )
     return likelihood
@@ -137,8 +140,8 @@ def test_model(config):
 begin_time = time.time()
 trace = pm.sample(
     test_model(config),
-    num_samples=50,
-    burn_in=50,
+    num_samples=500,
+    burn_in=500,
     use_auto_batching=False,
     num_chains=2,
     xla=True,
@@ -177,8 +180,8 @@ fig_new_cases = covid19_npis.plot.timeseries(trace, config=config, key="new_case
 for i, c in enumerate(config.data["countries"]):
     for j, a in enumerate(config.data["age_groups"]):
         fig_new_cases[j][i] = covid19_npis.plot.time_series._timeseries(
-            config.df.index,
-            config.df[(c, a)].to_numpy(),
+            config.df.index[:-16],
+            config.df[(c, a)].to_numpy()[16:],
             ax=fig_new_cases[j][i],
             alpha=0.5,
         )

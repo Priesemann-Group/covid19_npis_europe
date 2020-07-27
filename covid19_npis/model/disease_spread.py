@@ -307,6 +307,10 @@ def InfectionModel(N, I_0, R_t, C, g_p):
     out = tf.scan(fn=new_infectious_cases_next_day, elems=R_t, initializer=initial)
     daily_infections_final = out[0]
 
+    # Remove first l values
+    daily_infections_final = daily_infections_final[
+        16:,
+    ]
     # Transpose tensor in order to have batch dim before time dim
     if len(daily_infections_final.shape) == 4:
         daily_infections_final = tf.transpose(daily_infections_final, perm=(1, 0, 2, 3))

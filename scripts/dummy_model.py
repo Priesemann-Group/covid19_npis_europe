@@ -44,7 +44,6 @@ num_countries = 2
     shape label and the observed data. This is necessary for the data converter
     later on.
 """
-
 config = covid19_npis.Config(I_new)
 
 
@@ -101,12 +100,12 @@ def test_model(config):
     # should be done earlier in the real model
     N = tf.convert_to_tensor([10e5, 10e5, 10e5, 10e5] * 2)
     N = tf.reshape(N, event_shape)
-    # log.debug(f"N:\n{N}")
+    log.debug(f"N:\n{N}")
     # Calculate new cases
     new_cases = covid19_npis.model.InfectionModel(
         N=N, I_0=I_0, R_t=R_t, C=C, g_p=g_p  # default valueOp:AddV2
     )
-    # log.debug(f"new_cases:\n{new_cases[0,:]}")  # dimensons=t,c,a
+    log.debug(f"new_cases:\n{new_cases[0,:]}")  # dimensons=t,c,a
 
     # Clip in order to avoid infinities
     new_cases = tf.clip_by_value(new_cases, 1e-7, 1e9)
@@ -130,40 +129,11 @@ def test_model(config):
         observed=config.get_data().to_numpy().astype("float32").reshape((50, 2, 4)),
         reinterpreted_batch_ndims=3,
     )
-
-    """
-
-    psi = yield pm.HalfCauchy(
-        name=config.distributions["sigma"]["name"],
-        scale=50.0,
-        event_stack=(1, num_countries),  # same across time
-        conditionally_independent=True,
-        transform=transformations.SoftPlus(reinterpreted_batch_ndims=2),
-    )
-
-    psi = psi[..., tf.newaxis]  # same across age groups
-
-    def convert(mu, psi):
-        p = mu / (mu + psi)
-        return tf.clip_by_value(p, 1e-9, 1.0)
-
-    p = convert(new_cases, psi)
-    log.debug(f"r:{p}")
-    new_cases = yield pm.Deterministic(name="new_cases", value=new_cases)
-    likelihood = yield pm.NegativeBinomial(
-        name="like",
-        total_count=psi,
-        probs=p,
-        observed=config.get_data().to_numpy().astype("float32").reshape((50, 2, 4)),
-        allow_nan_stats=True,
-        reinterpreted_batch_ndims=3,
-    )
-    """
-
     return likelihood
 
 
-# a = pm.sample_prior_predictive(test_model(data), sample_shape=1000, use_auto_batching=False)
+""" # MCMC Sampling
+"""
 begin_time = time.time()
 trace = pm.sample(
     test_model(config),
@@ -173,40 +143,36 @@ trace = pm.sample(
     num_chains=2,
     xla=True,
 )
-"""
-benchmark(
-    test_model(config),
-    only_xla=False,
-    iters=10,
-    num_chains=(4,),
-    parallelize=True,
-    n_evals=100,
-)
-"""
 end_time = time.time()
 log.info("running time: {:.1f}s".format(end_time - begin_time))
 
 
-""" # Convert trace to nicely format (easier plotting)
-    Function returns list with samples for each distribution in the config
-    (see config.py)
+""" # Plotting
 """
 
-# posteriors = covid19_npis.convert_trace_to_pandas_list(test_model, trace, config)
-
-""" # Sample for prior plots and also covert to nice format
+""" ## Sample for prior plots and also covert to nice format
 """
 trace_prior = pm.sample_prior_predictive(
     test_model(config), sample_shape=1000, use_auto_batching=False
 )
 
-""" # Plot distributions
-    Function returns a list of figures which can be shown by fig[i].show() each figure beeing one country.
+""" ## Plot distributions
+    Function returns a list of figures which can be shown by fig[i].show() each figure being one country.
 """
-fig_R = covid19_npis.plot.distribution(trace, trace_prior, config=config, key="R")
+dist_names = ["R", "I_0", "g_mu", "g_theta", "sigma"]
+fig = {}
+for name in dist_names:
+    fig[name] = covid19_npis.plot.distribution(
+        trace, trace_prior, config=config, key=name
+    )
+    # Save figure
+    fig[name].savefig("dist_" + name + ".png", dpi=300, transparent=True)
+
+""" ## Plot time series for "new_cases"
+"""
 fig_new_cases = covid19_npis.plot.timeseries(trace, config=config, key="new_cases")
 
-# plot data onto axes of new_cases
+# plot data into the axes
 for i, c in enumerate(config.data["countries"]):
     for j, a in enumerate(config.data["age_groups"]):
         fig_new_cases[j][i] = covid19_npis.plot.time_series._timeseries(
@@ -215,3 +181,6 @@ for i, c in enumerate(config.data["countries"]):
             ax=fig_new_cases[j][i],
             alpha=0.5,
         )
+
+# Save figure
+fig_new_cases.savefig("ts_new_cases.png", dpi=300, transparent=True)

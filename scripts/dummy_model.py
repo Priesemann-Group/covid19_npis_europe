@@ -61,7 +61,7 @@ def test_model(config):
         event_stack=event_shape,
         transform=transformations.Log(reinterpreted_batch_ndims=len(event_shape)),
     )
-    I_0 = tf.clip_by_value(I_0, 1e-9, 1e10)
+    I_0 = tf.clip_by_value(I_0, 1e-12, 1e12)
 
     # Create Reproduction Number for every age group
     R = yield pm.LogNormal(
@@ -86,9 +86,7 @@ def test_model(config):
         dimension=num_age_groups,
         concentration=2,  # eta
         conditionally_independent=True,
-        event_stack=num_countries
-        # event_stack = num_countries,
-        # batch_stack=batch_stack
+        event_stack=num_countries,
     )  # dimensions: batch_dims x num_countries x num_age_groups x num_age_groups
     C = yield pm.Deterministic(
         name=config.distributions["C"]["name"],

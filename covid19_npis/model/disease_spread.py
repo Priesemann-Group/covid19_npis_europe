@@ -46,7 +46,7 @@ def _construct_I_0_t(I_0, l=16):
 
     # sums every given I_0 with the exponential function values
     I_0_t = tf.einsum("...ca,t->t...ca", I_0, exp)
-    I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
+    I_0_t = tf.clip_by_value(I_0_t, 1e-12, 1e12)
 
     return I_0_t
 
@@ -246,7 +246,7 @@ def InfectionModel(N, I_0, R_t, C, g_p):
     # Generate exponential distributed intial I_0_t
     I_0_t = _construct_I_0_t(I_0, l - 1)
     # Clip in order to avoid infinities
-    I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
+    I_0_t = tf.clip_by_value(I_0_t, 1e-12, 1e12)
     log.debug(f"I_0_t:\n{I_0_t}")
 
     # TO DO: Documentation

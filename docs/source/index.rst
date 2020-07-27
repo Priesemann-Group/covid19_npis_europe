@@ -6,9 +6,9 @@
 Welcome to COVID-19 NPIS's documentation!
 =========================================
 .. toctree::
-   :hidden:
+    :hidden:
 
-   self
+    self
    
 .. toctree::
     :maxdepth: 2
@@ -23,7 +23,7 @@ Welcome to COVID-19 NPIS's documentation!
     :caption: For developpers
 
     doc/contributing
-
+    doc/debugging
 
 Indices and tables
 ==================

@@ -99,6 +99,7 @@ def construct_generation_interval(
 ):
     r"""
     Generates the generation interval with two underlying gamma distributions for mu and theta
+        
         .. math::
 
             g(\tau) = Gamma(\tau;

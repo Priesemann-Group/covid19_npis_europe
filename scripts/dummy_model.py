@@ -149,6 +149,7 @@ log.info("running time: {:.1f}s".format(end_time - begin_time))
 
 """ # Plotting
 """
+import matplotlib.pyplot as plt
 
 """ ## Sample for prior plots and also covert to nice format
 """
@@ -166,7 +167,7 @@ for name in dist_names:
         trace, trace_prior, config=config, key=name
     )
     # Save figure
-    fig[name].savefig("dist_" + name + ".png", dpi=300, transparent=True)
+    plt.savefig("figures/dist_" + name + ".pdf", dpi=300, transparent=True)
 
 """ ## Plot time series for "new_cases"
 """
@@ -183,4 +184,4 @@ for i, c in enumerate(config.data["countries"]):
         )
 
 # Save figure
-fig_new_cases.savefig("ts_new_cases.png", dpi=300, transparent=True)
+plt.savefig("figures/ts_new_cases.pdf", dpi=300, transparent=True)

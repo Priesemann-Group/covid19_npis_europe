@@ -11,6 +11,7 @@ from scipy import stats
 import logging
 
 log = logging.getLogger(__name__)
+plt.rcParams.update({"figure.max_open_warning": 0})
 
 
 def _plot_prior(x, ax=None, **kwargs):
@@ -126,6 +127,7 @@ def distribution(trace_posterior, trace_prior, config, key):
     """
 
     # Get prior and posterior data for key
+    log.info(f"Createing distibution plot for {key}")
     posterior = convert_trace_to_dataframe(trace_posterior, config, key)
     prior = convert_trace_to_dataframe(trace_prior, config, key)
 
@@ -197,10 +199,10 @@ def distribution(trace_posterior, trace_prior, config, key):
 
         # Set labels on y-axis
         for i in range(cols):
-            ax[0, i].set_ylabel(posterior.index.get_level_values(label1).unique()[i])
+            ax[0][i].set_xlabel(posterior.index.get_level_values(label1).unique()[i])
         # Set labels on x-axis
         for i in range(rows):
-            ax[i, 0].set_xlabel(posterior.index.get_level_values(label2).unique()[i])
+            ax[i][0].set_ylabel(posterior.index.get_level_values(label2).unique()[i])
 
         return ax
 

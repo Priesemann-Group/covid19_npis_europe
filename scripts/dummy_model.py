@@ -130,6 +130,7 @@ def test_model(config):
         observed=config.get_data().to_numpy().astype("float32").reshape((50, 2, 4)),
         reinterpreted_batch_ndims=3,
     )
+
     """
 
     psi = yield pm.HalfCauchy(

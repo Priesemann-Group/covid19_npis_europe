@@ -177,11 +177,6 @@ def einsum_indexed(
     )
     ind_output = ["-" for _ in range(len_output)]
 
-    print(ind_inputs1)
-    print(ind_inputs2)
-    print(inner1)
-    print(inner2)
-
     for pos1, pos2 in zip(inner1, inner2):
         ind_inputs1[pos1] = alphabet[0]
         ind_inputs2[pos2] = alphabet[0]
@@ -307,9 +302,8 @@ def einsum_indexed(
     if "!" in ind_inputs1 or "!" in ind_inputs2:
         raise RuntimeError("Wrong parametrization of einsum")
 
-    # Necessary because tf.einsum doesn't accept size 1 and n axes, when not doing
-    # broadcasting with ellipsis
-
+    # Necessary because tf.einsum doesn't accept axis size 1 and >1 respectively for
+    # the two inputs when not doing when the broadcasting is not parametrized with "..."
     tensor1 = tf.broadcast_to(tensor1, tensor1_broadcast_to)
     tensor2 = tf.broadcast_to(tensor2, tensor2_broadcast_to)
 
@@ -473,8 +467,8 @@ def convolution_with_varying_kernel(data, kernel, data_time_axis, filter_axes_da
     data : tensor
         The input tensor
     kernel : tensor
-        Has as shape filter_axes x time_kernel x time_data. filter_axes can be several axes, where in each
-        dimension a difference kernel is located
+        Has as shape filter_axes x time_kernel x time_data. filter_axes can be several
+        axes, where in each dimension a difference kernel is located
     data_time_axis : int
         the axis of data which corresponds to the time axis
     filter_axes_data : tuple

@@ -10,3 +10,9 @@ Disease spread
 
 .. autofunction:: covid19_npis.model.disease_spread._construct_I_0_t
 
+Utility
+^^^^^^^
+
+.. automodule:: covid19_npis.model.utils
+	:members:
+	

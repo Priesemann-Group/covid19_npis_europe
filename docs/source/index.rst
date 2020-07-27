@@ -16,7 +16,7 @@ Welcome to COVID-19 NPIS's documentation!
 
     doc/model
     doc/plot
-
+    
 .. toctree::
     :titlesonly:
     :maxdepth: 2

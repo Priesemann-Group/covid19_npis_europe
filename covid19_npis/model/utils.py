@@ -21,12 +21,14 @@ def weibull(x, alpha, beta):
 def positive_axes(axes, ndim):
     """
     Given a list of axes, returns them written as positive numbers
+
     Parameters
     ----------
     axes : array-like, int
         list of axes, positive or negative
     ndim : int
         number of dimensions of the array
+
     Returns
     -------
     positive list of axes
@@ -48,11 +50,11 @@ def match_axes(tensor, target_axes, ndim=None):
         The input tensor with len(tensor.dims) == len(target_axes)
     target_axes : list of ints
         Target positions of the dimensions. Can be negative.
+
     Returns
     -------
     tensor :
         The transposed and expanded tensor.
-
     """
 
     ### Preparation
@@ -323,6 +325,7 @@ def einsum_indexed(
 def concatenate_axes(tensor, axis1, axis2):
     """
     Concatenates two consecutive axess
+
     Parameters
     ----------
     tensor : tensor
@@ -347,6 +350,7 @@ def concatenate_axes(tensor, axis1, axis2):
 def slice_of_axis(tensor, axis, begin, end):
     """
     Returns the tensor where the axis `axis` is sliced from `begin` to `end`
+    
     Parameters
     ----------
     tensor : tensor
@@ -395,6 +399,7 @@ def convolution_with_fixed_kernel(
         Each of this dimension is therefore subject to a different filter
     padding : int
         By default, the padding is set to length of data_time_axis divided by 4.
+    
     Returns
     -------
     A convolved tensor with the same shape as data.
@@ -475,6 +480,7 @@ def convolution_with_varying_kernel(data, kernel, data_time_axis, filter_axes_da
     filter_axes_data : tuple
         the axes of `data`, to which the `filter_axes` of `kernel` should be mapped to.
         Each of this dimension is therefore subject to a different filter
+    
     Returns
     -------
     A convolved tensor with the same shape as data.

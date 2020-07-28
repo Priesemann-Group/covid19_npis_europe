@@ -98,7 +98,7 @@ def test_model(config):
 
     # Create N tensor (vector)
     # should be done earlier in the real model
-    N = tf.convert_to_tensor([10e5, 10e5, 10e5, 10e5] * 2)
+    N = tf.convert_to_tensor([1e12, 1e12, 1e12, 1e12] * num_countries)
     N = tf.reshape(N, event_shape)
     log.debug(f"N:\n{N}")
     # Calculate new cases
@@ -129,7 +129,7 @@ def test_model(config):
         observed=config.get_data()
         .to_numpy()
         .astype("float32")
-        .reshape((50, 2, 4))[16:],
+        .reshape((50, num_countries, num_age_groups))[16:],
         reinterpreted_batch_ndims=3,
     )
     return likelihood
@@ -157,7 +157,7 @@ import matplotlib.pyplot as plt
 """ ## Sample for prior plots and also covert to nice format
 """
 trace_prior = pm.sample_prior_predictive(
-    test_model(config), sample_shape=1000, use_auto_batching=False
+    test_model(config), sample_shape=5000, use_auto_batching=False
 )
 
 """ ## Plot distributions

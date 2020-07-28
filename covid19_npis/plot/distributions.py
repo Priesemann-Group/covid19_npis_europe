@@ -127,7 +127,7 @@ def distribution(trace_posterior, trace_prior, config, key):
     """
 
     # Get prior and posterior data for key
-    log.info(f"Createing distibution plot for {key}")
+    log.info(f"Creating distibution plot for {key}")
     posterior = convert_trace_to_dataframe(trace_posterior, config, key)
     prior = convert_trace_to_dataframe(trace_prior, config, key)
 

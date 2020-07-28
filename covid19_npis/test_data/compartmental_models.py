@@ -12,8 +12,9 @@ def simple_new_I(factor):
         -------
         DataFrame
     """
+    N = 1e12
 
-    def f(t, I_t, R_t):
+    def f(t, I_t, R_t, S_t):
         """
         Function for a simple SI model
 
@@ -26,7 +27,10 @@ def simple_new_I(factor):
         R_t: array 2d
             Reproduction matrix
         """
-        return R_t @ I_t
+        f = S_t / N
+
+        new = f * R_t @ I_t
+        return new, S_t - new
 
     # 4 Age groups
     R_0 = np.diag([1, 1, 1.05, 1.03]) * factor + np.random.random(size=[4, 4]) * 0.05
@@ -44,8 +48,9 @@ def simple_new_I(factor):
     # ------------------------------------------------------------------------------ #
     # Iteration
     # ------------------------------------------------------------------------------ #
+    S_t = N
     for i in range(len(t) - 1):  # -1 because we append to an array
-        I_n = f(i, I_t[i], R_t[i])
+        I_n, S_t = f(i, I_t[i], R_t[i], S_t)
 
         # Only append to I_t because R_t gets constructed beforehand
         I_t.append(I_n)

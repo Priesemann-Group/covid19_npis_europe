@@ -89,7 +89,7 @@ def _construct_I_0_t_transposed(I_0, l=16):
 
     # sums every given I_0 with the exponential function values
     I_0_t = tf.einsum("...ca,t->...tca", I_0, exp)
-    I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
+    I_0_t = tf.clip_by_value(I_0_t, 1e-12, 1e12)
 
     return I_0_t
 
@@ -217,11 +217,6 @@ def InfectionModel(N, I_0, R_t, C, g_p):
                     \tilde{I}(t) &= \frac{S(t)}{N} \cdot R_{eff} \cdot \sum_{\tau=0}^{t} \tilde{I}(t-1-\tau) g(\tau) \\
                     S(t) &= S(t-1) - \tilde{I}(t-1)
 
-    TODO
-    ----
-    - rewrite while loop to tf.scan function
-
-
     Parameters
     ----------
     I_0:
@@ -244,6 +239,7 @@ def InfectionModel(N, I_0, R_t, C, g_p):
     -------
     :
         Sample from distribution of new, daily cases
+        |shape| batch_dims, time, country, age
     """
 
     # @tf.function(autograph=False)
@@ -288,13 +284,7 @@ def InfectionModel(N, I_0, R_t, C, g_p):
 
     # Generate exponential distributed intial I_0_t
     I_0_t = _construct_I_0_t(I_0, l - 1)
-    # Clip in order to avoid infinities
-    I_0_t = tf.clip_by_value(I_0_t, 1e-12, 1e12)
     log.debug(f"I_0_t:\n{I_0_t}")
-
-    # TO DO: Documentation
-    # log.info(f"R_t outside scan:\n{R_t}")
-    total_days = R_t.shape[0]
 
     # Initial susceptible population = total - infected
     S_initial = N - tf.reduce_sum(I_0_t, axis=0)
@@ -307,7 +297,7 @@ def InfectionModel(N, I_0, R_t, C, g_p):
     out = tf.scan(fn=new_infectious_cases_next_day, elems=R_t, initializer=initial)
     daily_infections_final = out[0]
 
-    # Remove first l values
+    # Remove first l values maybe remove at a later point again
     daily_infections_final = daily_infections_final[
         16:,
     ]
@@ -341,11 +331,6 @@ def InfectionModel_unrolled(N, I_0, R_t, C, g_p):
                     \tilde{I}(t) &= \frac{S(t)}{N} \cdot R_{eff} \cdot \sum_{\tau=0}^{t} \tilde{I}(t-1-\tau) g(\tau) \\
                     S(t) &= S(t-1) - \tilde{I}(t-1)
 
-    TODO
-    ----
-    - rewrite while loop to tf.scan function
-
-
     Parameters
     ----------
     I_0:
@@ -368,6 +353,7 @@ def InfectionModel_unrolled(N, I_0, R_t, C, g_p):
     -------
     :
         Sample from distribution of new, daily cases
+        |shape| batch_dims, time, country, age
     """
 
     # @tf.function(autograph=False)
@@ -378,7 +364,7 @@ def InfectionModel_unrolled(N, I_0, R_t, C, g_p):
     # Generate exponential distributed intial I_0_t
     I_0_t = _construct_I_0_t_transposed(I_0, l - 1)
     # Clip in order to avoid infinities
-    I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
+    I_0_t = tf.clip_by_value(I_0_t, 1e-12, 1e12)
     log.debug(f"I_0_t:\n{I_0_t}")
 
     # TO DO: Documentation

@@ -18,7 +18,13 @@ class Change_point(object):
 
         Parameters
         ----------
-        
+        date_loc:
+            Prior location parameter for the date of the change point
+        prior_date_scale:
+            Prior scale parameter for the date of the change point
+        gamma_max:
+            Maximum value the logistic function gamma_t should converge to
+
         TODO
         ----
         - Documentation
@@ -36,7 +42,7 @@ class Change_point(object):
         Returns pymc4 generator for the date :math:`d`, i.e. a normal distribution. The priors
         are set at init of the object.
         """
-        return pm.Normal(self.name, self.prior_date_loc, self.prior_date_scale)
+        return pm.Normal(self.name, self.prior_date_loc, self.prior_date_scale)# Test if it works like this or if we need yield statement here already.
 
     def gamma_t(self, t, l):
         """
@@ -67,7 +73,7 @@ class Intervention(object):
             Prior for the scale of the effectivity for the intervention.
 
         change_points: dict, optional
-            Constructs Change_points object from the dict TODO: think about that a bit more.
+            Constructs Change_point objects from the dict TODO: think about that a bit more.
             |default| None
 
 
@@ -132,7 +138,7 @@ def create_interventions():
     Parameter
     ---------
     change_points : dict
-        Dict housing every parameter for the interventions, i.e. 
+        Dict housing every parameter for the interventions, i.e.
         :math:`l_{i}`
         :math:`d_{i,n}`
         :math:`alpha_{i}`
@@ -157,7 +163,7 @@ def construct_R_t(R_0, Interventions):
         |shape| batch, countries, age group
 
     Interventions: array like covid19_npis.reproduction_number.Intervention
-        
+
     Return
     ------
     R_t:

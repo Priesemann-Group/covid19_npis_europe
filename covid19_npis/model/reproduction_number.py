@@ -18,14 +18,21 @@ class Change_point(object):
 
         Parameters
         ----------
-        
-        TODO
-        ----
-        - Documentation
-        - implement name
+        name: str
+            Name of the change point, get passed to the pymc4 distribution for the date.
+
+        date_loc : number
+            Prior for the location of the date for the change point.
+
+        date_scale : number
+            Prior for the scale of the date for the change point.
+
+        gamma_max : number
+            Maximum gamma value for the change point. [-1,1]
     """
 
-    def __init__(self, date_loc, date_scale, gamma_max):
+    def __init__(self, name, date_loc, date_scale, gamma_max):
+        self.name = name
         self.prior_date_loc = date_loc
         self.prior_date_scale = date_scale
         self.gamma_max = gamma_max
@@ -40,7 +47,8 @@ class Change_point(object):
 
     def gamma_t(self, t, l):
         """
-            Returns gamma value at t with parameters l and d.
+        Returns gamma value at t with given length :math:`l`. The length :math:`l` should be
+        passed from the intervention class.
         """
         return _fsigmoid(t, l, self.date) * self.gamma_max
 
@@ -52,6 +60,10 @@ class Intervention(object):
 
         Parameters
         ----------
+        name: str
+            Name of the intervention, get passed to the pymc4 functions with suffix '_length' or 
+            '_alpha'. 
+
         length_loc:
             Prior for the location of the length. Set to one overarching value for all
             change points.
@@ -73,21 +85,25 @@ class Intervention(object):
 
         TODO
         ----
-        - implement name
         - method to add an change point
     """
 
     def __init__(
-        self, length_loc, length_scale, alpha_loc, alpha_scale, change_points=None
+        self, name, length_loc, length_scale, alpha_loc, alpha_scale, change_points=None
     ):
+        self.name = name
 
+        # Distributions
         self.prior_length_loc = length_loc
         self.prior_length_scale = length_scale
-
         self.prior_alpha_loc = alpha_loc
         self.prior_alpha_scale = alpha_scale
 
-        # TODO change point construct logic and name
+        self.change_points = []
+        # Add to change points
+        if change_points is not None:
+            for change_point in change_points:
+                self.add_change_point(change_point)
 
     @property
     def length(self):
@@ -108,6 +124,33 @@ class Intervention(object):
         return pm.Normal(
             self.name + "_alpha", self.prior_alpha_loc, self.prior_alpha_scale
         )
+
+    def add_change_point(self, change_point):
+        """
+        Adds a change point to the intervention by dictionary or by passing the class
+        itself.
+        """
+        if isinstance(change_point, Change_point):
+            self.change_points.append(change_point)
+        elif isinstance(change_point, dict):
+            assert "name" in change_point, f"Change point dict must have 'name' key"
+            assert (
+                "date_loc" in change_point
+            ), f"Change point dict must have 'date_loc' key"
+            assert (
+                "date_scale" in change_point
+            ), f"Change point dict must have 'date_scale' key"
+            assert (
+                "gamma_max" in change_point
+            ), f"Change point dict must have 'gamma_max' key"
+            self.change_points.append(
+                Change_point(
+                    change_point["name"],
+                    change_point["date_loc"],
+                    change_point["date_scale"],
+                    change_point["gamma_max"],
+                )
+            )
 
     def gamma_t(self, t):
         """

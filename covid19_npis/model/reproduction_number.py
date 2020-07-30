@@ -80,12 +80,7 @@ class Intervention(object):
 
         change_points: dict, optional
             Constructs Change_points object from the dict TODO: think about that a bit more.
-            |default| None
-
-
-        TODO
-        ----
-        - method to add an change point
+            |default| :code:`None`
     """
 
     def __init__(
@@ -186,6 +181,7 @@ def create_interventions():
     :
         Interventions array like
     """
+    return
 
 
 def construct_R_t(R_0, Interventions):
@@ -207,3 +203,4 @@ def construct_R_t(R_0, Interventions):
         Reproduction number matrix.
         |shape| time, batch_dims, country, age_group
     """
+    return

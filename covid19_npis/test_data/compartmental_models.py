@@ -83,7 +83,7 @@ def simple_new_I_with_R_t(factor):
     R_0 = np.array([1.2, 1.3, 1.1, 1.3]) * factor
     I_0 = np.array([10, 10, 10, 10])
     cp1_1 = Change_point(alpha=0.1, gamma_max=0.5, length=5, begin=8)
-    cp1_2 = Change_point(alpha=0.2, gamma_max=-0.5, length=2, begin=30)
+    cp1_2 = Change_point(alpha=0.1, gamma_max=-0.5, length=2, begin=30)
     cp2 = Change_point(alpha=0.2, gamma_max=1, length=2, begin=25)
     cps = [cp1_1, cp1_2, cp2]
 

@@ -195,7 +195,7 @@ def construct_R_t(R_0, Interventions):
     ---------
 
     R_0:
-        |shape| batch, countries, age group
+        |shape| batch, country, age group
 
     Interventions: array like covid19_npis.reproduction_number.Intervention
 
@@ -203,6 +203,20 @@ def construct_R_t(R_0, Interventions):
     ------
     R_t:
         Reproduction number matrix.
-        |shape| time, batch_dims, country, age_group
+        |shape| batch, time, country, age group
     """
-    return
+
+    # Create tensorflow R_t for now hardcoded to 50 timesteps
+    R_t = tf.stack([R_0] * 50)
+
+    def _sum_interventions(t):
+        _sum = 0.0
+        for i in Interventions:
+            _sum += i.alpha * i.gamma_t(t)
+        return R_0 * tf.exp(_sum)
+
+    R_t = _sum_interventions(tf.range(0, 50, dtype="float32"))
+
+    # That could work like  that im not sure tho. -> has to be tested
+    # tf.map_fn(_sum_interventions, tf.range(0, 50, delta=1, dtype="float32"))
+    return R_t

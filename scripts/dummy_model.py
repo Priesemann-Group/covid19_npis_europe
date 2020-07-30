@@ -63,7 +63,7 @@ def test_model(config):
     I_0 = tf.clip_by_value(I_0, 1e-12, 1e12)
 
     # Create Reproduction Number for every age group
-    R = yield pm.LogNormal(
+    R_0 = yield pm.LogNormal(
         name=config.distributions["R"]["name"],
         loc=1,
         scale=2.5,
@@ -71,12 +71,39 @@ def test_model(config):
         event_stack=event_shape,
         transform=transformations.Log(reinterpreted_batch_ndims=len(event_shape)),
     )
-    log.debug(f"R:\n{R}")
+    log.debug(f"R_0:\n{R_0}")
 
-    R_t = tf.stack(
-        [R] * 50
-    )  # R_t has dimensions time x batch_dims x num_countries x num_age_groups
+    # Create interventions for dummy model
+    cp1_1 = covid19_npis.model.reproduction_number.Change_point(
+        "cp1_1", date_loc=7, date_scale=2, gamma_max=0.5
+    )
+    cp1_2 = covid19_npis.model.reproduction_number.Change_point(
+        "cp1_2", date_loc=30, date_scale=2, gamma_max=-0.5
+    )
+    cp2_1 = covid19_npis.model.reproduction_number.Change_point(
+        "cp2_1", date_loc=24, date_scale=2, gamma_max=1
+    )
+    Interventions = [
+        covid19_npis.model.reproduction_number.Intervention(
+            "inter_1",
+            length_loc=3,
+            length_scale=2,
+            alpha_loc=0.1,
+            alpha_scale=0.2,
+            change_points=[cp1_1, cp1_2],
+        ),
+        covid19_npis.model.reproduction_number.Intervention(
+            "inter_2",
+            length_loc=3,
+            length_scale=2,
+            alpha_loc=0.2,
+            alpha_scale=0.2,
+            change_points=[cp2_1],
+        ),
+    ]
 
+    R_t = yield covid19_npis.model.reproduction_number.construct_R_t(R_0, Interventions)
+    log.info(R_t)
     # Create Contact matrix
 
     # Use Cholesky version as the non Cholesky version uses tf.linalg.slogdet which isn't implemented in JAX

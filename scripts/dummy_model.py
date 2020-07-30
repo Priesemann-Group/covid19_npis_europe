@@ -75,13 +75,13 @@ def test_model(config):
 
     # Create interventions for dummy model
     cp1_1 = covid19_npis.model.reproduction_number.Change_point(
-        "cp1_1", date_loc=7, date_scale=2, gamma_max=0.5
+        "cp1_1", date_loc=7, date_scale=2, gamma_max=0.5, length=2
     )
     cp1_2 = covid19_npis.model.reproduction_number.Change_point(
-        "cp1_2", date_loc=30, date_scale=2, gamma_max=-0.5
+        "cp1_2", date_loc=30, date_scale=2, gamma_max=-0.5, length=2
     )
     cp2_1 = covid19_npis.model.reproduction_number.Change_point(
-        "cp2_1", date_loc=24, date_scale=2, gamma_max=1
+        "cp2_1", date_loc=24, date_scale=2, gamma_max=1, length=2
     )
     Interventions = [
         covid19_npis.model.reproduction_number.Intervention(

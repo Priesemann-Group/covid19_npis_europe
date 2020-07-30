@@ -44,14 +44,16 @@ class Change_point(object):
         Returns pymc4 generator for the date :math:`d`, i.e. a normal distribution. The priors
         are set at init of the object.
         """
-        return pm.Normal(self.name, self.prior_date_loc, self.prior_date_scale)# Test if it works like this or if we need yield statement here already.
+        yield pm.Normal(
+            self.name, self.prior_date_loc, self.prior_date_scale
+        )  # Test if it works like this or if we need yield statement here already.
 
     def gamma_t(self, t):
         """
         Returns gamma value at t with given length :math:`l`. The length :math:`l` should be
         passed from the intervention class.
         """
-        return _fsigmoid(t, self.length, self.date) * self.gamma_max
+        yield _fsigmoid(t, self.length, self.date) * self.gamma_max
 
 
 class Intervention(object):
@@ -107,7 +109,7 @@ class Intervention(object):
         Returns pymc4 generator for the length :math:`l`, i.e. a normal distribution. The priors
         are set at init of the object.
         """
-        return pm.Normal(
+        yield pm.Normal(
             self.name + "_length", self.prior_length_loc, self.prior_length_scale
         )
 
@@ -117,7 +119,7 @@ class Intervention(object):
         Returns pymc4 generator for the effetivity :math:`\alpha`, i.e. a normal distribution. The priors
         are set at init of the object.
         """
-        return pm.Normal(
+        yield pm.Normal(
             self.name + "_alpha", self.prior_alpha_loc, self.prior_alpha_scale
         )
 
@@ -158,7 +160,7 @@ class Intervention(object):
         t: number
             Time
         """
-        _sum = 0
+        _sum = 0.0
         for cp in self.change_points:
             _sum += cp.gamma_t(t)
         return _sum
@@ -198,6 +200,7 @@ def construct_R_t(R_0, Interventions):
         |shape| batch, country, age group
 
     Interventions: array like covid19_npis.reproduction_number.Intervention
+        |shape| country
 
     Return
     ------

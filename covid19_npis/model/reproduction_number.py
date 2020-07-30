@@ -31,10 +31,11 @@ class Change_point(object):
             Maximum gamma value for the change point, i.e the value the logistic function gamma_t converges to. [-1,1]
     """
 
-    def __init__(self, name, date_loc, date_scale, gamma_max):
+    def __init__(self, name, date_loc, date_scale, length, gamma_max):
         self.name = name
         self.prior_date_loc = date_loc
         self.prior_date_scale = date_scale
+        self.length = length
         self.gamma_max = gamma_max
 
     @property
@@ -45,12 +46,12 @@ class Change_point(object):
         """
         return pm.Normal(self.name, self.prior_date_loc, self.prior_date_scale)# Test if it works like this or if we need yield statement here already.
 
-    def gamma_t(self, t, l):
+    def gamma_t(self, t):
         """
         Returns gamma value at t with given length :math:`l`. The length :math:`l` should be
         passed from the intervention class.
         """
-        return _fsigmoid(t, l, self.date) * self.gamma_max
+        return _fsigmoid(t, self.length, self.date) * self.gamma_max
 
 
 class Intervention(object):
@@ -143,6 +144,7 @@ class Intervention(object):
                     change_point["name"],
                     change_point["date_loc"],
                     change_point["date_scale"],
+                    self.length,
                     change_point["gamma_max"],
                 )
             )
@@ -158,7 +160,7 @@ class Intervention(object):
         """
         _sum = 0
         for cp in self.change_points:
-            _sum += cp.gamma_t(t, self.length)
+            _sum += cp.gamma_t(t)
         return _sum
 
 

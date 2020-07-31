@@ -31,11 +31,10 @@ class Change_point(object):
             Maximum gamma value for the change point, i.e the value the logistic function gamma_t converges to. [-1,1]
     """
 
-    def __init__(self, name, date_loc, date_scale, length, gamma_max):
+    def __init__(self, name, date_loc, date_scale, gamma_max):
         self.name = name
         self.prior_date_loc = date_loc
         self.prior_date_scale = date_scale
-        self.length = length
         self.gamma_max = gamma_max
 
     @property
@@ -48,12 +47,12 @@ class Change_point(object):
             self.name, self.prior_date_loc, self.prior_date_scale
         )  # Test if it works like this or if we need yield statement here already.
 
-    def gamma_t(self, t):
+    def gamma_t(self, t, l):
         """
         Returns gamma value at t with given length :math:`l`. The length :math:`l` should be
         passed from the intervention class.
         """
-        yield _fsigmoid(t, self.length, self.date) * self.gamma_max
+        yield _fsigmoid(t, l, self.date) * self.gamma_max
 
 
 class Intervention(object):
@@ -194,7 +193,7 @@ def create_interventions(modelParams):
             for cp in C[i]:  # changepoints
                 cps.append(
                     Change_point(
-                        name=C[i][cp]["name"],
+                        name=f"{c}_{i}_{cp}",
                         date_loc=C[i][cp]["date"],
                         date_scale=2,
                         gamma_max=C[i][cp]["gamma_max"],
@@ -202,7 +201,7 @@ def create_interventions(modelParams):
                 )
             interventions.append(
                 Intervention(
-                    name=i,
+                    name=f"{c}_{i}",
                     length_loc=C[i][cp]["length"],
                     length_scale=2.5,
                     alpha_loc=C[i][cp]["alpha"],
@@ -237,13 +236,13 @@ def construct_R_t(R_0, Interventions):
     # Create tensorflow R_t for now hardcoded to 50 timesteps
     R_t = tf.stack([R_0] * 50)
 
-    def _sum_interventions(t):
+    def _sum_interventions(t, country_interventions):
         _sum = 0.0
-        for i in Interventions:
+        for i in country_interventions:
             _sum += i.alpha * i.gamma_t(t)
         return R_0 * tf.exp(_sum)
 
-    R_t = _sum_interventions(tf.range(0, 50, dtype="float32"))
+    R_t = _sum_interventions(tf.range(0, 50, dtype="float32"), Interventions[0])
 
     # That could work like  that im not sure tho. -> has to be tested
     # tf.map_fn(_sum_interventions, tf.range(0, 50, delta=1, dtype="float32"))

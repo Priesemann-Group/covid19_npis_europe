@@ -3,13 +3,15 @@ import logging
 import pymc4 as pm
 from .utils import gamma
 import tensorflow_probability as tfp
-
+import numpy as np
 
 log = logging.getLogger(__name__)
 
 
 def _fsigmoid(t, l, d):
-    return 1.0 / (1.0 + tf.exp(-4.0 / l * (t - d)))
+    inside_exp_1 = -4.0 / l
+    inside_exp_2 = t - d
+    return 1.0 / (1.0 + tf.exp(inside_exp_1 * inside_exp_2))
 
 
 class Change_point(object):
@@ -37,23 +39,33 @@ class Change_point(object):
         self.prior_date_scale = date_scale
         self.gamma_max = gamma_max
 
+        log.info(f"{self.prior_date_scale},{self.prior_date_loc}")
+
+        self._d = pm.Normal(
+            self.name,
+            self.prior_date_loc,
+            self.prior_date_scale,
+            conditionally_independent=True,
+        )  # Test if it works like this or if we need yield statement here already.
+
     @property
     def date(self):
         r"""
         Returns pymc4 generator for the date :math:`d`, i.e. a normal distribution. The priors
         are set at init of the object.
         """
-        yield pm.Normal(
-            self.name, self.prior_date_loc, self.prior_date_scale
-        )  # Test if it works like this or if we need yield statement here already.
+
+        return (yield self._d)
 
     def gamma_t(self, t, l):
         """
         Returns gamma value at t with given length :math:`l`. The length :math:`l` should be
         passed from the intervention class.
         """
-
-        return _fsigmoid(t, l, self.date) * self.gamma_max
+        log.info("gamma_t_change_point")
+        d = yield self.date
+        sigmoid = _fsigmoid(t, l, d)
+        return sigmoid * self.gamma_max
 
 
 class Intervention(object):
@@ -90,7 +102,7 @@ class Intervention(object):
         self, name, length_loc, length_scale, alpha_loc, alpha_scale, change_points=None
     ):
         self.name = name
-
+        log.info(name)
         # Distributions
         self.prior_length_loc = length_loc
         self.prior_length_scale = length_scale
@@ -103,15 +115,29 @@ class Intervention(object):
             for change_point in change_points:
                 self.add_change_point(change_point)
 
+        # Init distributions
+
+        self._l = pm.LogNormal(
+            self.name + "_length",
+            np.log(self.prior_length_loc).astype("float32"),
+            self.prior_length_scale,
+            conditionally_independent=True,
+        )
+
+        self._alpha = pm.Normal(
+            self.name + "_alpha",
+            self.prior_alpha_loc,
+            self.prior_alpha_scale,
+            conditionally_independent=True,
+        )
+
     @property
     def length(self):
         r"""
         Returns pymc4 generator for the length :math:`l`, i.e. a normal distribution. The priors
         are set at init of the object.
         """
-        yield pm.Normal(
-            self.name + "_length", self.prior_length_loc, self.prior_length_scale
-        )
+        return (yield self._l)
 
     @property
     def alpha(self):
@@ -119,9 +145,8 @@ class Intervention(object):
         Returns pymc4 generator for the effetivity :math:`\alpha`, i.e. a normal distribution. The priors
         are set at init of the object.
         """
-        yield pm.Normal(
-            self.name + "_alpha", self.prior_alpha_loc, self.prior_alpha_scale
-        )
+
+        return (yield self._alpha)
 
     def add_change_point(self, change_point):
         """
@@ -151,19 +176,21 @@ class Intervention(object):
                 )
             )
 
-    def gamma_t(self, t):
+    def gamma_t(self, t):  # Intervention
         """
         Returns the gamma (strength) value of an intervention at the time t.
+        Sum over all change points
 
         Parameter
         ---------
         t: number
             Time
         """
-        _sum = []
-        for cp in self.change_points:
-            _sum.append(cp.gamma_t(t, self.length))
-        return tf.reduce_sum(_sum)
+        # sum over cps
+        log.info("gamma_t_intervetion")
+        l = yield self.length
+        ret = yield self.change_points[0].gamma_t(t, l)
+        return ret
 
 
 def create_interventions(modelParams):
@@ -241,14 +268,13 @@ def construct_R_t(R_0, Interventions):
     # We need the second part i.e. e^(sum(alpha*gamma)) for each country
 
     for i in Interventions[0]:
-        print(tf.map_fn(fn=i.gamma_t, elems=t, dtype="float32"))
         # Idee:
-        _sum = i.alpha * tf.map_fn(fn=i.gamma_t, elems=t, dtype="float32")
-        print(_sum)
+        _alpha = yield i.alpha
+        temp = yield i.gamma_t(t)
+        print(temp)
+        print(_alpha)
     # alpha has |shape| batch
     # gamma has |shape| time
-
-    R_t = _sum_interventions(tf.range(0, 50, dtype="float32"),)
 
     # That could work like  that im not sure tho. -> has to be tested
     # tf.map_fn(_sum_interventions, tf.range(0, 50, delta=1, dtype="float32"))

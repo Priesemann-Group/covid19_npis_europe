@@ -83,7 +83,7 @@ def test_model(modelParams):
         modelParams
     )
     log.info(f"Interventions:\n{Interventions}")
-    R_t = covid19_npis.model.reproduction_number.construct_R_t(R_0, Interventions)
+    R_t = yield covid19_npis.model.reproduction_number.construct_R_t(R_0, Interventions)
     log.info(f"R_t:\n{R_t}")
 
     # Create Contact matrix

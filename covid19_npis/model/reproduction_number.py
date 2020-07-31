@@ -166,7 +166,7 @@ class Intervention(object):
         return _sum
 
 
-def create_interventions():
+def create_interventions(modelParams):
     """
     Returns a list of interventions :py:func:`covid19_npis.reproduction_number.Intervention` from
     a change point dict.
@@ -184,8 +184,33 @@ def create_interventions():
     ------
     :
         Interventions array like
+        |shape| country, interventions
     """
-    return
+    ret = []
+    for c, C in enumerate(modelParams.interventions):  # Country
+        interventions = []
+        for i in C:  # interventions
+            cps = []
+            for cp in C[i]:  # changepoints
+                cps.append(
+                    Change_point(
+                        name=C[i][cp]["name"],
+                        date_loc=C[i][cp]["date"],
+                        date_scale=2,
+                        gamma_max=C[i][cp]["gamma_max"],
+                    )
+                )
+            interventions.append(
+                Intervention(
+                    name=i,
+                    length_loc=C[i][cp]["length"],
+                    length_scale=2.5,
+                    alpha_loc=C[i][cp]["alpha"],
+                    alpha_scale=0.5,
+                )
+            )
+        ret.append(interventions)
+    return ret
 
 
 def construct_R_t(R_0, Interventions):
@@ -222,4 +247,5 @@ def construct_R_t(R_0, Interventions):
 
     # That could work like  that im not sure tho. -> has to be tested
     # tf.map_fn(_sum_interventions, tf.range(0, 50, delta=1, dtype="float32"))
+    R_t = tf.stack([R_0] * 50)
     return R_t

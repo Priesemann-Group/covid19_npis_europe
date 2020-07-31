@@ -52,7 +52,8 @@ class Change_point(object):
         Returns gamma value at t with given length :math:`l`. The length :math:`l` should be
         passed from the intervention class.
         """
-        yield _fsigmoid(t, l, self.date) * self.gamma_max
+
+        return _fsigmoid(t, l, self.date) * self.gamma_max
 
 
 class Intervention(object):
@@ -159,10 +160,10 @@ class Intervention(object):
         t: number
             Time
         """
-        _sum = 0.0
+        _sum = []
         for cp in self.change_points:
-            _sum += cp.gamma_t(t)
-        return _sum
+            _sum.append(cp.gamma_t(t, self.length))
+        return tf.reduce_sum(_sum)
 
 
 def create_interventions(modelParams):
@@ -206,6 +207,7 @@ def create_interventions(modelParams):
                     length_scale=2.5,
                     alpha_loc=C[i][cp]["alpha"],
                     alpha_scale=0.5,
+                    change_points=cps,
                 )
             )
         ret.append(interventions)
@@ -234,15 +236,19 @@ def construct_R_t(R_0, Interventions):
     """
 
     # Create tensorflow R_t for now hardcoded to 50 timesteps
-    R_t = tf.stack([R_0] * 50)
+    t = tf.range(0, 50, dtype="float32")
 
-    def _sum_interventions(t, country_interventions):
-        _sum = 0.0
-        for i in country_interventions:
-            _sum += i.alpha * i.gamma_t(t)
-        return R_0 * tf.exp(_sum)
+    # We need the second part i.e. e^(sum(alpha*gamma)) for each country
 
-    R_t = _sum_interventions(tf.range(0, 50, dtype="float32"), Interventions[0])
+    for i in Interventions[0]:
+        print(tf.map_fn(fn=i.gamma_t, elems=t, dtype="float32"))
+        # Idee:
+        _sum = i.alpha * tf.map_fn(fn=i.gamma_t, elems=t, dtype="float32")
+        print(_sum)
+    # alpha has |shape| batch
+    # gamma has |shape| time
+
+    R_t = _sum_interventions(tf.range(0, 50, dtype="float32"),)
 
     # That could work like  that im not sure tho. -> has to be tested
     # tf.map_fn(_sum_interventions, tf.range(0, 50, delta=1, dtype="float32"))

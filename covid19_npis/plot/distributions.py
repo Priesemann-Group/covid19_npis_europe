@@ -98,7 +98,7 @@ def _plot_posterior(x, bins=50, ax=None, **kwargs):
     return ax
 
 
-def distribution(trace_posterior, trace_prior, config, key):
+def distribution(trace_posterior, trace_prior, modelParams, key):
     """
     High level function for creating plot overview for a variable. Works for
     one and two dimensional variable at the moment.
@@ -113,7 +113,7 @@ def distribution(trace_posterior, trace_prior, config, key):
     trace_posterior,trace_prior : arivz InferenceData
         Raw data from pymc4 sampling
 
-    config : cov19_npis.config.Config
+    modelParams : cov19_npis.modelParams.ModelParams
 
     key : str
         Name of the variable to plot
@@ -128,10 +128,10 @@ def distribution(trace_posterior, trace_prior, config, key):
 
     # Get prior and posterior data for key
     log.info(f"Creating distibution plot for {key}")
-    posterior = convert_trace_to_dataframe(trace_posterior, config, key)
-    prior = convert_trace_to_dataframe(trace_prior, config, key)
+    posterior = convert_trace_to_dataframe(trace_posterior, modelParams, key)
+    prior = convert_trace_to_dataframe(trace_prior, modelParams, key)
 
-    dist = config.get_distribution_by_name(key)
+    dist = modelParams.get_distribution_by_name(key)
 
     # Get ndim of distribution i.e. event stack ndim
     if isinstance(dist["shape"], int):
@@ -230,7 +230,7 @@ def _distribution(array_posterior, array_prior, distribution_dict, suffix="", ax
         Sampling data as array, should be filtered beforehand.
 
     distribution_dict: dict
-        Config.distibution["name"] dictionary, get via config.get_distribution_by_name("name")
+        modelParams.distibution["name"] dictionary, get via modelParams.get_distribution_by_name("name")
     
     suffix: str,optional
         Suffix for the plot title e.g. "age_group_1"
@@ -239,24 +239,6 @@ def _distribution(array_posterior, array_prior, distribution_dict, suffix="", ax
     ax : mpl axes element, optional
         Plot into an existing axes element
         |default| :code:`None`
-    
-
-    Example
-    -------
-    .. :code: 
-
-        # With given trace for prior and posterior
-        df_posterior = convert_trace_to_dataframe(trace_posterior,"R")
-        df_prior = convert_trace_to_dataframe(trace_prior,"R")
-
-        _distribution(
-            df_posterior,
-            df_prior,
-            config=config,
-            country="my_country_name",
-            age_group="my_age_group")
-
-        plt.show()
 
 
     """

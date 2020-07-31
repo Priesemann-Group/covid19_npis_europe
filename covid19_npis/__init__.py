@@ -11,5 +11,5 @@ from . import test_data
 from . import model
 from . import plot
 
-from .config import Config
+from .modelParams import ModelParams
 from .data import convert_trace_to_dataframe_list

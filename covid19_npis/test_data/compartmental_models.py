@@ -83,7 +83,7 @@ def simple_new_I_with_R_t(factor):
     R_0 = np.array([1.2, 1.3, 1.1, 1.3]) * factor
     I_0 = np.array([10, 10, 10, 10])
     cp1_1 = Change_point(alpha=0.1, gamma_max=0.5, length=5, begin=8)
-    cp1_2 = Change_point(alpha=0.1, gamma_max=-0.5, length=2, begin=30)
+    cp1_2 = Change_point(alpha=0.1, gamma_max=-0.5, length=5, begin=30)
     cp2 = Change_point(alpha=0.2, gamma_max=1, length=2, begin=25)
     cps = [cp1_1, cp1_2, cp2]
 
@@ -150,4 +150,30 @@ def simple_new_I_with_R_t(factor):
     df = df.set_index("date")
     df.columns = pd.MultiIndex.from_tuples(df.columns, names=["country", "age_group"])
 
-    return df
+    # Prep interventions/change points to return
+    interventions = {
+        "Name_intervention_1": {
+            "cp1": {
+                "alpha": cp1_1.alpha,
+                "gamma_max": cp1_1.gamma_max,
+                "date": cp1_1.begin,
+                "length": cp1_1.length,
+            },
+            "cp2": {
+                "alpha": cp1_2.alpha,
+                "gamma_max": cp1_2.gamma_max,
+                "date": cp1_2.begin,
+                "length": cp1_2.length,
+            },
+        },
+        "Name_intervention_2": {
+            "cp1": {
+                "alpha": cp2.alpha,
+                "gamma_max": cp2.gamma_max,
+                "date": cp2.begin,
+                "length": cp2.length,
+            },
+        },
+    }
+
+    return df, interventions

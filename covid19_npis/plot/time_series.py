@@ -14,17 +14,17 @@ import logging
 log = logging.getLogger(__name__)
 
 
-def timeseries(trace, config, key, plot_observed=False):
+def timeseries(trace, modelParams, key, plot_observed=False):
     """
     Create time series overview for a a give variable, i.e. plot for every additional dimension.
-    Can only done to variables with a time shape label. See config.py
+    Can only done to variables with a time shape label. See modelParams.py
 
     Parameters
     ----------
     trace_posterior,trace_prior : arivz InferenceData
         Raw data from pymc4 sampling
 
-    config : cov19_npis.config.Config
+    modelParams : cov19_npis.modelParams.modelParams
 
     key : str
         Name of the variable to plot
@@ -33,8 +33,8 @@ def timeseries(trace, config, key, plot_observed=False):
         Do you want to plot the new cases? May not work for 1 and 2 dim case.
     """
 
-    df = convert_trace_to_dataframe(trace, config, key)
-    dist = config.get_distribution_by_name(key)
+    df = convert_trace_to_dataframe(trace, modelParams, key)
+    dist = modelParams.get_distribution_by_name(key)
 
     # Determine ndim:
     if isinstance(dist["shape"], int):
@@ -95,8 +95,8 @@ def timeseries(trace, config, key, plot_observed=False):
 
                 if plot_observed:
                     axes[j][i] = _timeseries(
-                        config.df.index,
-                        config.df[(value1, value2)],
+                        modelParams.df.index,
+                        modelParams.df[(value1, value2)],
                         ax=axes[j][i],
                         what="data",
                     )

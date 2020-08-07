@@ -12,9 +12,8 @@ from covid19_npis.benchmarking import benchmark
 
 import logging
 
-logging.basicConfig(level=logging.debug)
 log = logging.getLogger(__name__)
-
+# Set logging level in __init__!!
 
 """ # Debugging and other snippets
 """
@@ -33,8 +32,8 @@ tf.config.set_visible_devices([], "GPU")
     Retrieves some dummy/test data and creates ModelParams object
 """
 # Get test dataset with time dependent reproduction number
-I_new_1, interventions_1 = covid19_npis.test_data.simple_new_I_with_R_t(1)
-I_new_2, interventions_2 = covid19_npis.test_data.simple_new_I_with_R_t(1)
+I_new_1, interventions_1 = covid19_npis.test_data.simple_new_I_with_R_t(0.9)
+I_new_2, interventions_2 = covid19_npis.test_data.simple_new_I_with_R_t(0.9)
 I_new = I_new_1.join(I_new_2)
 interventions = [interventions_1, interventions_2]
 
@@ -78,13 +77,13 @@ def test_model(modelParams):
         event_stack=event_shape,
         transform=transformations.Log(reinterpreted_batch_ndims=len(event_shape)),
     )
-    log.info(f"R_0:\n{R_0}")
+    log.debug(f"R_0:\n{R_0}")
     Interventions = covid19_npis.model.reproduction_number.create_interventions(
         modelParams
     )
     log.info(f"Interventions:\n{Interventions}")
     R_t = yield covid19_npis.model.reproduction_number.construct_R_t(R_0, Interventions)
-    log.info(f"R_t:\n{R_t}")
+    log.debug(f"R_t:\n{R_t}")
 
     # Create Contact matrix
     # Use Cholesky version as the non Cholesky version uses tf.linalg.slogdet which isn't implemented in JAX
@@ -113,7 +112,7 @@ def test_model(modelParams):
     new_cases = covid19_npis.model.InfectionModel(
         N=N, I_0=I_0, R_t=R_t, C=C, g_p=g_p  # default valueOp:AddV2
     )
-    log.debug(f"new_cases:\n{new_cases[0,:]}")  # dimensons=t,c,a
+    log.debug(f"new_cases:\n{new_cases.shape}")  # dimensons=t,c,a
 
     # Clip in order to avoid infinities
     new_cases = tf.clip_by_value(new_cases, 1e-7, 1e9)
@@ -126,6 +125,7 @@ def test_model(modelParams):
         conditionally_independent=True,
         transform=transformations.SoftPlus(reinterpreted_batch_ndims=2),
     )
+    log.debug(f"sigma:\n{sigma.shape}")
     sigma = sigma[..., tf.newaxis]  # same across age groups
     new_cases = yield pm.Deterministic(name="new_cases", value=new_cases)
     # Likelihood of the data
@@ -151,7 +151,7 @@ trace = pm.sample(
     num_samples=500,
     burn_in=500,
     use_auto_batching=False,
-    num_chains=2,
+    num_chains=10,
     xla=True,
 )
 end_time = time.time()

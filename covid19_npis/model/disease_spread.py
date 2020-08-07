@@ -368,7 +368,7 @@ def InfectionModel_unrolled(N, I_0, R_t, C, g_p):
     log.debug(f"I_0_t:\n{I_0_t}")
 
     # TO DO: Documentation
-    # log.info(f"R_t outside scan:\n{R_t}")
+    # log.debug(f"R_t outside scan:\n{R_t}")
     total_days = R_t.shape[0]
 
     # Initial susceptible population = total - infected

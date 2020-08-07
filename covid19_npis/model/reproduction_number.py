@@ -8,9 +8,20 @@ import numpy as np
 log = logging.getLogger(__name__)
 
 
+num_age_groups = 4
+num_countries = 2
+
+
 def _fsigmoid(t, l, d):
+    # Prep dimensions
+    d = tf.expand_dims(d, axis=-1)
+    l = tf.expand_dims(l, axis=-1)
+
     inside_exp_1 = -4.0 / l
-    inside_exp_2 = t - d
+    log.info("hi")
+    inside_exp_2 = -d + t
+    log.info(f"-4/l\n{inside_exp_1.shape}")
+    log.info(f"t-d\n{inside_exp_2.shape}")
     return 1.0 / (1.0 + tf.exp(inside_exp_1 * inside_exp_2))
 
 
@@ -46,6 +57,7 @@ class Change_point(object):
             self.prior_date_loc,
             self.prior_date_scale,
             conditionally_independent=True,
+            batch_stack=num_age_groups,
         )  # Test if it works like this or if we need yield statement here already.
 
     @property
@@ -122,6 +134,7 @@ class Intervention(object):
             np.log(self.prior_length_loc).astype("float32"),
             self.prior_length_scale,
             conditionally_independent=True,
+            batch_stack=num_age_groups,
         )
 
         self._alpha = pm.Normal(
@@ -129,6 +142,7 @@ class Intervention(object):
             self.prior_alpha_loc,
             self.prior_alpha_scale,
             conditionally_independent=True,
+            batch_stack=(1),
         )
 
     @property
@@ -186,10 +200,18 @@ class Intervention(object):
         t: number
             Time
         """
-        # sum over cps
+
         log.info("gamma_t_intervetion")
         l = yield self.length
-        ret = yield self.change_points[0].gamma_t(t, l)
+
+        # Sum over change points
+        _sum = []
+        for cp in self.change_points:
+            gamma_cp = yield cp.gamma_t(t, l)
+            _sum.append(gamma_cp)
+
+        ret = tf.reduce_sum(_sum, axis=0)
+
         return ret
 
 
@@ -213,6 +235,7 @@ def create_interventions(modelParams):
         Interventions array like
         |shape| country, interventions
     """
+    log.info("create_interventions")
     ret = []
     for c, C in enumerate(modelParams.interventions):  # Country
         interventions = []
@@ -259,24 +282,49 @@ def construct_R_t(R_0, Interventions):
     ------
     R_t:
         Reproduction number matrix.
-        |shape| batch, time, country, age group
+        |shape| time, batch, country, age group
     """
 
     # Create tensorflow R_t for now hardcoded to 50 timesteps
     t = tf.range(0, 50, dtype="float32")
 
-    # We need the second part i.e. e^(sum(alpha*gamma)) for each country
+    """ We want to create a time dependent R_t for each country and age group
+        We iterate over country and interventions.
+    """
 
-    for i in Interventions[0]:
-        # Idee:
-        _alpha = yield i.alpha
-        temp = yield i.gamma_t(t)
-        print(temp)
-        print(_alpha)
-    # alpha has |shape| batch
-    # gamma has |shape| time
+    exp_to_multi = []
+    for c in range(num_countries):
+        _sum = []
+        for i in Interventions[c]:
+            # Idee:
+            _alpha = yield i.alpha
+            gamma_t = yield i.gamma_t(t)
+            log.info(f"gamma_t\n{gamma_t.shape}")
+            log.info(f"alpha\n{_alpha.shape}")
+            _sum.append(tf.einsum("...ai,...j->...ai", gamma_t, _alpha))
 
-    # That could work like  that im not sure tho. -> has to be tested
-    # tf.map_fn(_sum_interventions, tf.range(0, 50, delta=1, dtype="float32"))
-    R_t = tf.stack([R_0] * 50)
+        # We sum over all interventions in a country and append to list for countries
+        exp_to_multi.append(tf.exp(tf.reduce_sum(_sum, axis=0)))
+
+    exp_to_multi = tf.convert_to_tensor(exp_to_multi)
+
+    if len(exp_to_multi.shape) == 4:
+        # before |shape| country, batch, agegroup, time
+        exp_to_multi = tf.transpose(exp_to_multi, perm=(1, 0, 2, 3))
+        # after |shape| batch, country, agegroup, time
+
+    """
+    Multiplicate R_0 with the exponent i.e.
+        R(t) = R_0 * exp(sum_i(gamm_i(t)*alpha_i))
+        R_0: |shape| batch, country, agegroup
+        exp: |shape| batch, country, agegroup, time
+    """
+    log.info(f"country exponential function:\n{exp_to_multi.shape}")
+    log.info(f"R_0:\n{R_0.shape}")
+
+    R_t = tf.einsum(
+        "...ca,...cat->t...ca", R_0, exp_to_multi
+    )  # Reshape to |shape| time, batch, country, age group here
+    log.info(f"R_t:\n{R_t.shape}")
+
     return R_t

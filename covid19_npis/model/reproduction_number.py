@@ -18,10 +18,10 @@ def _fsigmoid(t, l, d):
     l = tf.expand_dims(l, axis=-1)
 
     inside_exp_1 = -4.0 / l
-    log.info("hi")
-    inside_exp_2 = -d + t
+    inside_exp_2 = t - d
     log.info(f"-4/l\n{inside_exp_1.shape}")
     log.info(f"t-d\n{inside_exp_2.shape}")
+
     return 1.0 / (1.0 + tf.exp(inside_exp_1 * inside_exp_2))
 
 

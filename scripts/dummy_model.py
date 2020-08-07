@@ -82,9 +82,9 @@ def test_model(modelParams):
         modelParams
     )
     log.info(f"Interventions:\n{Interventions}")
-    R_t = yield covid19_npis.model.reproduction_number.construct_R_t(R_0, Interventions)
-    log.debug(f"R_t:\n{R_t}")
-
+    R_t = covid19_npis.model.reproduction_number.construct_R_t(R_0, Interventions)
+    R_t = tf.stack([R_0] * 50)
+    log.info(f"R_t:\n{R_t.shape}")
     # Create Contact matrix
     # Use Cholesky version as the non Cholesky version uses tf.linalg.slogdet which isn't implemented in JAX
     C = yield pm.LKJCholesky(

@@ -12,24 +12,18 @@ import os
 sys.path.append("../")
 
 # Needed to set logging level before importing other modules
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
 import covid19_npis
 from covid19_npis import transformations
 from covid19_npis.benchmarking import benchmark
 
-import logging
-
-logging.basicConfig(level=logging.debug)
-log = logging.getLogger(__name__)
-
-
 """ # Debugging and other snippets
 """
 # For eventual debugging:
-tf.config.run_functions_eagerly(True)
-tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
+# tf.config.run_functions_eagerly(True)
+# tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
 
 # Force CPU
 my_devices = tf.config.experimental.list_physical_devices(device_type="CPU")
@@ -42,13 +36,14 @@ tf.config.set_visible_devices([], "GPU")
     Retrieves some dummy/test data and creates ModelParams object
 """
 # Get test dataset with time dependent reproduction number
-I_new_1, interventions_1 = covid19_npis.test_data.simple_new_I_with_R_t(0.9)
+"""
+I_new_1, interventions_1 = covid19_npis.test_data.simple_new_I_with_R_t(1)
 I_new_2, interventions_2 = covid19_npis.test_data.simple_new_I_with_R_t(0.9)
 I_new = I_new_1.join(I_new_2)
 interventions = [interventions_1, interventions_2]
-
-# Interventions
-# Create interventions for dummy model TODO move that into test data
+"""
+I_new = covid19_npis.test_data.simple_new_I(1)
+I_new = I_new.join(covid19_npis.test_data.simple_new_I(1))
 
 
 # Create model params
@@ -58,7 +53,7 @@ shape label and the observed data. This is necessary for the data converter
 later on.
 """
 modelParams = covid19_npis.ModelParams(I_new)
-modelParams.interventions = interventions
+# modelParams.interventions = interventions
 """ # Construct pymc4 model
 """
 
@@ -67,16 +62,6 @@ modelParams.interventions = interventions
 def test_model(modelParams):
     event_shape = (modelParams.num_countries, modelParams.num_age_groups)
     len_gen_interv_kernel = 12
-    # Create I_0
-    I_0 = yield pm.HalfCauchy(
-        name=modelParams.distributions["I_0"]["name"],
-        loc=10.0,
-        scale=25,
-        conditionally_independent=True,
-        event_stack=event_shape,
-        transform=transformations.Log(reinterpreted_batch_ndims=len(event_shape)),
-    )
-    I_0 = tf.clip_by_value(I_0, 1e-12, 1e12)
 
     # Create Reproduction Number for every age group
     mean_R_0 = 2.5
@@ -103,9 +88,11 @@ def test_model(modelParams):
     C = yield pm.LKJCholesky(
         name="C_cholesky",
         dimension=modelParams.num_age_groups,
-        concentration=2,  # eta
+        concentration=4,  # eta
         conditionally_independent=True,
         event_stack=modelParams.num_countries,
+        validate_args=True,
+        transform=transformations.CorrelationCholesky(reinterpreted_batch_ndims=1),
     )  # |shape| batch_dims, num_countries, num_age_groups, num_age_groups
     log.debug(f"C chol:\n{C}")
 
@@ -154,13 +141,14 @@ def test_model(modelParams):
 
 """ # MCMC Sampling
 """
+
 begin_time = time.time()
 trace = pm.sample(
     test_model(modelParams),
-    num_samples=300,
-    burn_in=300,
+    num_samples=50,
+    burn_in=100,
     use_auto_batching=False,
-    num_chains=10,
+    num_chains=2,
     xla=True,
 )
 end_time = time.time()
@@ -199,8 +187,8 @@ fig_new_cases = covid19_npis.plot.timeseries(
 for i, c in enumerate(modelParams.data_summary["countries"]):
     for j, a in enumerate(modelParams.data_summary["age_groups"]):
         fig_new_cases[j][i] = covid19_npis.plot.time_series._timeseries(
-            modelParams.dataframe.index[:-16],
-            modelParams.dataframe[(c, a)].to_numpy()[16:],
+            modelParams.dataframe.index[:],
+            modelParams.dataframe[(c, a)].to_numpy()[:],
             ax=fig_new_cases[j][i],
             alpha=0.5,
         )

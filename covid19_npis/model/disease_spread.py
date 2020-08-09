@@ -79,24 +79,42 @@ def construct_h_0_t(
 
         log.debug(f"i, I_t:{i}\n{I_t}")
 
+    h_0_t_mean = [None for _ in range(len_gen_interv_kernel - 1, -1, -1)]
     for i in range(len_gen_interv_kernel - 1, -1, -1):
         # R = tf.gather(R_t_rescaled, i_sim_begin_list + i, axis=-3, batch_dims=1,))
         # I_t = tf.linalg.matvec(R_eff_inv, I_t)
         I_t = R_inv[0] * I_t
         log.debug(f"i, I_t:{i}\n{I_t}")
-        h_0_t_mean.append(I_t)
+        h_0_t_mean[i] = I_t
     h_0_t_mean = tf.stack(h_0_t_mean, axis=-3) / len_gen_interv_kernel
     h_0_t_mean = tf.clip_by_value(h_0_t_mean, 1e-5, 1e6)
     log.debug(f"h_0_t_mean:\n{h_0_t_mean}")
-    h_0_t_rand = yield pm.LogNormal(
-        "I_0_diff",
-        loc=tf.math.log(h_0_t_mean),
-        scale=3,
-        conditionally_independent=False,
-        reinterpreted_batch_ndims=len(h_0_t_mean.shape),
-        transform=transformations.SoftPlus(
-            reinterpreted_batch_ndims=len(h_0_t_mean.shape)
+
+    h_0_base = h_0_t_mean[..., 0:1, :, :] * tf.exp(
+        (
+            yield pm.Normal(
+                "I_0_diff_base",
+                loc=0.0,
+                scale=3.0,
+                conditionally_independent=False,
+                event_stack=tuple(h_0_t_mean[..., 0:1, :, :].shape),
+            )
         ),
+    )
+    h_0_mean_diff = h_0_t_mean[..., :-1, :, :] - h_0_t_mean[..., 1:, :, :]
+    h_0_base_add = h_0_mean_diff * tf.exp(
+        (
+            yield pm.Normal(
+                "I_0_diff_add",
+                loc=0.0,
+                scale=1.0,
+                conditionally_independent=False,
+                event_stack=tuple(h_0_mean_diff.shape),
+            )
+        ),
+    )
+    h_0_t_rand = tf.math.cumsum(
+        tf.concat([h_0_base, h_0_base_add,], axis=-3,), axis=-3
     )  # shape:  batch_dims x len_gen_interv_kernel x countries x age_groups
 
     if len(h_0_t_rand.shape) == 4:
@@ -361,6 +379,7 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
         # log.debug(f"infectious: {infectious}")
         # log.debug(f"R_eff:\n{R_eff}")
         # log.debug(f"f:\n{f}")
+        # log.debug(f"h:\n{h}")
 
         # Calculate new infections
         new = tf.einsum("...ci,...cij,...cj->...cj", infectious, R_eff, f) + h

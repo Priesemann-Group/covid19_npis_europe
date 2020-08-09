@@ -110,20 +110,29 @@ def convert_trace_to_dataframe(trace, config, key):
 
     # Rename country index to country names
     if r"country" in df.index.names:
-        df.index = df.index.set_levels(config.data["countries"], level="country")
+        df.index = df.index.set_levels(
+            config.data_summary["countries"], level="country"
+        )
 
     # Rename age_group index to age_group names
     if r"age_group" in df.index.names:
-        df.index = df.index.set_levels(config.data["age_groups"], level="age_group")
+        df.index = df.index.set_levels(
+            config.data_summary["age_groups"], level="age_group"
+        )
     if r"age_group_i" in df.index.names:
-        df.index = df.index.set_levels(config.data["age_groups"], level="age_group_i")
+        df.index = df.index.set_levels(
+            config.data_summary["age_groups"], level="age_group_i"
+        )
     if r"age_group_j" in df.index.names:
-        df.index = df.index.set_levels(config.data["age_groups"], level="age_group_j")
+        df.index = df.index.set_levels(
+            config.data_summary["age_groups"], level="age_group_j"
+        )
 
     # Convert time index to datetime starting at model begin
     if r"time" in df.index.names:
         df.index = df.index.set_levels(
-            pd.date_range(config.df.index.min(), config.df.index.max()), level="time",
+            pd.date_range(config.dataframe.index.min(), config.dataframe.index.max()),
+            level="time",
         )
 
     # Last rename column

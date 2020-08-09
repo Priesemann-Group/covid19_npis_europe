@@ -1,4 +1,8 @@
 import sys
+import logging
+import time
+import os
+
 import pymc4 as pm
 import tensorflow as tf
 import numpy as np
@@ -6,20 +10,26 @@ import time
 import os
 
 sys.path.append("../")
+
+# Needed to set logging level before importing other modules
+logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger(__name__)
+
 import covid19_npis
 from covid19_npis import transformations
 from covid19_npis.benchmarking import benchmark
 
 import logging
 
+logging.basicConfig(level=logging.debug)
 log = logging.getLogger(__name__)
-# Set logging level in __init__!!
+
 
 """ # Debugging and other snippets
 """
 # For eventual debugging:
 tf.config.run_functions_eagerly(True)
-tf.debugging.enable_check_numerics(stack_height_limit=30, path_length_limit=50)
+tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
 
 # Force CPU
 my_devices = tf.config.experimental.list_physical_devices(device_type="CPU")
@@ -56,7 +66,7 @@ modelParams.interventions = interventions
 @pm.model
 def test_model(modelParams):
     event_shape = (modelParams.num_countries, modelParams.num_age_groups)
-
+    len_gen_interv_kernel = 12
     # Create I_0
     I_0 = yield pm.HalfCauchy(
         name=modelParams.distributions["I_0"]["name"],
@@ -69,22 +79,25 @@ def test_model(modelParams):
     I_0 = tf.clip_by_value(I_0, 1e-12, 1e12)
 
     # Create Reproduction Number for every age group
-    R_0 = yield pm.LogNormal(
+    mean_R_0 = 2.5
+    beta_R_0 = 2.0
+    R_0 = yield pm.Gamma(
         name=modelParams.distributions["R"]["name"],
-        loc=1,
-        scale=2.5,
+        concentration=mean_R_0 * beta_R_0,
+        rate=beta_R_0,
         conditionally_independent=True,
         event_stack=event_shape,
-        transform=transformations.Log(reinterpreted_batch_ndims=len(event_shape)),
+        transform=transformations.SoftPlus(reinterpreted_batch_ndims=len(event_shape)),
     )
     log.debug(f"R_0:\n{R_0}")
-    Interventions = covid19_npis.model.reproduction_number.create_interventions(
-        modelParams
-    )
-    log.info(f"Interventions:\n{Interventions}")
-    R_t = covid19_npis.model.reproduction_number.construct_R_t(R_0, Interventions)
+    # Interventions = covid19_npis.model.reproduction_number.create_interventions(
+    #    modelParams
+    # )
+    # log.info(f"Interventions:\n{Interventions}")
+    # R_t = yield covid19_npis.model.reproduction_number.construct_R_t(R_0, Interventions)
     R_t = tf.stack([R_0] * 50)
-    log.info(f"R_t:\n{R_t.shape}")
+    log.debug(f"R_t:\n{R_t}")
+
     # Create Contact matrix
     # Use Cholesky version as the non Cholesky version uses tf.linalg.slogdet which isn't implemented in JAX
     C = yield pm.LKJCholesky(
@@ -94,14 +107,29 @@ def test_model(modelParams):
         conditionally_independent=True,
         event_stack=modelParams.num_countries,
     )  # |shape| batch_dims, num_countries, num_age_groups, num_age_groups
+    log.debug(f"C chol:\n{C}")
+
     C = yield pm.Deterministic(
         name=modelParams.distributions["C"]["name"],
-        value=tf.einsum("...ab,...ba->...ab", C, C),
+        value=tf.einsum("...an,...bn->...ab", C, C),
     )
+    log.debug(f"C:\n{C}")
 
     # Create normalized pdf of generation interval
-    g_p = yield covid19_npis.model.construct_generation_interval()
-    log.debug(f"g_p:\n{g_p}")
+    (
+        gen_kernel,  # shape: countries x len_gen_interv,
+        mean_gen_interv,  #  shape g_mu: countries x 1
+    ) = yield covid19_npis.model.construct_generation_interval(l=len_gen_interv_kernel)
+    log.debug(f"gen_interv:\n{gen_kernel}")
+
+    # Generate exponential distribution with initial infections as external input
+    h_0_t = yield covid19_npis.model.construct_h_0_t(
+        modelParams=modelParams,
+        len_gen_interv_kernel=len_gen_interv_kernel,
+        R_t=R_t,
+        mean_gen_interv=mean_gen_interv,
+        mean_test_delay=0,
+    )
 
     # Create N tensor (vector)
     # should be done earlier in the real model
@@ -110,36 +138,17 @@ def test_model(modelParams):
     log.debug(f"N:\n{N}")
     # Calculate new cases
     new_cases = covid19_npis.model.InfectionModel(
-        N=N, I_0=I_0, R_t=R_t, C=C, g_p=g_p  # default valueOp:AddV2
+        N=N, h_0_t=h_0_t, R_t=R_t, C=C, gen_kernel=gen_kernel  # default valueOp:AddV2
     )
-    log.debug(f"new_cases:\n{new_cases.shape}")  # dimensons=t,c,a
+    log.debug(f"new_cases:\n{new_cases[0,:]}")  # dimensons=t,c,a
 
     # Clip in order to avoid infinities
     new_cases = tf.clip_by_value(new_cases, 1e-7, 1e9)
 
-    # Get scale of likelihood
-    sigma = yield pm.HalfCauchy(
-        name=modelParams.distributions["sigma"]["name"],
-        scale=50.0,
-        event_stack=(1, modelParams.num_countries),
-        conditionally_independent=True,
-        transform=transformations.SoftPlus(reinterpreted_batch_ndims=2),
-    )
-    log.debug(f"sigma:\n{sigma.shape}")
-    sigma = sigma[..., tf.newaxis]  # same across age groups
     new_cases = yield pm.Deterministic(name="new_cases", value=new_cases)
-    # Likelihood of the data
-    likelihood = yield pm.StudentT(
-        name="like",
-        loc=new_cases,
-        scale=sigma * tf.sqrt(new_cases) + 1,
-        df=4,
-        observed=modelParams.get_data()
-        .to_numpy()
-        .astype("float32")
-        .reshape((50, modelParams.num_countries, modelParams.num_age_groups))[16:],
-        reinterpreted_batch_ndims=3,
-    )
+
+    likelihood = yield covid19_npis.model.studentT_likelihood(modelParams, new_cases)
+
     return likelihood
 
 
@@ -148,8 +157,8 @@ def test_model(modelParams):
 begin_time = time.time()
 trace = pm.sample(
     test_model(modelParams),
-    num_samples=500,
-    burn_in=500,
+    num_samples=300,
+    burn_in=300,
     use_auto_batching=False,
     num_chains=10,
     xla=True,
@@ -171,7 +180,7 @@ trace_prior = pm.sample_prior_predictive(
 """ ## Plot distributions
     Function returns a list of figures which can be shown by fig[i].show() each figure being one country.
 """
-dist_names = ["R", "I_0", "g_mu", "g_theta", "sigma"]
+dist_names = ["R", "I_0_diff", "g_mu", "g_theta", "sigma"]
 fig = {}
 for name in dist_names:
     fig[name] = covid19_npis.plot.distribution(
@@ -187,11 +196,11 @@ fig_new_cases = covid19_npis.plot.timeseries(
 )
 
 # plot data into the axes
-for i, c in enumerate(modelParams.data["countries"]):
-    for j, a in enumerate(modelParams.data["age_groups"]):
+for i, c in enumerate(modelParams.data_summary["countries"]):
+    for j, a in enumerate(modelParams.data_summary["age_groups"]):
         fig_new_cases[j][i] = covid19_npis.plot.time_series._timeseries(
-            modelParams.df.index[:-16],
-            modelParams.df[(c, a)].to_numpy()[16:],
+            modelParams.dataframe.index[:-16],
+            modelParams.dataframe[(c, a)].to_numpy()[16:],
             ax=fig_new_cases[j][i],
             alpha=0.5,
         )

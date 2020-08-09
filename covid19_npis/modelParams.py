@@ -7,7 +7,7 @@ import logging
 log = logging.getLogger(__name__)
 
 
-class ModelParams(object):
+class ModelParams:
     """ 
         Class for all model params should be used if one wants to use the,
         plotting and data converters. Contains names and shapes with labels
@@ -19,6 +19,9 @@ class ModelParams(object):
             params = ModelParams()
             params.distributions["I_0"]["name"] = "my new fancy name"
 
+        This class also contains the data used for fitting. `dataframe` is the original
+        dataframe. `data_tensor` is a tensor in the correct shape (time x countries x age)
+        with values replace by nans when no data is available.
 
         Parameters
         ----------
@@ -26,22 +29,84 @@ class ModelParams(object):
             DataFrame with country/age group multicolumn and datetime index
     """
 
-    def __init__(self, data):
-
-        # Get number of age groups and countries from data
-        self.num_countries = len(data.columns.levels[0])
-        self.num_age_groups = len(data.columns.levels[1])
+    def __init__(
+        self, data, min_offset_sim_data=20, minimal_daily_cases=40, dtype="float32"
+    ):
 
         # Data object
-        self.df = data
+        self._dtype = dtype
+        self._min_offset_sim_data = min_offset_sim_data
+        self._minimal_daily_cases = minimal_daily_cases
+        self.dataframe = data
 
         # Configs for distribution
         self.distributions = self.__get_default_dist_config()
-        # Config for input data
-        self.data = self.__get_default_data_config(data)
 
-    def get_data(self):
-        return self.df
+    @property
+    def dataframe(self):
+        return self._df
+
+    @dataframe.setter
+    def dataframe(self, df):
+        # set dataframe
+        self._df = df
+
+        # Config for input data
+        self._data_summary = self.__get_default_data_config(self.dataframe)
+
+        # set data tensor, replaces values smaller than 40 by nans.
+        data_tensor = (
+            self.dataframe.to_numpy()
+            .astype(self.dtype)
+            .reshape((-1, len(self.countries), len(self.age_groups)))
+        )
+        i_data_begin_list = []
+        for c in range(data_tensor.shape[1]):
+            mask = np.sum(data_tensor[:, c, :], axis=-1) > self._minimal_daily_cases
+            i_data_begin = np.min(np.nonzero(mask)[0])
+            i_data_begin_list.append(i_data_begin)
+        i_data_begin_list = np.array(i_data_begin_list)
+        i_data_begin_list = np.maximum(i_data_begin_list, self._min_offset_sim_data)
+        self._indices_begin_data = i_data_begin_list
+        for i in i_data_begin_list:
+            data_tensor[:i] = np.nan
+        self._data_tensor = data_tensor
+
+    @property
+    def min_offset_sim_data(self):
+        return self._min_offset_sim_data
+
+    @property
+    def data_tensor(self):
+        return self._data_tensor
+
+    @property
+    def dtype(self):
+        return self._dtype
+
+    @property
+    def indices_begin_sim(self):
+        return self._indices_begin_data
+
+    @property
+    def data_summary(self):
+        return self._data_summary
+
+    @property
+    def age_groups(self):
+        return self.data_summary["age_groups"]
+
+    @property
+    def countries(self):
+        return self.data_summary["countries"]
+
+    @property
+    def num_age_groups(self):
+        return len(self.data_summary["age_groups"])
+
+    @property
+    def num_countries(self):
+        return len(self.data_summary["countries"])
 
     def get_distribution_by_name(self, name):
         for dist, value in self.distributions.items():
@@ -54,9 +119,9 @@ class ModelParams(object):
             Get default values of distribution dict.
         """
         distributions = {
-            "I_0": {
-                "name": "I_0",
-                "long_name": "Initial infectious people",
+            "I_0_diff": {
+                "name": "I_0_diff",
+                "long_name": "Initial infectious difference to inferred ones",
                 "shape": (self.num_countries, self.num_age_groups),
                 "shape_label": ("country", "age_group"),
                 "math": "I_0",
@@ -99,7 +164,7 @@ class ModelParams(object):
             "new_cases": {
                 "name": "new_cases",
                 "long_name": "Daily new infectious cases",
-                "shape": (len(self.df), self.num_countries, self.num_age_groups),
+                "shape": self.data_tensor.shape,
                 "shape_label": ("time", "country", "age_group"),
             },
         }

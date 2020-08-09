@@ -95,8 +95,8 @@ def timeseries(trace, modelParams, key, plot_observed=False):
 
                 if plot_observed:
                     axes[j][i] = _timeseries(
-                        modelParams.df.index,
-                        modelParams.df[(value1, value2)],
+                        modelParams.dataframe.index,
+                        modelParams.dataframe[(value1, value2)],
                         ax=axes[j][i],
                         what="data",
                     )

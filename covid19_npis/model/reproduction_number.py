@@ -325,6 +325,6 @@ def construct_R_t(R_0, Interventions):
     R_t = tf.einsum(
         "...ca,...cat->t...ca", R_0, exp_to_multi
     )  # Reshape to |shape| time, batch, country, age group here
-    log.info(f"R_t:\n{R_t.shape}")
+    log.info(f"R_t_inside:\n{R_t.shape}")
 
     return R_t

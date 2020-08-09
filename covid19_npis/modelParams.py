@@ -119,8 +119,8 @@ class ModelParams:
             Get default values of distribution dict.
         """
         distributions = {
-            "I_0_diff": {
-                "name": "I_0_diff",
+            "I_0_diff_base": {
+                "name": "I_0_diff_base",
                 "long_name": "Initial infectious difference to inferred ones",
                 "shape": (self.num_countries, self.num_age_groups),
                 "shape_label": ("country", "age_group"),

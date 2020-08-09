@@ -168,7 +168,7 @@ trace_prior = pm.sample_prior_predictive(
 """ ## Plot distributions
     Function returns a list of figures which can be shown by fig[i].show() each figure being one country.
 """
-dist_names = ["R", "g_mu", "g_theta", "sigma"]
+dist_names = ["R", "I_0_diff_base", "g_mu", "g_theta", "sigma"]
 fig = {}
 for name in dist_names:
     fig[name] = covid19_npis.plot.distribution(

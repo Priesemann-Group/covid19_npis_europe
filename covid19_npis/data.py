@@ -46,7 +46,7 @@ def convert_trace_to_dataframe_list(trace, config):
     return dfs
 
 
-def convert_trace_to_dataframe(trace, config, key):
+def convert_trace_to_dataframe(trace, modelParams, key):
     r"""
     Converts the pymc4 arviz trace for a single key to a pandas dataframes.
     Also sets the right labels for the  dimensions i.e splits data by
@@ -58,16 +58,16 @@ def convert_trace_to_dataframe(trace, config, key):
     ----------
     trace: arivz InferenceData
 
-    config: cov19_npis.config.Config
+    modelParams: cov19_npis.modelParams.modelParams
 
     key: str
-        Name of variable in config
+        Name of variable in modelParams
         
     Returns
     -------
     pd.DataFrame
         Multiindex dataframe containing all samples by chain and other dimensions
-        defined in config.py
+        defined in modelParams.py
 
     """
     # Try to get posterior and prior data
@@ -85,53 +85,62 @@ def convert_trace_to_dataframe(trace, config, key):
 
     # Check key value
     assert key in [
-        config.distributions[dist]["name"] for dist in config.distributions
-    ], f"Key '{key}' not found! Is it added to config.py?"
+        modelParams.distributions[dist]["name"] for dist in modelParams.distributions
+    ], f"Key '{key}' not found! Is it added to modelParams.py?"
 
     # Get distribution
-    dist = config.get_distribution_by_name(key)
+    dist = modelParams.get_distribution_by_name(key)
 
     df = data[f"{model_name}/{dist['name']}"].to_dataframe()
     num_of_levels = len(df.index.levels)
 
     # Rename level to dimension labels
-    for i in range(num_of_levels):
-        """
-        i=0 is always chain
-        i=1 is always sample
-        i=2 is config.distribution...shape[0]
-        i=3 is config.distribution...shape[1]
-        """
-        if i == 0 or i == 1:
-            continue
+    """
+    0 is always chain
+    1 is always sample
+    ... somthing else sometimes
+    -3 is modelParams.distribution...shape[0]
+    -2 is modelParams.distribution...shape[1]
+    -1 is modelParams.distribution...shape[2]
+
+    The last 3 can shift up to the number of labels 
+    """
+    if isinstance(dist["shape_label"], (tuple, list)):
+        ndim = len(dist["shape_label"])
+    else:
+        ndim = 1
+
+    for i in range(ndim):
         df.index.rename(
-            dist["shape_label"][i - 2], level=i, inplace=True,
+            dist["shape_label"][i], level=i - ndim, inplace=True,
         )
 
     # Rename country index to country names
     if r"country" in df.index.names:
         df.index = df.index.set_levels(
-            config.data_summary["countries"], level="country"
+            modelParams.data_summary["countries"], level="country"
         )
 
     # Rename age_group index to age_group names
     if r"age_group" in df.index.names:
         df.index = df.index.set_levels(
-            config.data_summary["age_groups"], level="age_group"
+            modelParams.data_summary["age_groups"], level="age_group"
         )
     if r"age_group_i" in df.index.names:
         df.index = df.index.set_levels(
-            config.data_summary["age_groups"], level="age_group_i"
+            modelParams.data_summary["age_groups"], level="age_group_i"
         )
     if r"age_group_j" in df.index.names:
         df.index = df.index.set_levels(
-            config.data_summary["age_groups"], level="age_group_j"
+            modelParams.data_summary["age_groups"], level="age_group_j"
         )
 
     # Convert time index to datetime starting at model begin
     if r"time" in df.index.names:
         df.index = df.index.set_levels(
-            pd.date_range(config.dataframe.index.min(), config.dataframe.index.max()),
+            pd.date_range(
+                modelParams.dataframe.index.min(), modelParams.dataframe.index.max()
+            ),
             level="time",
         )
 

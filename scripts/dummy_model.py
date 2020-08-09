@@ -145,8 +145,8 @@ def test_model(modelParams):
 begin_time = time.time()
 trace = pm.sample(
     test_model(modelParams),
-    num_samples=50,
-    burn_in=100,
+    num_samples=500,
+    burn_in=500,
     use_auto_batching=False,
     num_chains=2,
     xla=True,
@@ -162,13 +162,13 @@ import matplotlib.pyplot as plt
 """ ## Sample for prior plots and also covert to nice format
 """
 trace_prior = pm.sample_prior_predictive(
-    test_model(modelParams), sample_shape=5000, use_auto_batching=False
+    test_model(modelParams), sample_shape=1000, use_auto_batching=False
 )
 
 """ ## Plot distributions
     Function returns a list of figures which can be shown by fig[i].show() each figure being one country.
 """
-dist_names = ["R", "I_0_diff", "g_mu", "g_theta", "sigma"]
+dist_names = ["R", "g_mu", "g_theta", "sigma"]
 fig = {}
 for name in dist_names:
     fig[name] = covid19_npis.plot.distribution(

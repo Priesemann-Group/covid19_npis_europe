@@ -7,20 +7,34 @@ import numpy as np
 
 log = logging.getLogger(__name__)
 
+from covid19_npis import transformations
 
 num_age_groups = 4
 num_countries = 2
 
 
 def _fsigmoid(t, l, d):
+    r"""
+        Calculates and returns
+
+        .. math::
+            
+            \frac{1}{1+e^{-4/l*(t-d)}}
+
+        Parameters
+        ----------
+
+
+
+    """
     # Prep dimensions
     d = tf.expand_dims(d, axis=-1)
     l = tf.expand_dims(l, axis=-1)
 
     inside_exp_1 = -4.0 / l
     inside_exp_2 = t - d
-    log.info(f"-4/l\n{inside_exp_1.shape}")
-    log.info(f"t-d\n{inside_exp_2.shape}")
+    log.debug(f"-4/l\n{inside_exp_1.shape}")
+    log.debug(f"t-d\n{inside_exp_2.shape}")
 
     return 1.0 / (1.0 + tf.exp(inside_exp_1 * inside_exp_2))
 
@@ -50,14 +64,13 @@ class Change_point(object):
         self.prior_date_scale = date_scale
         self.gamma_max = gamma_max
 
-        log.info(f"{self.prior_date_scale},{self.prior_date_loc}")
+        log.debug(f"{self.prior_date_scale},{self.prior_date_loc}")
 
         self._d = pm.Normal(
             self.name,
             self.prior_date_loc,
             self.prior_date_scale,
-            conditionally_independent=True,
-            batch_stack=num_age_groups,
+            event_stack=num_age_groups,
         )  # Test if it works like this or if we need yield statement here already.
 
     @property
@@ -74,7 +87,7 @@ class Change_point(object):
         Returns gamma value at t with given length :math:`l`. The length :math:`l` should be
         passed from the intervention class.
         """
-        log.info("gamma_t_change_point")
+        log.debug("gamma_t_change_point")
         d = yield self.date
         sigmoid = _fsigmoid(t, l, d)
         return sigmoid * self.gamma_max
@@ -114,7 +127,7 @@ class Intervention(object):
         self, name, length_loc, length_scale, alpha_loc, alpha_scale, change_points=None
     ):
         self.name = name
-        log.info(name)
+        log.debug(name)
         # Distributions
         self.prior_length_loc = length_loc
         self.prior_length_scale = length_scale
@@ -133,16 +146,15 @@ class Intervention(object):
             self.name + "_length",
             np.log(self.prior_length_loc).astype("float32"),
             self.prior_length_scale,
-            conditionally_independent=True,
-            batch_stack=num_age_groups,
+            event_stack=num_age_groups,
+            transform=transformations.SoftPlus(reinterpreted_batch_ndims=1),
         )
 
         self._alpha = pm.Normal(
             self.name + "_alpha",
             self.prior_alpha_loc,
             self.prior_alpha_scale,
-            conditionally_independent=True,
-            batch_stack=(1),
+            event_stack=(1),
         )
 
     @property
@@ -201,7 +213,7 @@ class Intervention(object):
             Time
         """
 
-        log.info("gamma_t_intervetion")
+        log.debug("gamma_t_intervetion")
         l = yield self.length
 
         # Sum over change points
@@ -235,7 +247,7 @@ def create_interventions(modelParams):
         Interventions array like
         |shape| country, interventions
     """
-    log.info("create_interventions")
+    log.debug("create_interventions")
     ret = []
     for c, C in enumerate(modelParams.interventions):  # Country
         interventions = []
@@ -284,7 +296,7 @@ def construct_R_t(R_0, Interventions):
         Reproduction number matrix.
         |shape| time, batch, country, age group
     """
-
+    log.debug("construct_R_t")
     # Create tensorflow R_t for now hardcoded to 50 timesteps
     t = tf.range(0, 50, dtype="float32")
 
@@ -299,8 +311,8 @@ def construct_R_t(R_0, Interventions):
             # Idee:
             _alpha = yield i.alpha
             gamma_t = yield i.gamma_t(t)
-            log.info(f"gamma_t\n{gamma_t.shape}")
-            log.info(f"alpha\n{_alpha.shape}")
+            log.debug(f"gamma_t\n{gamma_t.shape}")
+            log.debug(f"alpha\n{_alpha.shape}")
             _sum.append(tf.einsum("...ai,...j->...ai", gamma_t, _alpha))
 
         # We sum over all interventions in a country and append to list for countries
@@ -319,12 +331,11 @@ def construct_R_t(R_0, Interventions):
         R_0: |shape| batch, country, agegroup
         exp: |shape| batch, country, agegroup, time
     """
-    log.info(f"country exponential function:\n{exp_to_multi.shape}")
-    log.info(f"R_0:\n{R_0.shape}")
+    log.debug(f"country exponential function:\n{exp_to_multi.shape}")
+    log.debug(f"R_0:\n{R_0.shape}")
 
     R_t = tf.einsum(
         "...ca,...cat->t...ca", R_0, exp_to_multi
     )  # Reshape to |shape| time, batch, country, age group here
-    log.info(f"R_t_inside:\n{R_t.shape}")
-
+    log.debug(f"R_t_inside:\n{R_t.shape}")
     return R_t

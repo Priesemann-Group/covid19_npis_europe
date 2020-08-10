@@ -36,7 +36,7 @@ tf.config.set_visible_devices([], "GPU")
     Retrieves some dummy/test data and creates ModelParams object
 """
 # Get test dataset with time dependent reproduction number
-"""
+
 I_new_1, interventions_1 = covid19_npis.test_data.simple_new_I_with_R_t(1)
 I_new_2, interventions_2 = covid19_npis.test_data.simple_new_I_with_R_t(0.9)
 I_new = I_new_1.join(I_new_2)
@@ -44,7 +44,7 @@ interventions = [interventions_1, interventions_2]
 """
 I_new = covid19_npis.test_data.simple_new_I(1)
 I_new = I_new.join(covid19_npis.test_data.simple_new_I(1))
-
+"""
 
 # Create model params
 """
@@ -53,7 +53,7 @@ shape label and the observed data. This is necessary for the data converter
 later on.
 """
 modelParams = covid19_npis.ModelParams(I_new)
-# modelParams.interventions = interventions
+modelParams.interventions = interventions
 """ # Construct pymc4 model
 """
 
@@ -75,12 +75,12 @@ def test_model(modelParams):
         transform=transformations.SoftPlus(reinterpreted_batch_ndims=len(event_shape)),
     )
     log.debug(f"R_0:\n{R_0}")
-    # Interventions = covid19_npis.model.reproduction_number.create_interventions(
-    #    modelParams
-    # )
+    Interventions = covid19_npis.model.reproduction_number.create_interventions(
+        modelParams
+    )
     # log.info(f"Interventions:\n{Interventions}")
-    # R_t = yield covid19_npis.model.reproduction_number.construct_R_t(R_0, Interventions)
-    R_t = tf.stack([R_0] * 50)
+    R_t = yield covid19_npis.model.reproduction_number.construct_R_t(R_0, Interventions)
+    # R_t = tf.stack([R_0] * 50)
     log.debug(f"R_t:\n{R_t}")
 
     # Create Contact matrix
@@ -116,7 +116,7 @@ def test_model(modelParams):
         R_t=R_t,
         mean_gen_interv=mean_gen_interv,
         mean_test_delay=0,
-    )
+    )  # |shape| time, batch, countries, age_groups
 
     # Create N tensor (vector)
     # should be done earlier in the real model

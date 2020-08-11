@@ -154,3 +154,27 @@ def select_from_dataframe(df, axis=0, **kwargs):
     for key, value in kwargs.items():
         df = df.xs(value, level=key, axis=axis)
     return df
+
+
+class Country(object):
+    """docstring for Country"""
+
+    def __init__(self, arg):
+        super(Country, self).__init__()
+        self.arg = arg
+
+
+class Intervention(object):
+    """docstring for Intervention"""
+
+    def __init__(self, arg):
+        super(Intervention, self).__init__()
+        self.arg = arg
+
+
+class Change_point(object):
+    """docstring for Change_point"""
+
+    def __init__(self, arg):
+        super(Change_point, self).__init__()
+        self.arg = arg

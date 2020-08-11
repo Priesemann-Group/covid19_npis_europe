@@ -9,13 +9,14 @@ log = logging.getLogger(__name__)
 
 class ModelParams:
     """ 
-        Class for all model params should be used if one wants to use the,
-        plotting and data converters. Contains names and shapes with labels
-        for every used distribution in the model.
+        Class for all model parameters is used to among others add data and 
+        distrbution names/dimensions to the model.
+        Is also used by the plotting routines as references to distribution names etc.
 
         Distribution params can be changed by overwriting the defaults
 
-        .. code-block:: 
+        .. code-block::
+
             params = ModelParams()
             params.distributions["I_0"]["name"] = "my new fancy name"
 
@@ -78,6 +79,11 @@ class ModelParams:
 
     @property
     def data_tensor(self):
+        """
+        Tensor of input dataframe i.e. daily new cases for countries/regions
+        and age groups.
+        |shape| time, country, agegroup 
+        """
         return self._data_tensor
 
     @property
@@ -116,7 +122,7 @@ class ModelParams:
 
     def __get_default_dist_config(self):
         """
-            Get default values of distribution dict.
+            Returns default distributions dictionaries.
         """
         distributions = {
             "I_0_diff_base": {

@@ -23,9 +23,6 @@ def _fsigmoid(t, l, d):
 
         Parameters
         ----------
-
-
-
     """
     # Prep dimensions
     d = tf.expand_dims(d, axis=-1)

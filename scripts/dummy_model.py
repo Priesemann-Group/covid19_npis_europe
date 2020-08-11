@@ -38,7 +38,7 @@ tf.config.set_visible_devices([], "GPU")
 # Get test dataset with time dependent reproduction number
 
 I_new_1, interventions_1 = covid19_npis.test_data.simple_new_I_with_R_t(1)
-I_new_2, interventions_2 = covid19_npis.test_data.simple_new_I_with_R_t(0.9)
+I_new_2, interventions_2 = covid19_npis.test_data.simple_new_I_with_R_t(1)
 I_new = I_new_1.join(I_new_2)
 interventions = [interventions_1, interventions_2]
 """
@@ -145,7 +145,7 @@ def test_model(modelParams):
 begin_time = time.time()
 trace = pm.sample(
     test_model(modelParams),
-    num_samples=500,
+    num_samples=1000,
     burn_in=500,
     use_auto_batching=False,
     num_chains=2,

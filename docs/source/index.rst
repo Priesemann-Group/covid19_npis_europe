@@ -16,6 +16,7 @@ Welcome to COVID-19 NPIS's documentation!
 
     doc/model
     doc/plot
+    doc/data_and_modelParams
     
 .. toctree::
     :titlesonly:

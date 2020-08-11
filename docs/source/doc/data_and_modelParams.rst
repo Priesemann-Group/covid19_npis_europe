@@ -17,8 +17,10 @@ Data
 		:members:
 .. autoclass:: covid19_npis.data.Intervention
 		:members:
+		:private-members:
 .. autoclass:: covid19_npis.data.Change_point
 		:members:
+		:private-members:
 
 
 

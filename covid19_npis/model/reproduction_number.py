@@ -18,16 +18,23 @@ def _fsigmoid(t, l, d):
         Calculates and returns
 
         .. math::
-            
+
             \frac{1}{1+e^{-4/l*(t-d)}}
 
         Parameters
         ----------
+        t:
+            Time, "variable"
+        l:
+            Length of the change point, determines scale
+        d:
+            Date of the change point, determines location
     """
     # Prep dimensions
     d = tf.expand_dims(d, axis=-1)
     l = tf.expand_dims(l, axis=-1)
 
+    # Factors of the exponent
     inside_exp_1 = -4.0 / l
     inside_exp_2 = t - d
     log.debug(f"-4/l\n{inside_exp_1.shape}")
@@ -175,11 +182,21 @@ class Intervention(object):
         """
         Adds a change point to the intervention by dictionary or by passing the class
         itself.
+
+        Parameter
+        ---------
+        change_point: Change_point or dict
+            Contains all necessary information regarding a change point
         """
+        # Change point case
         if isinstance(change_point, Change_point):
             self.change_points.append(change_point)
+        # Dictionary case
         elif isinstance(change_point, dict):
-            assert "name" in change_point, f"Change point dict must have 'name' key"
+            # Check if necessary arguments are included
+            assert (
+                "name" in change_point
+            ), f"Change point dict must have 'name' key"
             assert (
                 "date_loc" in change_point
             ), f"Change point dict must have 'date_loc' key"
@@ -189,6 +206,7 @@ class Intervention(object):
             assert (
                 "gamma_max" in change_point
             ), f"Change point dict must have 'gamma_max' key"
+            # Append dictionary as change point
             self.change_points.append(
                 Change_point(
                     change_point["name"],
@@ -218,7 +236,6 @@ class Intervention(object):
         for cp in self.change_points:
             gamma_cp = yield cp.gamma_t(t, l)
             _sum.append(gamma_cp)
-
         ret = tf.reduce_sum(_sum, axis=0)
 
         return ret
@@ -277,7 +294,6 @@ def construct_R_t(R_0, Interventions):
     """
     Constructs the time dependent reproduction number :math:`R(t)` for every country and age group.
 
-
     Parameter
     ---------
 
@@ -323,8 +339,8 @@ def construct_R_t(R_0, Interventions):
         # after |shape| batch, country, agegroup, time
 
     """
-    Multiplicate R_0 with the exponent i.e.
-        R(t) = R_0 * exp(sum_i(gamm_i(t)*alpha_i))
+    Multiply R_0 with the exponent, i.e.
+        R(t) = R_0 * exp(sum_i(gamma_i(t)*alpha_i))
         R_0: |shape| batch, country, agegroup
         exp: |shape| batch, country, agegroup, time
     """

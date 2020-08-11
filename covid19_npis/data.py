@@ -220,7 +220,7 @@ class Country(object):
                 Change points dict :code:`{name:[cps]}`
         """
         # Add intervention also checks if it exists
-        num_stages = df.max() + 1  # 0,1,2,3 -> 4
+        num_stages = df.max()  # 0,1,2,3 -> 4
         self.add_intervention(df.name, num_stages)
 
         # Get intervention
@@ -234,19 +234,13 @@ class Country(object):
         previous_value = df[0]
         for row in range(1, len(df)):
             # Calc delta:
-            delta = previous_value - df[row]
-            if delta > 0:
+            delta = df[row] - previous_value
+            if delta != 0:
                 change_points.append(
                     Change_point(
                         prior_date_loc=df.index[row],
-                        gamma_max=df[row] / interv.num_stages,
-                    )
-                )
-            if delta < 0:
-                change_points.append(
-                    Change_point(
-                        prior_date_loc=df.index[row],
-                        gamma_max=-df[row] / interv.num_stages,
+                        gamma_max=delta
+                        / interv.num_stages,  # +1 because it starts at 0
                     )
                 )
             # Set new previous value
@@ -321,10 +315,7 @@ class Country(object):
 
 
 class Intervention(object):
-    """docstring for Country"""
-
-    def __init__(self, name, num_stages, prior_alpha_loc=0.05, prior_alpha_scale=0.02):
-        """
+    """
         Parameters
         ----------
         name : string
@@ -336,7 +327,9 @@ class Intervention(object):
         prior_alpha_loc : number, optional
 
         prior_alpha_scale : number, optional
-        """
+    """
+
+    def __init__(self, name, num_stages, prior_alpha_loc=0.05, prior_alpha_scale=0.02):
 
         # Name
         self.name = name
@@ -350,10 +343,7 @@ class Intervention(object):
 
 
 class Change_point(object):
-    """docstring for Change_point"""
-
-    def __init__(self, prior_date_loc, gamma_max, length=4, prior_date_scale=2):
-        """
+    """
         Parameters
         ----------
         prior_date_loc : number
@@ -367,8 +357,9 @@ class Change_point(object):
 
         prior_date_scale : number, optional
             Scale of prior distribution for the location (date) of the change point.
+    """
 
-        """
+    def __init__(self, prior_date_loc, gamma_max, length=4, prior_date_scale=2):
 
         # Priors
         self.prior_date_loc = prior_date_loc

@@ -14,4 +14,10 @@ from .reproduction_number import (
     construct_R_t,
 )
 
-from .distributions import *
+# We need a workaround for the documentation here this is maybe fixed in a newer sphinx version...
+import sys
+
+if "sphinx" in sys.modules:
+    print("Sphinx error workaraound")
+else:
+    from .distributions import *

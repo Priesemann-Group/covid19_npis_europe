@@ -196,7 +196,7 @@ class Country(object):
 
     def _load_csv_with_date_index(self, filepath):
         """
-        Loads csv file with date column
+            Loads csv file with date column
         """
         data = pd.read_csv(filepath)
         if "date" in data.columns:

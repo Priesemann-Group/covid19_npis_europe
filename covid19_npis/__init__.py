@@ -10,6 +10,7 @@ log = logging.getLogger(__name__)
 from . import test_data
 from . import model
 from . import plot
+from . import utils
+from . import data
 
 from .modelParams import ModelParams
-from .data import convert_trace_to_dataframe_list

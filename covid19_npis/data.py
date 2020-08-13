@@ -183,10 +183,14 @@ class Country(object):
     interventions = []
 
     def __init__(self, name, fp_new_cases, fp_interventions):
-
+        self.name = name
         # Retrieve files and parse them!
-        self.data_new_cases = self._load_csv_with_date_index(fp_new_cases)
-        self.data_interventions = self._load_csv_with_date_index(fp_interventions)
+        self.data_new_cases = self._to_iso(
+            self._load_csv_with_date_index(fp_new_cases), "age_group"
+        )
+        self.data_interventions = self._to_iso(
+            self._load_csv_with_date_index(fp_interventions), "intervention"
+        )
         # Create change_points from interventions time series
         self.change_points = {}
         for column in self.data_interventions.columns:
@@ -202,7 +206,25 @@ class Country(object):
         if "date" in data.columns:
             data["date"] = pd.to_datetime(data["date"])
             data = data.set_index("date")
+
         return data
+
+    def _to_iso(self, df, name):
+        """
+            Create multicolumn from normal columns with country at level 0
+            and name for level 1
+
+            Parameters
+            ----------
+            df : pandas.DataFrame
+
+            name: str
+        """
+        cols = []
+        for column in df.columns:
+            cols.append((self.name, column))
+        df.columns = pd.MultiIndex.from_tuples(cols, names=["country", name])
+        return df
 
     def create_change_points(self, df):
         """
@@ -221,10 +243,10 @@ class Country(object):
         """
         # Add intervention also checks if it exists
         num_stages = df.max()  # 0,1,2,3 -> 4
-        self.add_intervention(df.name, num_stages)
+        self.add_intervention(df.name[1], num_stages)
 
         # Get intervention
-        interv = self.get_intervention_by_name(df.name)
+        interv = self.get_intervention_by_name(df.name[1])
 
         """# Generate change points
         - iterate over time in df and detect changes in value
@@ -313,6 +335,10 @@ class Country(object):
             if name == interv.name:
                 return interv
 
+    def __repr__(self):
+        ret = f"Country data_object with \nname: {self.name} \nchange_points: {self.change_points} \ninterventions: {self.interventions}\n"
+        return ret
+
 
 class Intervention(object):
     """
@@ -341,6 +367,12 @@ class Intervention(object):
         self.prior_alpha_loc = prior_alpha_loc
         self.prior_alpha_scale = prior_alpha_scale
 
+    def __str__(self):
+        return f"Intervention object {self.name}"
+
+    def __repr__(self):
+        return f"Intervention: {self.name} with prior alpha {self.prior_alpha_loc}, {self.prior_alpha_scale} and {self.num_stages} stages"
+
 
 class Change_point(object):
     """
@@ -367,3 +399,7 @@ class Change_point(object):
 
         self.gamma_max = gamma_max
         self.length = length
+
+    def __repr__(self):
+        str_date = self.prior_date_loc.strftime("%x")
+        return f"Change_point at prior date {str_date}, {self.prior_date_scale} with length {self.length}"

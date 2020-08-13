@@ -18,6 +18,8 @@ log = logging.getLogger(__name__)
 import covid19_npis
 from covid19_npis import transformations
 from covid19_npis.benchmarking import benchmark
+from covid19_npis.model.distributions import LKJCholesky, Deterministic, Gamma
+
 
 """ # Debugging and other snippets
 """
@@ -26,16 +28,29 @@ from covid19_npis.benchmarking import benchmark
 # tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
 
 # Force CPU
-my_devices = tf.config.experimental.list_physical_devices(device_type="CPU")
-tf.config.experimental.set_visible_devices(devices=my_devices, device_type="CPU")
-tf.config.set_visible_devices([], "GPU")
+covid19_npis.utils.force_cpu_for_tensorflow()
 
-# os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=2"
 
 """ # Data Retrieval
-    Retrieves some dummy/test data and creates ModelParams object
+    Load data for different countries, for now we have to define every
+    country by hand maybe we want to automatize that at some point.
 """
-# Get test dataset with time dependent reproduction number
+
+# Load our data from csv files into our own custom data classes
+c1 = covid19_npis.data.Country(
+    "test_country_1",  # name
+    "../data/test_country_1/new_cases.csv",  # new_Cases per age groups in country
+    "../data/test_country_1/interventions.csv",  # interventions timeline with stringency index
+)
+c2 = covid19_npis.data.Country(
+    "test_country_2",
+    "../data/test_country_2/new_cases.csv",
+    "../data/test_country_2/interventions.csv",
+)
+
+# Construct modelParams class which is a utility class for our data, i.e. we can retrieve data from it
+
+# modelParams = covid19_npis.ModelParams(countries=[c1, c2])
 
 I_new_1, interventions_1 = covid19_npis.test_data.simple_new_I_with_R_t(1)
 I_new_2, interventions_2 = covid19_npis.test_data.simple_new_I_with_R_t(1)
@@ -58,7 +73,7 @@ modelParams.interventions = interventions
 """
 
 
-@pm.model
+@pm.model(keep_return=False)
 def test_model(modelParams):
     event_shape = (modelParams.num_countries, modelParams.num_age_groups)
     len_gen_interv_kernel = 12
@@ -66,13 +81,14 @@ def test_model(modelParams):
     # Create Reproduction Number for every age group
     mean_R_0 = 2.5
     beta_R_0 = 2.0
-    R_0 = yield pm.Gamma(
+    R_0 = yield Gamma(
         name=modelParams.distributions["R"]["name"],
         concentration=mean_R_0 * beta_R_0,
         rate=beta_R_0,
         conditionally_independent=True,
         event_stack=event_shape,
         transform=transformations.SoftPlus(reinterpreted_batch_ndims=len(event_shape)),
+        shape_label=("country", "age_group"),
     )
     log.debug(f"R_0:\n{R_0}")
     Interventions = covid19_npis.model.reproduction_number.create_interventions(
@@ -85,7 +101,7 @@ def test_model(modelParams):
 
     # Create Contact matrix
     # Use Cholesky version as the non Cholesky version uses tf.linalg.slogdet which isn't implemented in JAX
-    C = yield pm.LKJCholesky(
+    C = yield LKJCholesky(
         name="C_cholesky",
         dimension=modelParams.num_age_groups,
         concentration=4,  # eta
@@ -93,10 +109,11 @@ def test_model(modelParams):
         event_stack=modelParams.num_countries,
         validate_args=True,
         transform=transformations.CorrelationCholesky(reinterpreted_batch_ndims=1),
+        shape_label=("country", "age_group_i", "age_group_j"),
     )  # |shape| batch_dims, num_countries, num_age_groups, num_age_groups
     log.debug(f"C chol:\n{C}")
 
-    C = yield pm.Deterministic(
+    C = yield Deterministic(
         name=modelParams.distributions["C"]["name"],
         value=tf.einsum("...an,...bn->...ab", C, C),
     )
@@ -132,7 +149,9 @@ def test_model(modelParams):
     # Clip in order to avoid infinities
     new_cases = tf.clip_by_value(new_cases, 1e-7, 1e9)
 
-    new_cases = yield pm.Deterministic(name="new_cases", value=new_cases)
+    new_cases = yield Deterministic(
+        name="new_cases", value=new_cases, shape_label=("time", "country", "age_group")
+    )
 
     likelihood = yield covid19_npis.model.studentT_likelihood(modelParams, new_cases)
 

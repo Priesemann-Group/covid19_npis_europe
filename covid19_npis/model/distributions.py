@@ -31,9 +31,12 @@ class DistributionAdditions:
     """
 
     def __init__(self, *args, **kwargs):
+
+        if "shape_label" in kwargs:
+            self.shape_label = kwargs.get("shape_label")
+            del kwargs["shape_label"]
+
         super().__init__(*args, **kwargs)
-        if "shape_labels" in kwargs:
-            self.shape_labels = kwargs.get("shape_labels")
 
 
 # ------------------------------------------------------------------------------ #

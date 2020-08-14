@@ -6,6 +6,8 @@ import numpy as np
 
 from covid19_npis import transformations
 
+from covid19_npis.model.distributions import HalfCauchy
+
 log = logging.getLogger(__name__)
 
 
@@ -13,7 +15,7 @@ def studentT_likelihood(modelParams, new_cases):
     # Get scale of likelihood
 
     sigma = yield pm.HalfCauchy(
-        name=modelParams.distributions["sigma"]["name"],
+        name="sigma",
         scale=50.0,
         event_stack=(1, modelParams.num_countries),
         conditionally_independent=True,

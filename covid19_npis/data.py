@@ -335,10 +335,6 @@ class Country(object):
             if name == interv.name:
                 return interv
 
-    def __repr__(self):
-        ret = f"Country data_object with \nname: {self.name} \nchange_points: {self.change_points} \ninterventions: {self.interventions}\n"
-        return ret
-
 
 class Intervention(object):
     """
@@ -367,12 +363,6 @@ class Intervention(object):
         self.prior_alpha_loc = prior_alpha_loc
         self.prior_alpha_scale = prior_alpha_scale
 
-    def __str__(self):
-        return f"Intervention object {self.name}"
-
-    def __repr__(self):
-        return f"Intervention: {self.name} with prior alpha {self.prior_alpha_loc}, {self.prior_alpha_scale} and {self.num_stages} stages"
-
 
 class Change_point(object):
     """
@@ -399,7 +389,3 @@ class Change_point(object):
 
         self.gamma_max = gamma_max
         self.length = length
-
-    def __repr__(self):
-        str_date = self.prior_date_loc.strftime("%x")
-        return f"Change_point at prior date {str_date}, {self.prior_date_scale} with length {self.length}"

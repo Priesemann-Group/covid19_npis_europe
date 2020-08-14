@@ -8,6 +8,7 @@ import numpy as np
 log = logging.getLogger(__name__)
 
 from covid19_npis import transformations
+from covid19_npis.model.distributions import Normal
 
 num_age_groups = 4
 num_countries = 2
@@ -32,12 +33,9 @@ def _fsigmoid(t, l, d):
     """
     # Prep dimensions
     d = tf.expand_dims(d, axis=-1)
-    l = tf.expand_dims(l, axis=-1)
-
     # Factors of the exponent
     inside_exp_1 = -4.0 / l
     inside_exp_2 = t - d
-    log.debug(f"-4/l\n{inside_exp_1.shape}")
     log.debug(f"t-d\n{inside_exp_2.shape}")
 
     return 1.0 / (1.0 + tf.exp(inside_exp_1 * inside_exp_2))
@@ -68,14 +66,15 @@ class Change_point(object):
         self.prior_date_scale = date_scale
         self.gamma_max = gamma_max
 
-        log.debug(f"{self.prior_date_scale},{self.prior_date_loc}")
-
-        self._d = pm.Normal(
+        self._d = Normal(
             self.name,
             self.prior_date_loc,
             self.prior_date_scale,
             event_stack=num_age_groups,
+            conditionally_independent=True,
         )  # Test if it works like this or if we need yield statement here already.
+
+        log.debug(f"Created changepoint at prior_d={self.prior_date_scale}")
 
     @property
     def date(self):
@@ -100,148 +99,73 @@ class Change_point(object):
 class Intervention(object):
     """
         Intervention class, contains every variable that is only intervention dependent
-        and the change point for the intervention.
+        and the change point for the intervention, i.e. the hyperprior distributions.
 
         Parameters
         ----------
         name: str
-            Name of the intervention, get passed to the pymc4 functions with suffix '_length' or
-            '_alpha'.
+            Name of the intervention, get passed to the pymc4 functions with suffix.
 
-        length_loc:
-            Prior for the location of the length. Set to one overarching value for all
-            change points.
+        alpha_loc_loc:
+            Location of hyperprior location for the effectivity of the intervention.
 
-        length_scale:
-            Prior for the scale of the length. Set to one overarching value for all
-            change points.
+        alpha_loc_scale:
+            Scale of hyperprior location for the effectivity of the intervention.
 
-        alpha_loc:
-            Prior for the location of the effectivity for the intervention.
+        alpha_scale_loc:
+            Location of hyperprior sale for the effectivity of the intervention.
 
-        alpha_scale:
-            Prior for the scale of the effectivity for the intervention.
-
-        change_points: dict, optional
-            Constructs Change_points object from the dict TODO: think about that a bit more.
-            |default| :code:`None`
+        alpha_scale_scale:
+             Scale of hyperprior sale for the effectivity of the intervention.
     """
 
     def __init__(
-        self, name, length_loc, length_scale, alpha_loc, alpha_scale, change_points=None
+        self, name, alpha_loc_loc, alpha_loc_scale, alpha_scale_loc, alpha_scale_scale
     ):
         self.name = name
-        log.debug(name)
-        # Distributions
-        self.prior_length_loc = length_loc
-        self.prior_length_scale = length_scale
-        self.prior_alpha_loc = alpha_loc
-        self.prior_alpha_scale = alpha_scale
 
-        self.change_points = []
-        # Add to change points
-        if change_points is not None:
-            for change_point in change_points:
-                self.add_change_point(change_point)
+        # Distributions
+        self.prior_alpha_loc_loc = alpha_loc_loc
+        self.prior_alpha_loc_scale = alpha_loc_scale
+        self.prior_alpha_scale_loc = alpha_scale_loc
+        self.prior_alpha_scale_scale = alpha_scale_scale
 
         # Init distributions
-
-        self._l = pm.LogNormal(
-            self.name + "_length",
-            np.log(self.prior_length_loc).astype("float32"),
-            self.prior_length_scale,
-            event_stack=num_age_groups,
-            transform=transformations.SoftPlus(reinterpreted_batch_ndims=1),
+        self._alpha_loc = pm.LogNormal(
+            self.name + "_alpha_loc",
+            self.prior_alpha_loc_loc,
+            self.prior_alpha_loc_scale,
+            conditionally_independent=True,
         )
 
-        self._alpha = pm.Normal(
-            self.name + "_alpha",
-            self.prior_alpha_loc,
-            self.prior_alpha_scale,
-            event_stack=(1),
+        self._alpha_scale = pm.LogNormal(
+            self.name + "_alpha_scale",
+            self.prior_alpha_scale_loc,
+            self.prior_alpha_scale_scale,
+            conditionally_independent=True,
         )
+        log.debug(f"Create intervention with name: {name}")
 
     @property
-    def length(self):
-        r"""
-        Returns pymc4 generator for the length :math:`l`, i.e. a normal distribution. The priors
-        are set at init of the object.
-        """
-        return (yield self._l)
-
-    @property
-    def alpha(self):
+    def alpha_loc(self):
         r"""
         Returns pymc4 generator for the effetivity :math:`\alpha`, i.e. a normal distribution. The priors
         are set at init of the object.
         """
 
-        return (yield self._alpha)
+        return (yield self._alpha_loc)
 
-    def add_change_point(self, change_point):
-        """
-        Adds a change point to the intervention by dictionary or by passing the class
-        itself.
-
-        Parameter
-        ---------
-        change_point: Change_point or dict
-            Contains all necessary information regarding a change point
-        """
-        # Change point case
-        if isinstance(change_point, Change_point):
-            self.change_points.append(change_point)
-        # Dictionary case
-        elif isinstance(change_point, dict):
-            # Check if necessary arguments are included
-            assert (
-                "name" in change_point
-            ), f"Change point dict must have 'name' key"
-            assert (
-                "date_loc" in change_point
-            ), f"Change point dict must have 'date_loc' key"
-            assert (
-                "date_scale" in change_point
-            ), f"Change point dict must have 'date_scale' key"
-            assert (
-                "gamma_max" in change_point
-            ), f"Change point dict must have 'gamma_max' key"
-            # Append dictionary as change point
-            self.change_points.append(
-                Change_point(
-                    change_point["name"],
-                    change_point["date_loc"],
-                    change_point["date_scale"],
-                    self.length,
-                    change_point["gamma_max"],
-                )
-            )
-
-    def gamma_t(self, t):  # Intervention
-        """
-        Returns the gamma (strength) value of an intervention at the time t.
-        Sum over all change points
-
-        Parameter
-        ---------
-        t: number
-            Time
+    @property
+    def alpha_scale(self):
+        r"""
+        Returns pymc4 generator for the effetivity :math:`\alpha`, i.e. a normal distribution. The priors
+        are set at init of the object.
         """
 
-        log.debug("gamma_t_intervetion")
-        l = yield self.length
-
-        # Sum over change points
-        _sum = []
-        for cp in self.change_points:
-            gamma_cp = yield cp.gamma_t(t, l)
-            _sum.append(gamma_cp)
-        ret = tf.reduce_sum(_sum, axis=0)
-
-        return ret
+        return (yield self._alpha_scale)
 
 
-def create_interventions(modelParams):
+def _create_distributions(modelParams):
     """
     Returns a list of interventions :py:func:`covid19_npis.reproduction_number.Intervention` from
     a change point dict.
@@ -262,35 +186,48 @@ def create_interventions(modelParams):
         |shape| country, interventions
     """
     log.debug("create_interventions")
-    ret = []
-    for c, C in enumerate(modelParams.interventions):  # Country
-        interventions = []
-        for i in C:  # interventions
-            cps = []
-            for cp in C[i]:  # changepoints
-                cps.append(
+    """
+    Get all interventions from the countries data objects
+    """
+    interventions_data = modelParams.countries[0].interventions
+
+    """
+    Create hyperprior for each intervention
+    """
+    interventions = {}
+    for i in interventions_data:
+        interventions[i.name] = Intervention(
+            name=i.name,
+            alpha_loc_loc=i.prior_alpha_loc,
+            alpha_loc_scale=i.prior_alpha_loc / 5,
+            alpha_scale_loc=i.prior_alpha_scale,
+            alpha_scale_scale=i.prior_alpha_scale / 5,
+        )
+
+    log.debug(interventions)
+    """
+        Create dict with distributions
+    """
+    countries = {}
+    for country in modelParams.countries:
+        countries[country.name] = {}
+        for intervention_name, change_points in country.change_points.items():
+            countries[country.name][intervention_name] = []
+            # Create changepoint
+            for i, change_point in enumerate(change_points):
+                countries[country.name][intervention_name].append(
                     Change_point(
-                        name=f"{c}_{i}_{cp}",
-                        date_loc=C[i][cp]["date"],
-                        date_scale=2,
-                        gamma_max=C[i][cp]["gamma_max"],
+                        name=f"{country.name}_{intervention_name}_{i}",
+                        date_loc=modelParams.date_to_index(change_point.prior_date_loc),
+                        date_scale=change_point.prior_date_scale,
+                        gamma_max=change_point.gamma_max,
                     )
                 )
-            interventions.append(
-                Intervention(
-                    name=f"{c}_{i}",
-                    length_loc=C[i][cp]["length"],
-                    length_scale=2.5,
-                    alpha_loc=C[i][cp]["alpha"],
-                    alpha_scale=0.5,
-                    change_points=cps,
-                )
-            )
-        ret.append(interventions)
-    return ret
+    log.debug(countries)
+    return interventions, countries
 
 
-def construct_R_t(R_0, Interventions):
+def construct_R_t(R_0, modelParams):
     """
     Constructs the time dependent reproduction number :math:`R(t)` for every country and age group.
 
@@ -310,27 +247,48 @@ def construct_R_t(R_0, Interventions):
         |shape| time, batch, country, age group
     """
     log.debug("construct_R_t")
-    # Create tensorflow R_t for now hardcoded to 50 timesteps
-    t = tf.range(0, 50, dtype="float32")
+
+    interventions, countries = _create_distributions(modelParams)
+
+    # Get alpha for each intervention
+    alpha = {}
+    for i_name, intervention in interventions.items():
+        alpha_loc = yield intervention.alpha_loc  # 7,1
+        alpha_scale = yield intervention.alpha_scale
+        alpha[i_name] = yield Normal(
+            name=f"{i_name}_alpha",
+            loc=alpha_loc,  #
+            scale=alpha_scale,
+            event_stack=modelParams.num_countries,
+        )
 
     """ We want to create a time dependent R_t for each country and age group
         We iterate over country and interventions.
     """
+    # Create time index tensor of length modelParams.simlength
+    t = tf.range(0, modelParams.length, dtype="float32")
 
     exp_to_multi = []
-    for c in range(num_countries):
+    country_index = 0
+    for country_name, country_interventions in countries.items():
         _sum = []
-        for i in Interventions[c]:
-            # Idee:
-            _alpha = yield i.alpha
-            gamma_t = yield i.gamma_t(t)
-            log.debug(f"gamma_t\n{gamma_t.shape}")
-            log.debug(f"alpha\n{_alpha.shape}")
-            _sum.append(tf.einsum("...ai,...j->...ai", gamma_t, _alpha))
+        for intervention_name, changepoints in country_interventions.items():
+            log.debug(f"Alpha\n{alpha[intervention_name].shape}")
+            alpha_interv = alpha[intervention_name][..., country_index]
+            log.debug(f"Alpha_slice\n{alpha_interv.shape}")
+            # Calculate the gamma value for each cp and sum them up
+            gammas_cp = []
+            for cp in changepoints:
+                gamma_cp = yield cp.gamma_t(t, l=5.0)
+                gammas_cp.append(gamma_cp)
+            gamma_t = tf.reduce_sum(gammas_cp, axis=0)
+
+            # Append gamma*alpha to array
+            _sum.append(tf.einsum("...ai,...->...ai", gamma_t, alpha_interv))
 
         # We sum over all interventions in a country and append to list for countries
         exp_to_multi.append(tf.exp(tf.reduce_sum(_sum, axis=0)))
-
+        country_index = country_index + 1
     exp_to_multi = tf.convert_to_tensor(exp_to_multi)
 
     if len(exp_to_multi.shape) == 4:

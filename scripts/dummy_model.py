@@ -25,14 +25,14 @@ from covid19_npis.model.distributions import LKJCholesky, Deterministic, Gamma
 """
 # For eventual debugging:
 # tf.config.run_functions_eagerly(True)
-# tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
+# tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=100)
 
 # Force CPU
 covid19_npis.utils.force_cpu_for_tensorflow()
 
 
-""" # Data Retrieval
-    Load data for different countries, for now we have to define every
+""" # 1. Data Retrieval
+    Load data for different countries/regions, for now we have to define every
     country by hand maybe we want to automatize that at some point.
 """
 
@@ -48,32 +48,15 @@ c2 = covid19_npis.data.Country(
     "../data/test_country_2/interventions.csv",
 )
 
-# Construct modelParams class which is a utility class for our data, i.e. we can retrieve data from it
+# Construct our modelParams from the data.
+modelParams = covid19_npis.ModelParams(countries=[c1, c2])
 
-# modelParams = covid19_npis.ModelParams(countries=[c1, c2])
 
-I_new_1, interventions_1 = covid19_npis.test_data.simple_new_I_with_R_t(1)
-I_new_2, interventions_2 = covid19_npis.test_data.simple_new_I_with_R_t(1)
-I_new = I_new_1.join(I_new_2)
-interventions = [interventions_1, interventions_2]
-"""
-I_new = covid19_npis.test_data.simple_new_I(1)
-I_new = I_new.join(covid19_npis.test_data.simple_new_I(1))
-"""
-
-# Create model params
-"""
-We create our own model params object which holds names of the distributions,
-shape label and the observed data. This is necessary for the data converter
-later on.
-"""
-modelParams = covid19_npis.ModelParams(I_new)
-modelParams.interventions = interventions
 """ # Construct pymc4 model
 """
 
 
-@pm.model(keep_return=False)
+@pm.model()
 def test_model(modelParams):
     event_shape = (modelParams.num_countries, modelParams.num_age_groups)
     len_gen_interv_kernel = 12
@@ -82,7 +65,7 @@ def test_model(modelParams):
     mean_R_0 = 2.5
     beta_R_0 = 2.0
     R_0 = yield Gamma(
-        name=modelParams.distributions["R"]["name"],
+        name="R_0",
         concentration=mean_R_0 * beta_R_0,
         rate=beta_R_0,
         conditionally_independent=True,
@@ -91,13 +74,11 @@ def test_model(modelParams):
         shape_label=("country", "age_group"),
     )
     log.debug(f"R_0:\n{R_0}")
-    Interventions = covid19_npis.model.reproduction_number.create_interventions(
-        modelParams
-    )
-    # log.info(f"Interventions:\n{Interventions}")
-    R_t = yield covid19_npis.model.reproduction_number.construct_R_t(R_0, Interventions)
+
+    # Create interventions and change points from model parameters. Combine to R_t
+    R_t = yield covid19_npis.model.reproduction_number.construct_R_t(R_0, modelParams)
     # R_t = tf.stack([R_0] * 50)
-    log.debug(f"R_t:\n{R_t}")
+    log.info(f"R_t:\n{R_t}")
 
     # Create Contact matrix
     # Use Cholesky version as the non Cholesky version uses tf.linalg.slogdet which isn't implemented in JAX
@@ -111,12 +92,9 @@ def test_model(modelParams):
         transform=transformations.CorrelationCholesky(reinterpreted_batch_ndims=1),
         shape_label=("country", "age_group_i", "age_group_j"),
     )  # |shape| batch_dims, num_countries, num_age_groups, num_age_groups
-    log.debug(f"C chol:\n{C}")
+    log.info(f"C chol:\n{C}")
 
-    C = yield Deterministic(
-        name=modelParams.distributions["C"]["name"],
-        value=tf.einsum("...an,...bn->...ab", C, C),
-    )
+    C = yield pm.Deterministic(name="C", value=tf.einsum("...an,...bn->...ab", C, C),)
     log.debug(f"C:\n{C}")
 
     # Create normalized pdf of generation interval
@@ -124,7 +102,7 @@ def test_model(modelParams):
         gen_kernel,  # shape: countries x len_gen_interv,
         mean_gen_interv,  #  shape g_mu: countries x 1
     ) = yield covid19_npis.model.construct_generation_interval(l=len_gen_interv_kernel)
-    log.debug(f"gen_interv:\n{gen_kernel}")
+    log.info(f"gen_interv:\n{gen_kernel}")
 
     # Generate exponential distribution with initial infections as external input
     h_0_t = yield covid19_npis.model.construct_h_0_t(
@@ -144,14 +122,12 @@ def test_model(modelParams):
     new_cases = covid19_npis.model.InfectionModel(
         N=N, h_0_t=h_0_t, R_t=R_t, C=C, gen_kernel=gen_kernel  # default valueOp:AddV2
     )
-    log.debug(f"new_cases:\n{new_cases[0,:]}")  # dimensons=t,c,a
+    log.info(f"new_cases:\n{new_cases[0,:]}")  # dimensons=t,c,a
 
     # Clip in order to avoid infinities
     new_cases = tf.clip_by_value(new_cases, 1e-7, 1e9)
 
-    new_cases = yield Deterministic(
-        name="new_cases", value=new_cases, shape_label=("time", "country", "age_group")
-    )
+    new_cases = yield pm.Deterministic(name="new_cases", value=new_cases,)
 
     likelihood = yield covid19_npis.model.studentT_likelihood(modelParams, new_cases)
 

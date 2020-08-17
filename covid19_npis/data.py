@@ -226,7 +226,7 @@ class Country(object):
         """
         data = pd.read_csv(filepath)
         if "date" in data.columns:
-            data["date"] = pd.to_datetime(data["date"])
+            data["date"] = pd.to_datetime(data["date"], format="%d.%m.%y")
             data = data.set_index("date")
 
         return data

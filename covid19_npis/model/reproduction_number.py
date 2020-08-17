@@ -36,7 +36,7 @@ def _fsigmoid(t, l, d):
     # Factors of the exponent
     inside_exp_1 = -4.0 / l
     inside_exp_2 = t - d
-    log.debug(f"t-d\n{inside_exp_2.shape}")
+    log.debug(f"t-d\n{inside_exp_2}")
 
     return 1.0 / (1.0 + tf.exp(inside_exp_1 * inside_exp_2))
 
@@ -273,9 +273,9 @@ def construct_R_t(R_0, modelParams):
     for country_name, country_interventions in countries.items():
         _sum = []
         for intervention_name, changepoints in country_interventions.items():
-            log.debug(f"Alpha\n{alpha[intervention_name].shape}")
+            log.debug(f"Alpha\n{alpha[intervention_name]}")
             alpha_interv = alpha[intervention_name][..., country_index]
-            log.debug(f"Alpha_slice\n{alpha_interv.shape}")
+            log.debug(f"Alpha_slice\n{alpha_interv}")
             # Calculate the gamma value for each cp and sum them up
             gammas_cp = []
             for cp in changepoints:
@@ -306,9 +306,18 @@ def construct_R_t(R_0, modelParams):
     log.debug(f"R_0:\n{R_0.shape}")
 
     R_t = tf.einsum(
-        "...ca,...cat->t...ca", R_0, exp_to_multi
-    )  # Reshape to |shape| time, batch, country, age group here
+        "...ca,...cat->...tca", R_0, exp_to_multi
+    )  # Reshape to |shape| batch, time. country, age group here
     log.debug(f"R_t_inside:\n{R_t.shape}")
 
-    R_t = yield Deterministic(name="R_t", value=R_t)
+    R_t = yield Deterministic(
+        name="R_t",
+        value=R_t,
+        shape=(50, 2, 4),
+        shape_label=("time", "country", "age_group"),
+    )
+
+    if len(R_t.shape) == 4:
+        R_t = tf.transpose(R_t, perm=(1, 0, 2, 3))
+
     return R_t

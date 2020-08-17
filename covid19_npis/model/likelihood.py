@@ -23,10 +23,11 @@ def studentT_likelihood(modelParams, new_cases):
         shape_label=("country"),
     )
 
-    sigma = sigma[..., tf.newaxis]  # same across age groups
-    sigma = sigma[tf.newaxis, ...]  # same across time
+    sigma = tf.expand_dims(sigma, axis=-1)  # same across age groups
+    sigma = tf.expand_dims(sigma, axis=0)  # same across time
     if len(sigma.shape) == 4:  # Move batch to front again
         sigma = tf.transpose(sigma, perm=(1, 0, 2, 3))
+    log.debug(f"sigma:\n{sigma}")
 
     # Likelihood of the data
     data = modelParams.data_tensor
@@ -50,4 +51,5 @@ def studentT_likelihood(modelParams, new_cases):
         observed=tf.boolean_mask(data, mask),
         reinterpreted_batch_ndims=1,
     )
+    log.debug(f"likelihood:\n {likelihood}")
     return likelihood

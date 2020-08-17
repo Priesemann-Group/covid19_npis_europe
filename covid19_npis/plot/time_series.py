@@ -42,7 +42,6 @@ def timeseries(trace, sample_state, key, plot_observed=False):
     model_name = get_model_name_from_sample_state(sample_state)
     dist = get_dist_by_name_from_sample_state(sample_state, key)
     check_for_shape_and_shape_label(dist)
-
     # Determine ndim:
     if isinstance(dist.shape, int):
         ndim = 1

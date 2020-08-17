@@ -12,7 +12,7 @@ import os
 sys.path.append("../")
 
 # Needed to set logging level before importing other modules
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
 import covid19_npis
@@ -24,8 +24,8 @@ from covid19_npis.model.distributions import LKJCholesky, Deterministic, Gamma
 """ # Debugging and other snippets
 """
 # For eventual debugging:
-tf.config.run_functions_eagerly(True)
-tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=100)
+# tf.config.run_functions_eagerly(True)
+# tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=100)
 
 # Force CPU
 covid19_npis.utils.force_cpu_for_tensorflow()
@@ -149,10 +149,10 @@ def test_model(modelParams):
 begin_time = time.time()
 trace = pm.sample(
     test_model(modelParams),
-    num_samples=500,
-    burn_in=1000,
+    num_samples=50,
+    burn_in=100,
     use_auto_batching=False,
-    num_chains=2,
+    num_chains=3,
     xla=True,
 )
 end_time = time.time()
@@ -182,7 +182,7 @@ for name in dist_names:
     # Save figure
     plt.savefig("figures/dist_" + name + ".pdf", dpi=300, transparent=True)
 
-""" ## Plot time series for "new_cases"
+""" ## Plot time series for "new_cases" and "R_t"
 """
 fig_new_cases = covid19_npis.plot.timeseries(
     trace, sample_state=sample_state, key="new_cases"
@@ -200,3 +200,9 @@ for i, c in enumerate(modelParams.data_summary["countries"]):
 
 # Save figure
 plt.savefig("figures/ts_new_cases.pdf", dpi=300, transparent=True)
+
+
+fig_R_t = covid19_npis.plot.timeseries(trace, sample_state=sample_state, key="R_t")
+
+# Save figure
+plt.savefig("figures/ts_R_t.pdf", dpi=300, transparent=True)

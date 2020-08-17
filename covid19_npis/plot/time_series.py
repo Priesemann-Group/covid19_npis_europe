@@ -1,6 +1,11 @@
 from .rcParams import *
 from ..data import convert_trace_to_dataframe, select_from_dataframe
-
+from .utils import (
+    get_model_name_from_sample_state,
+    get_dist_by_name_from_sample_state,
+    check_for_shape_and_shape_label,
+)
+from .. import modelParams
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -14,33 +19,35 @@ import logging
 log = logging.getLogger(__name__)
 
 
-def timeseries(trace, modelParams, key, plot_observed=False):
+def timeseries(trace, sample_state, key, plot_observed=False):
     """
     Create time series overview for a a give variable, i.e. plot for every additional dimension.
-    Can only done to variables with a time shape label. See modelParams.py
+    Should only done to variables with a time shape label at position 0!
 
     Parameters
     ----------
     trace_posterior,trace_prior : arivz InferenceData
         Raw data from pymc4 sampling
 
-    modelParams : cov19_npis.modelParams.modelParams
+    sample_state : pymc4 sample stae
 
     key : str
-        Name of the variable to plot
+        Name of the variable/distribution to plot. Must be the same as defined in the model.
 
     plot_observed: bool, optional
         Do you want to plot the new cases? May not work for 1 and 2 dim case.
     """
 
-    df = convert_trace_to_dataframe(trace, modelParams, key)
-    dist = modelParams.get_distribution_by_name(key)
+    df = convert_trace_to_dataframe(trace, sample_state, key)
+    model_name = get_model_name_from_sample_state(sample_state)
+    dist = get_dist_by_name_from_sample_state(sample_state, key)
+    check_for_shape_and_shape_label(dist)
 
     # Determine ndim:
-    if isinstance(dist["shape"], int):
+    if isinstance(dist.shape, int):
         ndim = 1
     else:
-        ndim = len(dist["shape"])
+        ndim = len(dist.shape)
 
     def timeseries_ndim_1():
         """
@@ -59,9 +66,13 @@ def timeseries(trace, modelParams, key, plot_observed=False):
         Time and an additional dimension
         """
         # In the default case: label1 should be time and label2 should age_group
-        time, label1 = dist["shape_label"]
+        if hasattr(dist, "shape_label"):
+            time, label1 = dist.shape_label
+        else:
+            time = "dim_0"
+            label1 = "dim_1"
         cols = 1
-        rows = dist["shape"][1]  # not time
+        rows = dist.shape[1]  # not time
 
         fig, axes = plt.subplots(rows, cols, figsize=(6, 3 * rows))
         for i, value in enumerate(df.index.get_level_values(label1).unique()):
@@ -74,9 +85,15 @@ def timeseries(trace, modelParams, key, plot_observed=False):
         return axes
 
     def timeseries_ndim_3():
-        time, label1, label2 = dist["shape_label"]
-        cols = dist["shape"][1]
-        rows = dist["shape"][2]
+        if hasattr(dist, "shape_label"):
+            time, label1, label2 = dist.shape_label
+        else:
+            time = "dim_0"
+            label1 = "dim_1"
+            label2 = "dim_2"
+
+        cols = dist.shape[1]
+        rows = dist.shape[2]
 
         # Create figure
         fig, axes = plt.subplots(rows, cols, figsize=(6 * cols, 3 * rows))
@@ -95,8 +112,8 @@ def timeseries(trace, modelParams, key, plot_observed=False):
 
                 if plot_observed:
                     axes[j][i] = _timeseries(
-                        modelParams.dataframe.index,
-                        modelParams.dataframe[(value1, value2)],
+                        modelParams.modelParams.dataframe.index,
+                        modelParams.modelParams.dataframe[(value1, value2)],
                         ax=axes[j][i],
                         what="data",
                     )

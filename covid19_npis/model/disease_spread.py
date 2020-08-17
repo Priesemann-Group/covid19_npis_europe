@@ -6,7 +6,7 @@ import numpy as np
 import tensorflow_probability as tfp
 
 from covid19_npis import transformations
-
+from covid19_npis.model.distributions import HalfCauchy, Normal, Gamma
 
 log = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ def construct_h_0_t(
 
     h_0_base = h_0_t_mean[..., 0:1, :, :] * tf.exp(
         (
-            yield pm.Normal(
+            yield Normal(
                 "I_0_diff_base",
                 loc=0.0,
                 scale=3.0,
@@ -104,7 +104,7 @@ def construct_h_0_t(
     h_0_mean_diff = h_0_t_mean[..., :-1, :, :] - h_0_t_mean[..., 1:, :, :]
     h_0_base_add = h_0_mean_diff * tf.exp(
         (
-            yield pm.Normal(
+            yield Normal(
                 "I_0_diff_add",
                 loc=0.0,
                 scale=1.0,
@@ -246,11 +246,12 @@ def construct_generation_interval(
     # See https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Gamma
     # and https://en.wikipedia.org/wiki/Gamma_distribution
 
-    g_mu = yield pm.Gamma(
+    g_mu = yield Gamma(
         name="g_mu",
         concentration=g["mu"]["k"],
         rate=1.0 / g["mu"]["θ"],
         conditionally_independent=True,
+        shape=(1),
     )
 
     # g_mu = tf.constant(5.0)
@@ -263,11 +264,12 @@ def construct_generation_interval(
     g["θ"]["k"] = theta_k
     g["θ"]["θ"] = theta_theta
 
-    g_theta = yield pm.Gamma(
+    g_theta = yield Gamma(
         name="g_theta",
         concentration=g["θ"]["k"],
         rate=1.0 / g["θ"]["θ"],
         conditionally_independent=True,
+        shape=(1),
     )
 
     log.debug(f"g_mu:\n{g_mu}")

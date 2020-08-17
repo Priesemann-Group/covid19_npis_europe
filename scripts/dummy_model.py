@@ -12,7 +12,7 @@ import os
 sys.path.append("../")
 
 # Needed to set logging level before importing other modules
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
 import covid19_npis
@@ -24,8 +24,8 @@ from covid19_npis.model.distributions import LKJCholesky, Deterministic, Gamma
 """ # Debugging and other snippets
 """
 # For eventual debugging:
-# tf.config.run_functions_eagerly(True)
-# tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=100)
+tf.config.run_functions_eagerly(True)
+tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=100)
 
 # Force CPU
 covid19_npis.utils.force_cpu_for_tensorflow()
@@ -94,7 +94,11 @@ def test_model(modelParams):
     )  # |shape| batch_dims, num_countries, num_age_groups, num_age_groups
     log.info(f"C chol:\n{C}")
 
-    C = yield pm.Deterministic(name="C", value=tf.einsum("...an,...bn->...ab", C, C),)
+    C = yield Deterministic(
+        name="C",
+        value=tf.einsum("...an,...bn->...ab", C, C),
+        shape_label=("country", "age_group_i", "age_group_j"),
+    )
     log.debug(f"C:\n{C}")
 
     # Create normalized pdf of generation interval
@@ -127,7 +131,12 @@ def test_model(modelParams):
     # Clip in order to avoid infinities
     new_cases = tf.clip_by_value(new_cases, 1e-7, 1e9)
 
-    new_cases = yield pm.Deterministic(name="new_cases", value=new_cases,)
+    new_cases = yield Deterministic(
+        name="new_cases",
+        value=new_cases,
+        shape=modelParams.data_tensor.shape,
+        shape_label=("time", "country", "age_group"),
+    )
 
     likelihood = yield covid19_npis.model.studentT_likelihood(modelParams, new_cases)
 
@@ -140,8 +149,8 @@ def test_model(modelParams):
 begin_time = time.time()
 trace = pm.sample(
     test_model(modelParams),
-    num_samples=1000,
-    burn_in=500,
+    num_samples=500,
+    burn_in=1000,
     use_auto_batching=False,
     num_chains=2,
     xla=True,
@@ -159,15 +168,16 @@ import matplotlib.pyplot as plt
 trace_prior = pm.sample_prior_predictive(
     test_model(modelParams), sample_shape=1000, use_auto_batching=False
 )
+_, sample_state = pm.evaluate_model(test_model(modelParams))
 
 """ ## Plot distributions
     Function returns a list of figures which can be shown by fig[i].show() each figure being one country.
 """
-dist_names = ["R", "I_0_diff_base", "g_mu", "g_theta", "sigma"]
+dist_names = ["R_0", "I_0_diff_base", "g_mu", "g_theta", "sigma"]
 fig = {}
 for name in dist_names:
     fig[name] = covid19_npis.plot.distribution(
-        trace, trace_prior, modelParams=modelParams, key=name
+        trace, trace_prior, sample_state=sample_state, key=name
     )
     # Save figure
     plt.savefig("figures/dist_" + name + ".pdf", dpi=300, transparent=True)
@@ -175,7 +185,7 @@ for name in dist_names:
 """ ## Plot time series for "new_cases"
 """
 fig_new_cases = covid19_npis.plot.timeseries(
-    trace, modelParams=modelParams, key="new_cases"
+    trace, sample_state=sample_state, key="new_cases"
 )
 
 # plot data into the axes

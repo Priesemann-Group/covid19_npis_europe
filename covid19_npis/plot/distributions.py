@@ -1,5 +1,12 @@
 from .rcParams import *
 from ..data import convert_trace_to_dataframe, select_from_dataframe
+from .. import modelParams
+
+from .utils import (
+    get_model_name_from_sample_state,
+    get_dist_by_name_from_sample_state,
+    check_for_shape_and_shape_label,
+)
 
 import numpy as np
 import matplotlib as mpl
@@ -98,7 +105,7 @@ def _plot_posterior(x, bins=50, ax=None, **kwargs):
     return ax
 
 
-def distribution(trace_posterior, trace_prior, modelParams, key):
+def distribution(trace_posterior, trace_prior, sample_state, key):
     """
     High level function for creating plot overview for a variable. Works for
     one and two dimensional variable at the moment.
@@ -113,7 +120,7 @@ def distribution(trace_posterior, trace_prior, modelParams, key):
     trace_posterior,trace_prior : arivz InferenceData
         Raw data from pymc4 sampling
 
-    modelParams : cov19_npis.modelParams.ModelParams
+    sample_state : pymc4 sample state
 
     key : str
         Name of the variable to plot
@@ -128,22 +135,27 @@ def distribution(trace_posterior, trace_prior, modelParams, key):
 
     # Get prior and posterior data for key
     log.info(f"Creating distibution plot for {key}")
-    posterior = convert_trace_to_dataframe(trace_posterior, modelParams, key)
-    prior = convert_trace_to_dataframe(trace_prior, modelParams, key)
+    posterior = convert_trace_to_dataframe(trace_posterior, sample_state, key)
+    prior = convert_trace_to_dataframe(trace_prior, sample_state, key)
 
-    dist = modelParams.get_distribution_by_name(key)
+    dist = get_dist_by_name_from_sample_state(sample_state, key)
+    check_for_shape_and_shape_label(dist)
 
     # Get ndim of distribution i.e. event stack ndim
-    if isinstance(dist["shape"], int):
+    if isinstance(dist.shape, int):
         ndim = 1
     else:
-        ndim = len(dist["shape"])
+        ndim = len(dist.shape)
 
     def dist_ndim_1():
         # E.g. only age groups or only one value over all age groups
-        rows = dist["shape"]
+        rows = dist.shape
         cols = 1
-        label1 = dist["shape_label"]
+
+        if hasattr(dist, "shape_label"):
+            label1 = dist.shape_label
+        else:
+            label1 = "dim_0"
 
         fig, ax = plt.subplots(
             rows, cols, figsize=(4.5 / 3 * cols, rows * 1), constrained_layout=True
@@ -152,7 +164,7 @@ def distribution(trace_posterior, trace_prior, modelParams, key):
             # Flatten chains and other sampling dimensions of df into one array
             array_posterior = posterior.to_numpy().flatten()
             array_prior = prior.to_numpy().flatten()
-            return _distribution(array_posterior, array_prior, dist, ax=ax)
+            return _distribution(array_posterior, array_prior, dist.name, "x", ax=ax)
         else:
             for i, value in enumerate(
                 posterior.index.get_level_values(label1).unique()
@@ -161,18 +173,27 @@ def distribution(trace_posterior, trace_prior, modelParams, key):
                 array_posterior = posterior.xs(value, level=label1).to_numpy().flatten()
                 array_prior = prior.xs(value, level=label1).to_numpy().flatten()
                 ax[i] = _distribution(
-                    array_posterior, array_prior, dist, ax=ax[i], suffix=f"{i}"
+                    array_posterior,
+                    array_prior,
+                    dist.name,
+                    "x",
+                    ax=ax[i],
+                    suffix=f"{i}",
                 )
             return ax
 
     def dist_ndim_2():
 
         # In the default case: label1 should be country and label2 should age_group
-        label1, label2 = dist["shape_label"]
+        if hasattr(dist, "shape_label"):
+            label1, label2 = dist.shape_label
+        else:
+            label1 = "dim_0"
+            label2 = "dim_1"
 
         # First label is rows
         # Second label is columns
-        cols, rows = dist["shape"]
+        cols, rows = dist.shape
 
         fig, ax = plt.subplots(
             rows, cols, figsize=(4.5 / 3 * cols, rows * 1), constrained_layout=True,
@@ -194,7 +215,12 @@ def distribution(trace_posterior, trace_prior, modelParams, key):
                 )
 
                 ax[j][i] = _distribution(
-                    arry_posterior, array_prior, dist, ax=ax[j][i], suffix=f"{i},{j}"
+                    arry_posterior,
+                    array_prior,
+                    dist.name,
+                    "x",
+                    ax=ax[j][i],
+                    suffix=f"{i},{j}",
                 )
 
         # Set labels on y-axis
@@ -220,7 +246,9 @@ def distribution(trace_posterior, trace_prior, modelParams, key):
         return dist_ndim_3()
 
 
-def _distribution(array_posterior, array_prior, distribution_dict, suffix="", ax=None):
+def _distribution(
+    array_posterior, array_prior, dist_name, dist_math, suffix="", ax=None
+):
     """
     Low level function to plots posterior and prior from arrays.
 
@@ -229,9 +257,11 @@ def _distribution(array_posterior, array_prior, distribution_dict, suffix="", ax
     array_posterior,array_prior : array
         Sampling data as array, should be filtered beforehand.
 
-    distribution_dict: dict
-        modelParams.distibution["name"] dictionary, get via modelParams.get_distribution_by_name("name")
-    
+    dist_name: str
+        name of distribution for plotting
+    dist_math: str
+        math of distribution for plotting
+
     suffix: str,optional
         Suffix for the plot title e.g. "age_group_1"
         |default| ""
@@ -242,8 +272,6 @@ def _distribution(array_posterior, array_prior, distribution_dict, suffix="", ax
 
 
     """
-    dist = distribution_dict
-
     if ax is None:
         fig, ax = plt.subplots(figsize=(4.5 / 3, 1), constrained_layout=True)
 
@@ -258,7 +286,7 @@ def _distribution(array_posterior, array_prior, distribution_dict, suffix="", ax
     # ------------------------------------------------------------------------------ #
     # add the overlay with median and CI values. these are two strings
     text_md, text_ci = _string_median_CI(array_posterior, prec=2)
-    text_md = f"${dist['math']}^{{{suffix}}}={text_md}$"
+    text_md = f"${dist_math}^{{{suffix}}}={text_md}$"
 
     # create the inset text elements, and we want a bounding box around the compound
     try:
@@ -287,7 +315,7 @@ def _distribution(array_posterior, array_prior, distribution_dict, suffix="", ax
             [tel_md, tel_ci], ax, facecolor="white", alpha=0.5, zorder=99,
         )
     except Exception as e:
-        log.info(f"Unable to create inset with {dist['name']} value: {e}")
+        log.info(f"Unable to create inset with {dist_name} value: {e}")
 
     # ------------------------------------------------------------------------------ #
     # Additional plotting settings

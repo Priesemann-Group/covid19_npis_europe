@@ -42,7 +42,9 @@ class ModelParams:
         self.countries = countries
 
         # Configs for distribution
-        # self.distributions = self.__get_default_dist_config()
+
+        # Make global accessible since only one instance should be active at any time
+        globals()["modelParams"] = self
 
     @property
     def countries(self):

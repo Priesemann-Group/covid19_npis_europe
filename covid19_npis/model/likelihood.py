@@ -14,14 +14,20 @@ log = logging.getLogger(__name__)
 def studentT_likelihood(modelParams, new_cases):
     # Get scale of likelihood
 
-    sigma = yield pm.HalfCauchy(
+    sigma = yield HalfCauchy(
         name="sigma",
         scale=50.0,
-        event_stack=(1, modelParams.num_countries),
+        event_stack=(modelParams.num_countries),
         conditionally_independent=True,
         transform=transformations.SoftPlus(reinterpreted_batch_ndims=2),
+        shape_label=("country"),
     )
+
     sigma = sigma[..., tf.newaxis]  # same across age groups
+    sigma = sigma[tf.newaxis, ...]  # same across time
+    if len(sigma.shape) == 4:  # Move batch to front again
+        sigma = tf.transpose(sigma, perm=(1, 0, 2, 3))
+
     # Likelihood of the data
     data = modelParams.data_tensor
     mask = ~np.isnan(data)

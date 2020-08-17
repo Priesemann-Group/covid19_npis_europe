@@ -2,9 +2,12 @@ import logging
 import pandas as pd
 
 log = logging.getLogger(__name__)
+from . import modelParams
+
+from .plot.utils import check_for_shape_and_shape_label
 
 
-def convert_trace_to_dataframe_list(trace, config):
+def convert_trace_to_dataframe_list(trace, sample_state):
     r"""
     Converts the pymc4 arviz trace to multiple pandas dataframes.
     Also sets the right labels for the  dimensions i.e splits data by
@@ -16,7 +19,7 @@ def convert_trace_to_dataframe_list(trace, config):
     ----------
     trace: arivz InferenceData
 
-    config: cov19_npis.config.Config
+    sample_state: pymc4 sample state
         
     Returns
     -------
@@ -36,17 +39,20 @@ def convert_trace_to_dataframe_list(trace, config):
         data.append(trace.prior_predictive.data_vars)
 
     # Get list of all distributions
-    dists = [key for key in config.distributions]
+    dists = [key for key in sample_state.distributions]
+    determs = [key for key in sample_state.deterministics]
 
     # Create dataframe from xarray
     dfs = []
     for d in data:
         for dist in dists:
-            dfs.append(convert_trace_to_dataframe(trace, config, dist))
+            dfs.append(convert_trace_to_dataframe(trace, sample_state, dist))
+        for deter in determs:
+            dfs.append(convert_trace_to_dataframe(trace, sample_state, deter))
     return dfs
 
 
-def convert_trace_to_dataframe(trace, modelParams, key):
+def convert_trace_to_dataframe(trace, sample_state, key):
     r"""
     Converts the pymc4 arviz trace for a single key to a pandas dataframes.
     Also sets the right labels for the  dimensions i.e splits data by
@@ -58,7 +64,7 @@ def convert_trace_to_dataframe(trace, modelParams, key):
     ----------
     trace: arivz InferenceData
 
-    modelParams: cov19_npis.modelParams.modelParams
+    sample_state: pymc4 sample state
 
     key: str
         Name of variable in modelParams
@@ -84,14 +90,22 @@ def convert_trace_to_dataframe(trace, modelParams, key):
         break
 
     # Check key value
-    assert key in [
-        modelParams.distributions[dist]["name"] for dist in modelParams.distributions
-    ], f"Key '{key}' not found! Is it added to modelParams.py?"
+    dists_and_determs = [dist.split("/")[1] for dist in sample_state.distributions]
+    for deter in sample_state.deterministics:
+        dists_and_determs.append(deter.split("/")[1])
+
+    assert key in dists_and_determs, f"Key '{key}' not found! Check for typos."
 
     # Get distribution
-    dist = modelParams.get_distribution_by_name(key)
+    try:
+        dist = sample_state.distributions[model_name + "/" + key]
+    except Exception as e:
+        dist = sample_state.deterministics[model_name + "/" + key]
 
-    df = data[f"{model_name}/{dist['name']}"].to_dataframe()
+    # Check if it has shape and shape_label
+    check_for_shape_and_shape_label(dist)
+    # convert to dataframe
+    df = data[f"{model_name}/{dist.name}"].to_dataframe()
     num_of_levels = len(df.index.levels)
 
     # Rename level to dimension labels
@@ -105,47 +119,55 @@ def convert_trace_to_dataframe(trace, modelParams, key):
 
     The last 3 can shift up to the number of labels 
     """
-    if isinstance(dist["shape_label"], (tuple, list)):
-        ndim = len(dist["shape_label"])
+    if isinstance(dist.shape, (tuple, list)):
+        ndim = len(dist.shape)
     else:
         ndim = 1
 
-    for i in range(ndim):
-        df.index.rename(
-            dist["shape_label"][i], level=i - ndim, inplace=True,
-        )
+    # Rename dimensions if shape labels are present
+    if hasattr(dist, "shape_label"):
+        for i in range(ndim):
+            if isinstance(dist.shape_label, (list, tuple,)):
+                df.index.rename(
+                    dist.shape_label[i], level=i - ndim, inplace=True,
+                )
+            else:
+                df.index.rename(
+                    dist.shape_label, level=i - ndim, inplace=True,
+                )
 
     # Rename country index to country names
     if r"country" in df.index.names:
         df.index = df.index.set_levels(
-            modelParams.data_summary["countries"], level="country"
+            modelParams.modelParams.data_summary["countries"], level="country"
         )
 
     # Rename age_group index to age_group names
     if r"age_group" in df.index.names:
         df.index = df.index.set_levels(
-            modelParams.data_summary["age_groups"], level="age_group"
+            modelParams.modelParams.data_summary["age_groups"], level="age_group"
         )
     if r"age_group_i" in df.index.names:
         df.index = df.index.set_levels(
-            modelParams.data_summary["age_groups"], level="age_group_i"
+            modelParams.modelParams.data_summary["age_groups"], level="age_group_i"
         )
     if r"age_group_j" in df.index.names:
         df.index = df.index.set_levels(
-            modelParams.data_summary["age_groups"], level="age_group_j"
+            modelParams.modelParams.data_summary["age_groups"], level="age_group_j"
         )
 
     # Convert time index to datetime starting at model begin
     if r"time" in df.index.names:
         df.index = df.index.set_levels(
             pd.date_range(
-                modelParams.dataframe.index.min(), modelParams.dataframe.index.max()
+                modelParams.modelParams.dataframe.index.min(),
+                modelParams.modelParams.dataframe.index.max(),
             ),
             level="time",
         )
 
     # Last rename column
-    df = df.rename(columns={f"{model_name}/{dist['name']}": dist["name"]})
+    df = df.rename(columns={f"{model_name}/{dist.name}": dist.name})
 
     return df
 
@@ -359,7 +381,7 @@ class Intervention(object):
         # Get number of stages
         self.num_stages = num_stages
 
-        # Prior effectivit
+        # Hyper prior effectivity
         self.prior_alpha_loc = prior_alpha_loc
         self.prior_alpha_scale = prior_alpha_scale
 

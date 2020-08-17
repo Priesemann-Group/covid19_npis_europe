@@ -8,7 +8,7 @@ import numpy as np
 log = logging.getLogger(__name__)
 
 from covid19_npis import transformations
-from covid19_npis.model.distributions import Normal
+from covid19_npis.model.distributions import Normal, LogNormal, Deterministic
 
 num_age_groups = 4
 num_countries = 2
@@ -131,14 +131,14 @@ class Intervention(object):
         self.prior_alpha_scale_scale = alpha_scale_scale
 
         # Init distributions
-        self._alpha_loc = pm.LogNormal(
+        self._alpha_loc = LogNormal(
             self.name + "_alpha_loc",
             self.prior_alpha_loc_loc,
             self.prior_alpha_loc_scale,
             conditionally_independent=True,
         )
 
-        self._alpha_scale = pm.LogNormal(
+        self._alpha_scale = LogNormal(
             self.name + "_alpha_scale",
             self.prior_alpha_scale_loc,
             self.prior_alpha_scale_scale,
@@ -309,4 +309,6 @@ def construct_R_t(R_0, modelParams):
         "...ca,...cat->t...ca", R_0, exp_to_multi
     )  # Reshape to |shape| time, batch, country, age group here
     log.debug(f"R_t_inside:\n{R_t.shape}")
+
+    R_t = yield Deterministic(name="R_t", value=R_t)
     return R_t

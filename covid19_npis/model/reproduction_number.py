@@ -132,16 +132,16 @@ class Intervention(object):
 
         # Init distributions
         self._alpha_loc = LogNormal(
-            self.name + "_alpha_loc",
-            self.prior_alpha_loc_loc,
-            self.prior_alpha_loc_scale,
+            "alpha_loc_" + self.name,
+            np.exp(self.prior_alpha_loc_loc, dtype="float32"),
+            np.exp(self.prior_alpha_loc_scale, dtype="float32"),
             conditionally_independent=True,
         )
 
         self._alpha_scale = LogNormal(
-            self.name + "_alpha_scale",
-            self.prior_alpha_scale_loc,
-            self.prior_alpha_scale_scale,
+            "alpha_scale_" + self.name,
+            np.exp(self.prior_alpha_scale_loc, dtype="float32"),
+            np.exp(self.prior_alpha_scale_scale, dtype="float32"),
             conditionally_independent=True,
         )
         log.debug(f"Create intervention with name: {name}")
@@ -250,16 +250,19 @@ def construct_R_t(R_0, modelParams):
 
     interventions, countries = _create_distributions(modelParams)
 
-    # Get alpha for each intervention
+    # Get alpha for each intervention,country event stack of country size
     alpha = {}
     for i_name, intervention in interventions.items():
         alpha_loc = yield intervention.alpha_loc  # 7,1
+        log.debug(f"Hyperdist_Alpha_loc\n {alpha_loc}")
         alpha_scale = yield intervention.alpha_scale
         alpha[i_name] = yield Normal(
-            name=f"{i_name}_alpha",
-            loc=alpha_loc,  #
-            scale=alpha_scale,
+            name=f"alpha_{i_name}",
+            loc=tf.exp(alpha_loc),
+            scale=tf.exp(alpha_scale),
             event_stack=modelParams.num_countries,
+            shape_label=("country"),
+            conditionally_independent=True,
         )
 
     """ We want to create a time dependent R_t for each country and age group

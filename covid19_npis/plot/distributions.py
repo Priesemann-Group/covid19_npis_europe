@@ -137,7 +137,7 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
     log.info(f"Creating distibution plot for {key}")
     posterior = convert_trace_to_dataframe(trace_posterior, sample_state, key)
     prior = convert_trace_to_dataframe(trace_prior, sample_state, key)
-
+    model_name = get_model_name_from_sample_state(sample_state)
     dist = get_dist_by_name_from_sample_state(sample_state, key)
     check_for_shape_and_shape_label(dist)
 
@@ -155,7 +155,7 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
         if hasattr(dist, "shape_label"):
             label1 = dist.shape_label
         else:
-            label1 = "dim_0"
+            label1 = f"{model_name}/{dist.name}_dim_0"
 
         fig, ax = plt.subplots(
             rows, cols, figsize=(4.5 / 3 * cols, rows * 1), constrained_layout=True
@@ -188,8 +188,8 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
         if hasattr(dist, "shape_label"):
             label1, label2 = dist.shape_label
         else:
-            label1 = "dim_0"
-            label2 = "dim_1"
+            label1 = model_name + "/" + dist.name + "_dim_0"
+            label2 = model_name + "/" + dist.name + "_dim_1"
 
         # First label is rows
         # Second label is columns

@@ -68,8 +68,8 @@ def timeseries(trace, sample_state, key, plot_observed=False):
         if hasattr(dist, "shape_label"):
             time, label1 = dist.shape_label
         else:
-            time = "dim_0"
-            label1 = "dim_1"
+            time = model_name + "/" + dist.name + "_dim_0"
+            label1 = model_name + "/" + dist.name + "_dim_1"
         cols = 1
         rows = dist.shape[1]  # not time
 
@@ -87,9 +87,9 @@ def timeseries(trace, sample_state, key, plot_observed=False):
         if hasattr(dist, "shape_label"):
             time, label1, label2 = dist.shape_label
         else:
-            time = "dim_0"
-            label1 = "dim_1"
-            label2 = "dim_2"
+            time = model_name + "/" + dist.name + "_dim_0"
+            label1 = model_name + "/" + dist.name + "_dim_1"
+            label2 = model_name + "/" + dist.name + "_dim_2"
 
         cols = dist.shape[1]
         rows = dist.shape[2]

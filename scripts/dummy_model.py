@@ -174,6 +174,7 @@ _, sample_state = pm.evaluate_model(test_model(modelParams))
     Function returns a list of figures which can be shown by fig[i].show() each figure being one country.
 """
 dist_names = ["R_0", "I_0_diff_base", "g_mu", "g_theta", "sigma"]
+
 fig = {}
 for name in dist_names:
     fig[name] = covid19_npis.plot.distribution(
@@ -181,6 +182,28 @@ for name in dist_names:
     )
     # Save figure
     plt.savefig("figures/dist_" + name + ".pdf", dpi=300, transparent=True)
+
+
+# Custom change points we need to automate that at some point
+
+dist_names = [
+    "alpha_schools_closed",
+    "alpha_curfew",
+    "date_test_country_1_schools_closed_0",
+    "date_test_country_1_schools_closed_1",
+    "date_test_country_1_curfew_0",
+    "date_test_country_2_schools_closed_0",
+    "date_test_country_2_schools_closed_1",
+    "date_test_country_2_curfew_0",
+]
+
+for name in dist_names:
+    fig[name] = covid19_npis.plot.distribution(
+        trace, trace_prior, sample_state=sample_state, key=name
+    )
+    # Save figure
+    plt.savefig("figures/dist_" + name + ".pdf", dpi=300, transparent=True)
+
 
 """ ## Plot time series for "new_cases" and "R_t"
 """

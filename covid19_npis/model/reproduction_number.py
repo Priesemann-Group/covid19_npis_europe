@@ -32,10 +32,11 @@ def _fsigmoid(t, l, d):
     # Prep dimensions
     d = tf.expand_dims(d, axis=-1)
     # Factors of the exponent
+    log.debug(f"d in _fsigmoid\n{d.shape}")
+    log.debug(f"t in _fsigmoid\n{t.shape}")
     inside_exp_1 = -4.0 / l
-    log.debug(f"d\n{d}")
     inside_exp_2 = t - d
-    log.debug(f"t-d\n{inside_exp_2}")
+    log.debug(f"t-d\n{inside_exp_2.shape}")
 
     return 1.0 / (1.0 + tf.exp(inside_exp_1 * inside_exp_2))
 
@@ -193,7 +194,7 @@ def _create_distributions(modelParams):
         Interventions array like
         |shape| country, interventions
     """
-    log.debug("create_interventions")
+    log.debug("_create_distributions")
     """
     Get all interventions from the countries data objects
     """
@@ -212,7 +213,6 @@ def _create_distributions(modelParams):
             alpha_scale_scale=i.prior_alpha_scale / 5,
         )
 
-    log.debug(interventions)
     """
         Create dict with distributions
     """
@@ -231,7 +231,6 @@ def _create_distributions(modelParams):
                         gamma_max=change_point.gamma_max,
                     )
                 )
-    log.debug(countries)
     return interventions, countries
 
 
@@ -256,14 +255,18 @@ def construct_R_t(R_0, modelParams):
     """
     log.debug("construct_R_t")
 
+    # Create distributions for date and hyperpriors.
     interventions, countries = _create_distributions(modelParams)
 
     # Get alpha for each intervention,country event stack of country size
     alpha = {}
     for i_name, intervention in interventions.items():
-        alpha_loc = yield intervention.alpha_loc  # 7,1
+        # Get hyperpriors
+        alpha_loc = yield intervention.alpha_loc
         alpha_scale = yield intervention.alpha_scale
         log.debug(f"Hyperdist_Alpha:\nloc:{alpha_loc}\nscale:{alpha_scale}")
+
+        # Create alpha for each country
         alpha[i_name] = yield Normal(
             name=f"alpha_{i_name}",
             loc=alpha_loc,
@@ -286,7 +289,9 @@ def construct_R_t(R_0, modelParams):
         for intervention_name, changepoints in country_interventions.items():
 
             alpha_interv = tf.gather(alpha[intervention_name], country_index, axis=-1)
-            log.debug(f"Alpha_slice\n{alpha_interv.shape}")
+            log.debug(
+                f"Alpha_sliced {country_name} {intervention_name}\n{alpha_interv}"
+            )
             # Calculate the gamma value for each cp and sum them up
             gammas_cp = []
             for cp in changepoints:

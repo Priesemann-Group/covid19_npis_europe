@@ -24,17 +24,17 @@ def studentT_likelihood(modelParams, new_cases):
     )
     sigma = sigma[..., tf.newaxis, :, tf.newaxis]
 
-    log.debug(f"sigma:\n{sigma}")
+    log.debug(f"sigma:\n{sigma.shape}")
     # Likelihood of the data
     data = modelParams.data_tensor
     mask = ~np.isnan(data)
     len_batch_shape = len(new_cases.shape) - 3
 
-    log.debug(f"data:\n{tf.boolean_mask(data, mask)}")
-    log.debug(f"new_cases without mask:\n{new_cases}")
+    log.debug(f"data:\n{tf.boolean_mask(data, mask).shape}")
+    log.debug(f"new_cases without mask:\n{new_cases.shape}")
 
     log.debug(
-        f"new_cases w. mask:\n{tf.boolean_mask(new_cases, mask, axis=len_batch_shape)}"
+        f"new_cases w. mask:\n{tf.boolean_mask(new_cases, mask, axis=len_batch_shape).shape}"
     )
 
     likelihood = yield pm.StudentT(
@@ -47,5 +47,5 @@ def studentT_likelihood(modelParams, new_cases):
         observed=tf.boolean_mask(data, mask),
         reinterpreted_batch_ndims=1,
     )
-    log.debug(f"likelihood:\n {likelihood}")
+    log.debug(f"likelihood:\n{likelihood.shape}")
     return likelihood

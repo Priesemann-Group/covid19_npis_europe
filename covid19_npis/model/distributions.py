@@ -10,7 +10,9 @@ this makes adding additional distribution later very easy.
 They have to be called the same name as in pymc4 e.g.
 'pm.LogNormal'->'LogNormal' !!
 """
+import logging
 
+log = logging.getLogger(__name__)
 import pymc4 as pm
 
 __all__ = [
@@ -42,6 +44,13 @@ class DistributionAdditions:
         if "shape" in kwargs:
             self.shape = kwargs.get("shape")
             del kwargs["shape"]
+
+        if "transformation" in kwargs and "shape" in kwargs:
+            if kwargs["transformation"]._reinterpreted_batch_ndims != len(self.shape):
+                log.warning(
+                    f"Automatically setting reinterpreted_batch_ndims to length of event_stack in transofrmation for {self.name}"
+                )
+                kwargs["transformation"]._reinterpreted_batch_ndims = len(self.shape)
 
         super().__init__(*args, **kwargs)
 

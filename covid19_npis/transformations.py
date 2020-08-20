@@ -6,9 +6,13 @@ class Log(Transform):
     name = "log"
     JacobianPreference = JacobianPreference.Backward
 
-    def __init__(self, reinterpreted_batch_ndims=0):
+    def __init__(self, scale=None, reinterpreted_batch_ndims=0):
         # NOTE: We actually need the inverse to match PyMC3, do we?
-        self._transform = tfb.Exp()
+        if scale is None:
+            scaling = tfb.Identity()
+        else:
+            scaling = tfb.Scale(scale)
+        self._transform = tfb.Chain([scaling, tfb.Exp()])
         self._reinterpreted_batch_ndims = reinterpreted_batch_ndims
 
     def forward(self, x):

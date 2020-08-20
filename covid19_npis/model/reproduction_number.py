@@ -9,9 +9,7 @@ log = logging.getLogger(__name__)
 
 from covid19_npis import transformations
 from covid19_npis.model.distributions import Normal, LogNormal, Deterministic
-
-num_age_groups = 4
-num_countries = 2
+from .. import modelParams
 
 
 def _fsigmoid(t, l, d):
@@ -35,6 +33,7 @@ def _fsigmoid(t, l, d):
     d = tf.expand_dims(d, axis=-1)
     # Factors of the exponent
     inside_exp_1 = -4.0 / l
+    log.debug(f"d\n{d}")
     inside_exp_2 = t - d
     log.debug(f"t-d\n{inside_exp_2}")
 
@@ -67,14 +66,15 @@ class Change_point(object):
         self.gamma_max = gamma_max
 
         self._d = Normal(
-            self.name,
+            "date_" + self.name,
             self.prior_date_loc,
             self.prior_date_scale,
-            event_stack=num_age_groups,
+            event_stack=modelParams.modelParams.num_age_groups,
+            shape_label=("age_group"),
             conditionally_independent=True,
-        )  # Test if it works like this or if we need yield statement here already.
+        )
 
-        log.debug(f"Created changepoint at prior_d={self.prior_date_scale}")
+        log.debug(f"Created changepoint at prior_d={self.prior_date_loc}")
 
     @property
     def date(self):
@@ -130,19 +130,27 @@ class Intervention(object):
         self.prior_alpha_scale_loc = alpha_scale_loc
         self.prior_alpha_scale_scale = alpha_scale_scale
 
+        log.debug(f"tsty\n{self.prior_alpha_loc_scale}")
         # Init distributions
+        # TODO: Add scale
         self._alpha_loc = LogNormal(
             "alpha_loc_" + self.name,
-            np.exp(self.prior_alpha_loc_loc, dtype="float32"),
-            np.exp(self.prior_alpha_loc_scale, dtype="float32"),
+            np.log(self.prior_alpha_loc_loc, dtype="float32"),
+            np.log(self.prior_alpha_loc_scale, dtype="float32"),
             conditionally_independent=True,
+            transformation=transformations.SoftPlus(
+                scale=20, reinterpreted_batch_ndims=0
+            ),
         )
 
         self._alpha_scale = LogNormal(
             "alpha_scale_" + self.name,
-            np.exp(self.prior_alpha_scale_loc, dtype="float32"),
-            np.exp(self.prior_alpha_scale_scale, dtype="float32"),
+            np.log(self.prior_alpha_scale_loc, dtype="float32"),
+            np.log(self.prior_alpha_scale_scale, dtype="float32"),
             conditionally_independent=True,
+            transformation=transformations.SoftPlus(
+                scale=20, reinterpreted_batch_ndims=0
+            ),
         )
         log.debug(f"Create intervention with name: {name}")
 
@@ -254,16 +262,16 @@ def construct_R_t(R_0, modelParams):
     alpha = {}
     for i_name, intervention in interventions.items():
         alpha_loc = yield intervention.alpha_loc  # 7,1
-        log.debug(f"Hyperdist_Alpha_loc\n {alpha_loc}")
         alpha_scale = yield intervention.alpha_scale
+        log.debug(f"Hyperdist_Alpha:\nloc:{alpha_loc}\nscale:{alpha_scale}")
         alpha[i_name] = yield Normal(
             name=f"alpha_{i_name}",
-            loc=tf.exp(alpha_loc),
-            scale=tf.exp(alpha_scale),
-            event_stack=modelParams.num_countries,
+            loc=alpha_loc,
+            scale=alpha_scale,
             shape_label=("country"),
-            conditionally_independent=True,
+            event_stack=modelParams.num_countries,
         )
+        log.debug(f"Alpha_{i_name}\n{alpha[i_name]}")
 
     """ We want to create a time dependent R_t for each country and age group
         We iterate over country and interventions.
@@ -276,20 +284,22 @@ def construct_R_t(R_0, modelParams):
     for country_name, country_interventions in countries.items():
         _sum = []
         for intervention_name, changepoints in country_interventions.items():
-            log.debug(f"Alpha\n{alpha[intervention_name]}")
-            alpha_interv = alpha[intervention_name][..., country_index]
-            log.debug(f"Alpha_slice\n{alpha_interv}")
+
+            alpha_interv = tf.gather(alpha[intervention_name], country_index, axis=-1)
+            log.debug(f"Alpha_slice\n{alpha_interv.shape}")
             # Calculate the gamma value for each cp and sum them up
             gammas_cp = []
             for cp in changepoints:
                 gamma_cp = yield cp.gamma_t(t, l=5.0)
                 gammas_cp.append(gamma_cp)
+            log.debug(f"gammas_cp:\n{gammas_cp}")
             gamma_t = tf.reduce_sum(gammas_cp, axis=0)
-
+            log.debug(f"gamma_t reduced_sum:\n{gammas_cp}")
             # Append gamma*alpha to array
             _sum.append(tf.einsum("...ai,...->...ai", gamma_t, alpha_interv))
 
         # We sum over all interventions in a country and append to list for countries
+        print(f"sum:{_sum}")
         exp_to_multi.append(tf.exp(tf.reduce_sum(_sum, axis=0)))
         country_index = country_index + 1
     exp_to_multi = tf.convert_to_tensor(exp_to_multi)

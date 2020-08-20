@@ -6,6 +6,7 @@ from .utils import (
     check_for_shape_and_shape_label,
 )
 from .. import modelParams
+
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt

@@ -180,6 +180,11 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
                     ax=ax[i],
                     suffix=f"{i}",
                 )
+
+            # Set labels on y-axis
+            for i in range(cols):
+                ax[i].set_xlabel(posterior.index.get_level_values(label1).unique()[i])
+
             return ax
 
     def dist_ndim_2():

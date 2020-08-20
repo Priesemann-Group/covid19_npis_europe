@@ -12,20 +12,25 @@ import os
 sys.path.append("../")
 
 # Needed to set logging level before importing other modules
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
 import covid19_npis
 from covid19_npis import transformations
 from covid19_npis.benchmarking import benchmark
-from covid19_npis.model.distributions import LKJCholesky, Deterministic, Gamma
+from covid19_npis.model.distributions import (
+    LKJCholesky,
+    Deterministic,
+    Gamma,
+    HalfCauchy,
+)
 
 
 """ # Debugging and other snippets
 """
 # For eventual debugging:
-# tf.config.run_functions_eagerly(True)
-# tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=100)
+tf.config.run_functions_eagerly(True)
+# tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
 
 # Force CPU
 covid19_npis.utils.force_cpu_for_tensorflow()
@@ -38,12 +43,12 @@ covid19_npis.utils.force_cpu_for_tensorflow()
 
 # Load our data from csv files into our own custom data classes
 c1 = covid19_npis.data.Country(
-    "test_country_1",  # name
+    "test-country-1",  # name
     "../data/test_country_1/new_cases.csv",  # new_Cases per age groups in country
     "../data/test_country_1/interventions.csv",  # interventions timeline with stringency index
 )
 c2 = covid19_npis.data.Country(
-    "test_country_2",
+    "test-country-2",
     "../data/test_country_2/new_cases.csv",
     "../data/test_country_2/interventions.csv",
 )
@@ -109,6 +114,7 @@ def test_model(modelParams):
     log.info(f"gen_interv:\n{gen_kernel}")
 
     # Generate exponential distribution with initial infections as external input
+    """
     h_0_t = yield covid19_npis.model.construct_h_0_t(
         modelParams=modelParams,
         len_gen_interv_kernel=len_gen_interv_kernel,
@@ -116,6 +122,21 @@ def test_model(modelParams):
         mean_gen_interv=mean_gen_interv,
         mean_test_delay=0,
     )  # |shape| time, batch, countries, age_groups
+    
+    h_0 = yield HalfCauchy(
+        name="I_0",
+        event_stack=(modelParams.num_countries, modelParams.num_age_groups),
+        scale=20,
+        transformation=transformations.SoftPlus(reinterpreted_batch_ndims=2),
+        shape_label=("country", "age_group"),
+        conditionally_independent=True,
+    )
+    """
+    if len(R_0.shape) == 3:
+        h_0 = tf.ones((3, 2, 4), dtype="float32")
+    else:
+        h_0 = tf.ones((2, 4), dtype="float32")
+    h_0_t = tf.stack([h_0] * 50)
 
     # Create N tensor (vector)
     # should be done earlier in the real model
@@ -187,14 +208,14 @@ for name in dist_names:
 # Custom change points we need to automate that at some point
 
 dist_names = [
-    "alpha_schools_closed",
+    "alpha_schools-closed",
     "alpha_curfew",
-    "date_test_country_1_schools_closed_0",
-    "date_test_country_1_schools_closed_1",
-    "date_test_country_1_curfew_0",
-    "date_test_country_2_schools_closed_0",
-    "date_test_country_2_schools_closed_1",
-    "date_test_country_2_curfew_0",
+    "date_test-country-1_schools-closed_0",
+    "date_test-country-1_schools-closed_1",
+    "date_test-country-1_curfew_0",
+    "date_test-country-2_schools-closed_0",
+    "date_test-country-2_schools-closed_1",
+    "date_test-country-2_curfew_0",
 ]
 
 for name in dist_names:

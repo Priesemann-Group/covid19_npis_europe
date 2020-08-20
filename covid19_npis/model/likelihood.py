@@ -17,18 +17,14 @@ def studentT_likelihood(modelParams, new_cases):
     sigma = yield HalfCauchy(
         name="sigma",
         scale=50.0,
-        event_stack=(modelParams.num_countries),
+        event_stack=modelParams.num_countries,
         conditionally_independent=True,
-        transform=transformations.SoftPlus(reinterpreted_batch_ndims=2),
-        shape_label=("country"),
+        transform=transformations.SoftPlus(reinterpreted_batch_ndims=1),
+        shape_label="country",
     )
+    sigma = sigma[..., tf.newaxis, :, tf.newaxis]
 
-    sigma = tf.expand_dims(sigma, axis=-1)  # same across age groups
-    sigma = tf.expand_dims(sigma, axis=0)  # same across time
-    if len(sigma.shape) == 4:  # Move batch to front again
-        sigma = tf.transpose(sigma, perm=(1, 0, 2, 3))
     log.debug(f"sigma:\n{sigma}")
-
     # Likelihood of the data
     data = modelParams.data_tensor
     mask = ~np.isnan(data)

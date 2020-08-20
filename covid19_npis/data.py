@@ -373,7 +373,7 @@ class Intervention(object):
         prior_alpha_scale : number, optional
     """
 
-    def __init__(self, name, num_stages, prior_alpha_loc=0.05, prior_alpha_scale=0.02):
+    def __init__(self, name, num_stages, prior_alpha_loc=0.1, prior_alpha_scale=0.1):
 
         # Name
         self.name = name

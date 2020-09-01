@@ -6,11 +6,12 @@
 ## First steps
 Initialize submodule while cloning
 ```
-git clone --recurse-submodules https://github.com/Priesemann-Group/covid19_npis_europe.git
+git clone --recurse-submodules git@github.com/Priesemann-Group/covid19_npis_europe.git
 ```
 
 Install all required packages
 ```
+pip install git+https://github.com/pymc-devs/pymc4
 pip install -r requirements.txt
 ```
 

@@ -3,3 +3,4 @@ pymc4 ==  4.0a2
 numpy
 matplotlib
 pandas
+timerit

@@ -1,4 +1,4 @@
-from pymc4.inference.sampling import (
+from pymc4.mcmc.samplers import (
     build_logp_and_deterministic_functions,
     vectorize_logp_function,
     tile_init,

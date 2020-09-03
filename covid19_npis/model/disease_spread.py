@@ -273,7 +273,7 @@ def construct_generation_interval(
     )
 
     log.debug(f"g_mu:\n{g_mu}")
-    log.debug(f"g_mu:\n{g_theta}")
+    log.debug(f"g_theta:\n{g_theta}")
 
     g_theta = tf.expand_dims(g_theta, axis=-1)
     g_mu = tf.expand_dims(g_mu, axis=-1)

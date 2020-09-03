@@ -8,9 +8,11 @@ import numpy as np
 log = logging.getLogger(__name__)
 
 
-# Un-normalized distribution pdf for generation interval
+# Distribution pdf for generation interval
 def gamma(x, alpha, beta):
-    return tf.math.pow(x, (alpha - 1)) * tf.exp(-beta * x)
+    log_unnormalized_prob = tf.math.xlogy(alpha - 1.0, x) - beta * x
+    log_normalization = tf.math.lgamma(alpha) - alpha * tf.math.log(beta)
+    return tf.exp(log_unnormalized_prob - log_normalization)
 
 
 # Un-normalized distribution pdf for generation interval

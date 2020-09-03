@@ -279,6 +279,7 @@ def construct_R_t(R_0, modelParams):
     """ We want to create a time dependent R_t for each country and age group
         We iterate over country and interventions.
     """
+
     # Create time index tensor of length modelParams.simlength
     t = tf.range(0, modelParams.length, dtype="float32")
 
@@ -299,7 +300,7 @@ def construct_R_t(R_0, modelParams):
                 gammas_cp.append(gamma_cp)
             log.debug(f"gammas_cp:\n{gammas_cp}")
             gamma_t = tf.reduce_sum(gammas_cp, axis=0)
-            log.debug(f"gamma_t reduced_sum:\n{gammas_cp}")
+            log.debug(f"gamma_t reduced_sum:\n{gamma_t}")
             # Append gamma*alpha to array
             _sum.append(tf.einsum("...ai,...->...ai", gamma_t, alpha_interv))
 

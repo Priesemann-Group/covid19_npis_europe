@@ -287,7 +287,7 @@ def construct_R_t(R_0, modelParams):
         Create dates for each change point
     """
     sigma_d_interv = yield distributions["sigma_d_interv"]
-    delta_d_c = (yield distributions["delta_d_c"]) * (
+    delta_d_c = (yield distributions["delta_d_c"]) * (  # shape country
         yield distributions["sigma_d_country"]
     )
 
@@ -319,7 +319,7 @@ def construct_R_t(R_0, modelParams):
     # Create time index tensor of length modelParams.simlength
     t = tf.range(0, modelParams.length, dtype="float32")
 
-    gamma_i_c_p = {}  # i.e. gamma_i_c_p
+    gamma_i_c_p = {}  # i.e. gamma_i_c_p country change_point  batch time
     for i_name, intervention in interventions.items():
         gamma_i_c_p[i_name] = {}
         for country in modelParams.countries:
@@ -329,6 +329,7 @@ def construct_R_t(R_0, modelParams):
 
                 gamma_i_c_p[i_name][country.name].append(
                     _fsigmoid(t, length[i_name], d[i_name][country.name][cp_index])
+                    * delta_gamma_max_data
                 )
 
             log.debug(
@@ -343,17 +344,17 @@ def construct_R_t(R_0, modelParams):
     for i_name, intervention in interventions.items():
         gamma_i_c[i_name] = []  # shape country
         for country in modelParams.countries:
-            gamma_i_c[i_name].append(
-                tf.reduce_sum(gamma_i_c_p[i_name][country.name], axis=0)
-            )
+            gamma_i_c[i_name].append(sum(gamma_i_c_p[i_name][country.name]))
         gamma_i_c[i_name] = tf.convert_to_tensor(
             gamma_i_c[i_name]
-        )  # shape country,time
+        )  # shape country,batch, time
 
         if len(gamma_i_c[i_name].shape) == 3:
             gamma_i_c[i_name] = tf.transpose(gamma_i_c[i_name], perm=(1, 0, 2))
 
-        log.debug(f"Gamma_i_c_{i_name}\n{gamma_i_c[i_name].shape}")
+        log.debug(
+            f"Gamma_i_c_{i_name}\n{gamma_i_c[i_name].shape}"
+        )  # shape batch, country, time
 
     """ Calculate R_eff
 

@@ -42,64 +42,8 @@ def _fsigmoid(t, l, d):
     inside_exp_1 = -4.0 / l
     inside_exp_2 = t - d
     log.debug(f"t-d\n{inside_exp_2.shape}")
-
+    inside_exp_1 = tf.expand_dims(inside_exp_1, axis=-1)
     return 1.0 / (1.0 + tf.exp(inside_exp_1 * inside_exp_2))
-
-
-class Change_point(object):
-    """
-        Change point class. Should contain date d, gamma_max and function to return gamma at point t.
-
-        Parameters
-        ----------
-        name: str
-            Name of the change point, get passed to the pymc4 distribution for the date.
-
-        date_loc : number
-            Prior for the location of the date of the change point.
-
-        date_scale : number
-            Prior for the scale of the date of the change point.
-
-        gamma_max : number
-            Maximum gamma value for the change point, i.e the value the logistic function gamma_t converges to. [-1,1]
-    """
-
-    def __init__(self, name, date_loc, date_scale, gamma_max):
-        self.name = name
-        self.prior_date_loc = date_loc
-        self.prior_date_scale = date_scale
-        self.gamma_max = gamma_max
-
-        self._d = Normal(
-            "date_" + self.name,
-            self.prior_date_loc,
-            self.prior_date_scale,
-            event_stack=modelParams.modelParams.num_age_groups,
-            shape_label=("age_group"),
-            conditionally_independent=True,
-        )
-
-        log.debug(f"Created changepoint at prior_d={self.prior_date_loc}")
-
-    @property
-    def date(self):
-        r"""
-        Returns pymc4 generator for the date :math:`d`, i.e. a normal distribution. The priors
-        are set at init of the object.
-        """
-
-        return (yield self._d)
-
-    def gamma_t(self, t, l):
-        """
-        Returns gamma value at t with given length :math:`l`. The length :math:`l` should be
-        passed from the intervention class.
-        """
-        log.debug("gamma_t_change_point")
-        d = yield self.date
-        sigmoid = _fsigmoid(t, l, d)
-        return sigmoid * self.gamma_max
 
 
 class Intervention(object):
@@ -383,26 +327,17 @@ def construct_R_t(R_0, modelParams):
             for cp_index, change_point in enumerate(country.change_points[i_name]):
                 delta_gamma_max_data = country.change_points[i_name][cp_index].gamma_max
 
-                # Prep dimensions
-                d[i_name][country.name][cp_index] = tf.expand_dims(
-                    d[i_name][country.name][cp_index], axis=-1
-                )
-                # Factors of the exponent
-                inside_exp_1 = -4.0 / length[i_name]
-                inside_exp_2 = t - d[i_name][country.name][cp_index]
-
-                inside_exp_1 = tf.expand_dims(inside_exp_1, axis=-1)
                 gamma_i_c_p[i_name][country.name].append(
-                    1.0 / (1.0 + tf.exp(inside_exp_1 * inside_exp_2))
+                    _fsigmoid(t, length[i_name], d[i_name][country.name][cp_index])
                 )
 
             log.debug(
                 f"Gamma_i_c_p_{i_name}_{country.name}\n{gamma_i_c_p[i_name][country.name]}"
             )
 
-    """ Calculate gamma_i_c
+    """ Calculate gamma_i_c from gamma_i_c_p
 
-        Iterate over all changepoints in an intervention and sum up gamma
+        Iterate over all changepoints in an intervention and sum up over every change point.
     """
     gamma_i_c = {}
     for i_name, intervention in interventions.items():
@@ -442,4 +377,4 @@ def construct_R_t(R_0, modelParams):
         shape_label=("time", "country", "age_group"),
     )
 
-    return R_t
+    return R_t  # shape batch, time, country, age_group

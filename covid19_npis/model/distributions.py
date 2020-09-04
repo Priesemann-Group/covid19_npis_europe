@@ -23,6 +23,7 @@ __all__ = [
     "StudentT",
     "Gamma",
     "Deterministic",
+    "HalfNormal",
 ]
 
 

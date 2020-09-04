@@ -282,7 +282,7 @@ class Country(object):
             if delta != 0:
                 change_points.append(
                     Change_point(
-                        prior_date_loc=df.index[row],
+                        date_data=df.index[row],
                         gamma_max=delta
                         / interv.num_stages,  # +1 because it starts at 0
                     )
@@ -403,11 +403,7 @@ class Change_point(object):
             Scale of prior distribution for the location (date) of the change point.
     """
 
-    def __init__(self, prior_date_loc, gamma_max, length=4, prior_date_scale=2):
+    def __init__(self, date_data, gamma_max):
 
-        # Priors
-        self.prior_date_loc = prior_date_loc
-        self.prior_date_scale = prior_date_scale
-
+        self.date_data = date_data
         self.gamma_max = gamma_max
-        self.length = length

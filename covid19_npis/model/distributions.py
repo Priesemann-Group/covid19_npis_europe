@@ -79,8 +79,14 @@ for dist_name in __all__:
 
 # Example:
 def other_init(self, *args, **kwargs):
+    kwargs["validate_args"] = True
     super(self.__class__, self).__init__(*args, **kwargs)
     # print("This is a modified __init__")
 
 
 LogNormal.__init__ = other_init
+Normal.__init__ = other_init
+LKJCholesky.__init__ = other_init
+HalfCauchy.__init__ = other_init
+StudentT.__init__ = other_init
+Gamma.__init__ = other_init

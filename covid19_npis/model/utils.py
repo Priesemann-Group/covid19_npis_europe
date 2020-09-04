@@ -8,8 +8,21 @@ import numpy as np
 log = logging.getLogger(__name__)
 
 
-# Distribution pdf for generation interval
 def gamma(x, alpha, beta):
+    """
+    Returns a gamma kernel evaluated at x. The implementation is the same as defined
+    in the tfp.gamma distribution which is probably quiet numerically stable.
+    Parameters
+    ----------
+    x
+    alpha
+    beta
+
+    Returns
+    -------
+
+    """
+
     log_unnormalized_prob = tf.math.xlogy(alpha - 1.0, x) - beta * x
     log_normalization = tf.math.lgamma(alpha) - alpha * tf.math.log(beta)
     return tf.exp(log_unnormalized_prob - log_normalization)

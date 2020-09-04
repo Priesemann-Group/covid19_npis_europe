@@ -220,6 +220,7 @@ def _create_distributions(modelParams):
         scale=1.0,
         event_stack=(modelParams.num_countries),
         shape_label=("country"),
+        conditionally_independent=True,
     )
     delta_alpha_cross_a = Normal(
         "delta_alpha_cross_a",
@@ -227,6 +228,7 @@ def _create_distributions(modelParams):
         scale=1.0,
         event_stack=(modelParams.num_age_groups),
         shape_label=("age_group"),
+        conditionally_independent=True,
     )
 
     """
@@ -314,6 +316,8 @@ def construct_R_t(R_0, modelParams):
         # Draw from distributions
         alpha_cross_i = yield intervention.alpha_cross
         # Add the country age and intervention distribution
+        alpha_cross_i = tf.expand_dims(alpha_cross_i, axis=-1)
+        alpha_cross_i = tf.expand_dims(alpha_cross_i, axis=-1)
         alpha_cross_i_c_a = alpha_cross_i + delta_alpha_cross_c + delta_alpha_cross_a
         alpha[i_name] = 1.0 / (1.0 + tf.exp(-1.0 * alpha_cross_i_c_a))
         log.debug(f"Alpha_{i_name}\n{alpha[i_name]}")
@@ -378,17 +382,20 @@ def construct_R_t(R_0, modelParams):
             gamma_i_c_p[i_name][country.name] = []
             for cp_index, change_point in enumerate(country.change_points[i_name]):
                 delta_gamma_max_data = country.change_points[i_name][cp_index].gamma_max
-                gamma_i_c_p[i_name][country.name].append(
-                    delta_gamma_max_data
-                    / (
-                        1.0
-                        + tf.exp(
-                            -4
-                            / length[i_name]
-                            * (t - d[i_name][country.name][cp_index])
-                        )
-                    )
+
+                # Prep dimensions
+                d[i_name][country.name][cp_index] = tf.expand_dims(
+                    d[i_name][country.name][cp_index], axis=-1
                 )
+                # Factors of the exponent
+                inside_exp_1 = -4.0 / length[i_name]
+                inside_exp_2 = t - d[i_name][country.name][cp_index]
+
+                inside_exp_1 = tf.expand_dims(inside_exp_1, axis=-1)
+                gamma_i_c_p[i_name][country.name].append(
+                    1.0 / (1.0 + tf.exp(inside_exp_1 * inside_exp_2))
+                )
+
             log.debug(
                 f"Gamma_i_c_p_{i_name}_{country.name}\n{gamma_i_c_p[i_name][country.name]}"
             )
@@ -407,7 +414,11 @@ def construct_R_t(R_0, modelParams):
         gamma_i_c[i_name] = tf.convert_to_tensor(
             gamma_i_c[i_name]
         )  # shape country,time
-        log.debug(f"Gamma_i_c_{i_name}\n{gamma_i_c[i_name]}")
+
+        if len(gamma_i_c[i_name].shape) == 3:
+            gamma_i_c[i_name] = tf.transpose(gamma_i_c[i_name], perm=(1, 0, 2))
+
+        log.debug(f"Gamma_i_c_{i_name}\n{gamma_i_c[i_name].shape}")
 
     """ Calculate R_eff
 
@@ -418,7 +429,7 @@ def construct_R_t(R_0, modelParams):
         _sum.append(tf.einsum("...ct,...ca->...cat", gamma_i_c[i_name], alpha[i_name]))
 
     R_eff = tf.einsum("...ca,...cat->...tca", R_0, tf.exp(tf.reduce_sum(_sum, axis=0)))
-    log.debug(f"R_eff\n{R_eff}")
+    log.debug(f"R_eff\n{R_eff.shape}")
 
     R_t = yield Deterministic(
         name="R_t",
@@ -430,8 +441,5 @@ def construct_R_t(R_0, modelParams):
         ),
         shape_label=("time", "country", "age_group"),
     )
-
-    if len(R_t.shape) == 4:
-        R_t = tf.transpose(R_t, perm=(1, 0, 2, 3))
 
     return R_t

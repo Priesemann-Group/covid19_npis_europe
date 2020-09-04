@@ -11,7 +11,7 @@ log = logging.getLogger(__name__)
 
 
 def get_model_name_from_sample_state(sample_state):
-    dists = list(sample_state.distributions.items())
+    dists = list(sample_state.continuous_distributions.items())
     model_name, dist_name = dists[0][0].split("/")
     return model_name
 
@@ -19,7 +19,7 @@ def get_model_name_from_sample_state(sample_state):
 def get_dist_by_name_from_sample_state(sample_state, name):
     model_name = get_model_name_from_sample_state(sample_state)
     try:
-        dist = sample_state.distributions[model_name + "/" + name]
+        dist = sample_state.continuous_distributions[model_name + "/" + name]
     except Exception as e:
         dist = sample_state.deterministics[model_name + "/" + name]
     return dist

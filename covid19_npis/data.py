@@ -90,7 +90,9 @@ def convert_trace_to_dataframe(trace, sample_state, key):
         break
 
     # Check key value
-    dists_and_determs = [dist.split("/")[1] for dist in sample_state.distributions]
+    dists_and_determs = [
+        dist.split("/")[1] for dist in sample_state.continuous_distributions
+    ]
     for deter in sample_state.deterministics:
         dists_and_determs.append(deter.split("/")[1])
 
@@ -98,7 +100,7 @@ def convert_trace_to_dataframe(trace, sample_state, key):
 
     # Get distribution
     try:
-        dist = sample_state.distributions[model_name + "/" + key]
+        dist = sample_state.continuous_distributions[model_name + "/" + key]
     except Exception as e:
         dist = sample_state.deterministics[model_name + "/" + key]
 

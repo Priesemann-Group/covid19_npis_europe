@@ -3,11 +3,35 @@ import logging
 import time
 import os
 
+"""
+os.environ["KMP_BLOCKTIME"] = "1"
+os.environ["KMP_SETTINGS"] = "1"
+os.environ["KMP_AFFINITY"] = "granularity=fine,verbose,compact,1,0"
+"""
+
 import pymc4 as pm
 import tensorflow as tf
 import numpy as np
 import time
 import os
+
+"""
+old_opts = tf.config.optimizer.get_experimental_options()
+print(old_opts)
+tf.config.optimizer.set_experimental_options(
+    {
+        "autoparallel_optimizer": True,
+        "layout_optimizer": True,
+        "loop_optimizer": True,
+        "dependency_optimizer": True,
+        "shape_optimizer": True,
+        "function_optimizer": True,
+        "constant_folding_optimizer": True,
+    }
+)
+print(tf.config.optimizer.get_experimental_options())
+"""
+
 
 sys.path.append("../")
 
@@ -176,10 +200,10 @@ def test_model(modelParams):
 begin_time = time.time()
 trace = pm.sample(
     test_model(modelParams),
-    num_samples=50,
-    burn_in=100,
+    num_samples=100,
+    burn_in=1000,
     use_auto_batching=False,
-    num_chains=3,
+    num_chains=2,
     xla=True,
 )
 

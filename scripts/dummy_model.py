@@ -222,62 +222,48 @@ trace_prior = pm.sample_prior_predictive(
 )
 _, sample_state = pm.evaluate_model(test_model(modelParams))
 
+
 """ ## Plot distributions
     Function returns a list of figures which can be shown by fig[i].show() each figure being one country.
 """
-dist_names = ["R_0", "I_0_diff_base", "g_mu", "g_theta", "sigma"]
-
-fig = {}
-for name in dist_names:
-    fig[name] = covid19_npis.plot.distribution(
-        trace, trace_prior, sample_state=sample_state, key=name
-    )
-    # Save figure
-    plt.savefig("figures/dist_" + name + ".pdf", dpi=300, transparent=True)
 
 
-# Custom change points we need to automate that at some point
-
+# Plot by name.
+# TODO:ADD THE R_T DISTRIBUTIONS i.e. alpha, d, l, sigma as deterministics
 dist_names = [
-    "alpha_schools-closed",
-    "alpha_curfew",
-    "date_test-country-1_schools-closed_0",
-    "date_test-country-1_schools-closed_1",
-    "date_test-country-1_curfew_0",
-    "date_test-country-2_schools-closed_0",
-    "date_test-country-2_schools-closed_1",
-    "date_test-country-2_curfew_0",
+    "R_0",
+    "I_0_diff_base",
+    "g_mu",
+    "g_theta",
+    "sigma",
 ]
 
+dist_fig = {}
 for name in dist_names:
-    fig[name] = covid19_npis.plot.distribution(
+    dist_fig[name] = covid19_npis.plot.distribution(
         trace, trace_prior, sample_state=sample_state, key=name
     )
     # Save figure
     plt.savefig("figures/dist_" + name + ".pdf", dpi=300, transparent=True)
 
 
-""" ## Plot time series for "new_cases" and "R_t"
+""" ## Plot time series
 """
-fig_new_cases = covid19_npis.plot.timeseries(
-    trace, sample_state=sample_state, key="new_cases"
-)
-
-# plot data into the axes
-for i, c in enumerate(modelParams.data_summary["countries"]):
-    for j, a in enumerate(modelParams.data_summary["age_groups"]):
-        fig_new_cases[j][i] = covid19_npis.plot.time_series._timeseries(
-            modelParams.dataframe.index[:],
-            modelParams.dataframe[(c, a)].to_numpy()[:],
-            ax=fig_new_cases[j][i],
-            alpha=0.5,
-        )
-
-# Save figure
-plt.savefig("figures/ts_new_cases.pdf", dpi=300, transparent=True)
-
-
-fig_R_t = covid19_npis.plot.timeseries(trace, sample_state=sample_state, key="R_t")
-
-# Save figure
-plt.savefig("figures/ts_R_t.pdf", dpi=300, transparent=True)
+ts_names = ["new_cases", "R_t"]
+ts_fig = {}
+for name in ts_names:
+    ts_fig[name] = covid19_npis.plot.timeseries(
+        trace, sample_state=sample_state, key="new_cases"
+    )
+    # plot data into new_cases
+    if name == "new_cases":
+        for i, c in enumerate(modelParams.data_summary["countries"]):
+            for j, a in enumerate(modelParams.data_summary["age_groups"]):
+                ts_fig["new_cases"][j][i] = covid19_npis.plot.time_series._timeseries(
+                    modelParams.dataframe.index[:],
+                    modelParams.dataframe[(c, a)].to_numpy()[:],
+                    ax=ts_fig["new_cases"][j][i],
+                    alpha=0.5,
+                )
+    # Save figure
+    plt.savefig(f"figures/ts_{name}.pdf", dpi=300, transparent=True)

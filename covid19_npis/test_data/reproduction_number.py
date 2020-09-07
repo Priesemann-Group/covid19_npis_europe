@@ -2,7 +2,8 @@ import numpy as np
 
 
 def fsigmoid(x, a, b):
-    return 1.0 / (1.0 + np.exp(-a * (x - b)))
+    b = np.expand_dims(b, axis=-1)
+    return 1.0 / (1.0 + np.exp(np.multiply(-a, (x - b))))
 
 
 class Change_point(object):
@@ -23,11 +24,12 @@ def gamma_from_delta_t(t, begin, delta_t):
 
 
 def get_R_t(times, R_0, cps):
-    R_t = np.array([R_0])
-    R_0 = np.array(R_0)
+
     for t in times:
+        print(t.shape)
         _sum = 0
         for cp in cps:
-            _sum += cp.alpha * cp.get_gamma(t)
+            alpha = np.expand_dims(cp.alpha, axis=-1)
+            _sum += alpha * cp.get_gamma(t)
         R_t = np.append(R_t, [R_0 * np.exp(-_sum)], axis=0)
     return R_t

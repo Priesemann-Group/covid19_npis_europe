@@ -152,6 +152,12 @@ def test_model(modelParams):
         mean_test_delay=0,
     )  # |shape| time, batch, countries, age_groups
 
+    yield Deterministic(
+        "h_0_t",
+        tf.einsum("t...ca->...tca", h_0_t),
+        shape_label=("time", "country", "age_group"),
+    )
+
     """
     h_0 = yield HalfCauchy(
         name="I_0",
@@ -200,8 +206,8 @@ def test_model(modelParams):
 begin_time = time.time()
 trace = pm.sample(
     test_model(modelParams),
-    num_samples=100,
-    burn_in=1000,
+    num_samples=200,
+    burn_in=400,
     use_auto_batching=False,
     num_chains=2,
     xla=True,

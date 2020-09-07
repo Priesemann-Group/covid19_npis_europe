@@ -292,7 +292,7 @@ def construct_R_t(R_0, modelParams):
         alpha_cross_i = tf.expand_dims(alpha_cross_i, axis=-1)
         alpha_cross_i = tf.expand_dims(alpha_cross_i, axis=-1)
         alpha_cross_i_c_a = alpha_cross_i + delta_alpha_cross_c + delta_alpha_cross_a
-        alpha[i_name] = 1.0 / (1.0 + tf.exp(-1.0 * alpha_cross_i_c_a))
+        alpha[i_name] = tf.math.sigmoid(alpha_cross_i_c_a)
         log.debug(f"Alpha_{i_name}\n{alpha[i_name]}")
 
     """ Construct l_{i,sign}

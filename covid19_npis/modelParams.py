@@ -159,7 +159,7 @@ class ModelParams:
 
     @property
     def length(self):
-        return 50
+        return len(self._dataframe)
 
     # ------------------------------------------------------------------------------ #
     # Methods

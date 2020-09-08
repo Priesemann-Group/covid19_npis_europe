@@ -178,13 +178,25 @@ def save_data(path, **params):
     new_cases, R_t, interv = test_data(**params)
 
     # Save new_Cases
-    new_cases.xs("country_1", 1).to_csv(path + "/test_country_1/new_cases.csv")
-    new_cases.xs("country_2", 1).to_csv(path + "/test_country_2/new_cases.csv")
+    new_cases.xs("country_1", 1).to_csv(
+        path + "/test_country_1/new_cases.csv", date_format="%d.%m.%y"
+    )
+    new_cases.xs("country_2", 1).to_csv(
+        path + "/test_country_2/new_cases.csv", date_format="%d.%m.%y"
+    )
 
     # Save interventions
-    interv.xs("country_1", 1).to_csv(path + "/test_country_1/interventions.csv")
-    interv.xs("country_2", 1).to_csv(path + "/test_country_2/interventions.csv")
+    interv.xs("country_1", 1).to_csv(
+        path + "/test_country_1/interventions.csv", date_format="%d.%m.%y"
+    )
+    interv.xs("country_2", 1).to_csv(
+        path + "/test_country_2/interventions.csv", date_format="%d.%m.%y"
+    )
 
     # Save R_t
-    R_t.xs("country_1", 1).to_csv(path + "/test_country_1/reproduction_number.csv")
-    R_t.xs("country_2", 1).to_csv(path + "/test_country_2/reproduction_number.csv")
+    R_t.xs("country_1", 1).to_csv(
+        path + "/test_country_1/reproduction_number.csv", date_format="%d.%m.%y"
+    )
+    R_t.xs("country_2", 1).to_csv(
+        path + "/test_country_2/reproduction_number.csv", date_format="%d.%m.%y"
+    )

@@ -1,8 +1,12 @@
+import logging
 from .reproduction_number import Change_point, get_R_t
 import numpy as np
-from scipy.stats import gamma
+from scipy.stats import gamma, nbinom
+from scipy.special import binom
 import pandas as pd
 import datetime
+
+log = logging.getLogger(__name__)
 
 
 def test_data(**in_params):
@@ -175,7 +179,15 @@ def test_data(**in_params):
 
 
 def save_data(path, **params):
+    """
+    Main entry point to generate test data. Passes params to generate function
+    and adds random noise to new cases.
+
+    Creates folder structure for two test countries.
+    """
     new_cases, R_t, interv = test_data(**params)
+
+    new_cases = _random_noise(new_cases, 0.00001)
 
     # Save new_Cases
     new_cases.xs("country_1", 1).to_csv(
@@ -200,3 +212,54 @@ def save_data(path, **params):
     R_t.xs("country_2", 1).to_csv(
         path + "/test_country_2/reproduction_number.csv", date_format="%d.%m.%y"
     )
+
+
+def _random_noise(df, noise_factor):
+    r"""
+    Generates random noise on an observable by a Negative Binomial :math:`NB`.
+    References to the negative binomial can be found `here <https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/NCSS/Negative_Binomial_Regression.pdf>`_
+    .
+
+    .. math::
+        O &\sim NB(\mu=datapoint,\alpha)
+    
+    We keep the alpha parameter low to obtain a small variance which should than always be approximately the size of the mean.
+
+    Parameters
+    ----------
+    df : new_cases , pandas.DataFrame
+        Observable on which we want to add the noise
+
+    noise_factor: :math:`\alpha`
+        Alpha factor for the random number generation
+
+    Returns
+    -------
+    array : 1-dim
+        observable with added noise
+    """
+
+    def convert(mu, alpha):
+        r = 1 / alpha
+        p = mu / (mu + r)
+        return r, 1 - p
+
+    # Apply noise on every column
+    for column in df:
+        # Get values
+        array = df[column].to_numpy()
+
+        for i in range(len(array)):
+            if (array[i] == 0) or (np.isnan(array[i])):
+                continue
+            log.debug(f"Data {array[i]}")
+            r, p = convert(array[i], noise_factor)
+            log.info(f"n {r}, p {p}")
+            mean, var = nbinom.stats(r, p, moments="mv")
+            log.debug(f"mean {mean} var {var}")
+            array[i] = nbinom.rvs(r, p)
+            log.debug(f"Drawn {array[i]}")
+
+        df[column] = array
+
+    return df

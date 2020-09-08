@@ -48,6 +48,8 @@ from covid19_npis.model.distributions import (
     Deterministic,
     Gamma,
     HalfCauchy,
+    Normal,
+    LogNormal,
 )
 
 
@@ -180,22 +182,32 @@ def test_model(modelParams):
     N = tf.reshape(N, event_shape)
     log.debug(f"N:\n{N}")
     # Calculate new cases
-    new_cases = covid19_npis.model.InfectionModel(
+    new_I_t = covid19_npis.model.InfectionModel(
         N=N, h_0_t=h_0_t, R_t=R_t, C=C, gen_kernel=gen_kernel  # default valueOp:AddV2
     )
-    log.debug(f"new_cases:\n{new_cases[0,:]}")  # dimensons=t,c,a
+    log.debug(f"new_I_t:\n{new_I_t[0,:]}")  # dimensons=t,c,a
 
     # Clip in order to avoid infinities
-    new_cases = tf.clip_by_value(new_cases, 1e-7, 1e9)
+    new_I_t = tf.clip_by_value(new_I_t, 1e-7, 1e9)
 
-    new_cases = yield Deterministic(
-        name="new_cases",
-        value=new_cases,
+    new_I_t = yield Deterministic(
+        name="new_I_t",
+        value=new_I_t,
         shape=modelParams.data_tensor.shape,
         shape_label=("time", "country", "age_group"),
     )
 
-    likelihood = yield covid19_npis.model.studentT_likelihood(modelParams, new_cases)
+    mean_delay = yield LogNormal(
+        name="mean_delay",
+        loc=np.log(12),
+        scale=0.1,
+        event_shape=(modelParams.num_countries, 1),
+    )
+
+    # kernel =
+    # new_cases = covid19_npis.model.utils.convolution_with_fixed_kernel(new_I_t, )
+
+    likelihood = yield covid19_npis.model.studentT_likelihood(modelParams, new_I_t)
 
     return likelihood
 
@@ -206,8 +218,8 @@ def test_model(modelParams):
 begin_time = time.time()
 trace = pm.sample(
     test_model(modelParams),
-    num_samples=200,
-    burn_in=400,
+    num_samples=100,
+    burn_in=200,
     use_auto_batching=False,
     num_chains=2,
     xla=True,
@@ -255,20 +267,20 @@ for name in dist_names:
 
 """ ## Plot time series
 """
-ts_names = ["new_cases", "R_t"]
+ts_names = ["new_I_t", "R_t"]
 ts_fig = {}
 for name in ts_names:
     ts_fig[name] = covid19_npis.plot.timeseries(
-        trace, sample_state=sample_state, key="new_cases"
+        trace, sample_state=sample_state, key="new_I_t"
     )
     # plot data into new_cases
-    if name == "new_cases":
+    if name == "new_I_t":
         for i, c in enumerate(modelParams.data_summary["countries"]):
             for j, a in enumerate(modelParams.data_summary["age_groups"]):
-                ts_fig["new_cases"][j][i] = covid19_npis.plot.time_series._timeseries(
+                ts_fig["new_I_t"][j][i] = covid19_npis.plot.time_series._timeseries(
                     modelParams.dataframe.index[:],
                     modelParams.dataframe[(c, a)].to_numpy()[:],
-                    ax=ts_fig["new_cases"][j][i],
+                    ax=ts_fig["new_I_t"][j][i],
                     alpha=0.5,
                 )
     # Save figure

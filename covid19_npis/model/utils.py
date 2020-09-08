@@ -392,7 +392,7 @@ def convolution_with_fixed_kernel(
     Convolve data with a time independent kernel. The returned shape is equal to the shape
     of data. In order avoid constructing a time_length x time_length kernel, the data
     is decomposed in overlapping frames, with a stride of `padding`, allowing to construct
-    a only padding x time_lenght sized kernel.
+    a only padding x time_length sized kernel.
 
     Parameters
     ----------

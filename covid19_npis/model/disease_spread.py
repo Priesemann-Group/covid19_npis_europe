@@ -5,8 +5,10 @@ from .utils import gamma
 import numpy as np
 import tensorflow_probability as tfp
 
+
 from covid19_npis import transformations
 from covid19_npis.model.distributions import HalfCauchy, Normal, Gamma
+
 
 log = logging.getLogger(__name__)
 
@@ -88,7 +90,7 @@ def construct_h_0_t(
         h_0_t_mean[i] = I_t
     h_0_t_mean = tf.stack(h_0_t_mean, axis=-3) / len_gen_interv_kernel
     h_0_t_mean = tf.clip_by_value(h_0_t_mean, 1e-5, 1e6)
-    log.debug(f"h_0_t_mean:\n{h_0_t_mean}")
+    log.debug(f"h_0_t_mean:\n{h_0_t_mean.shape}")
 
     h_0_base = h_0_t_mean[..., 0:1, :, :] * tf.exp(
         (
@@ -96,8 +98,8 @@ def construct_h_0_t(
                 "I_0_diff_base",
                 loc=0.0,
                 scale=3.0,
-                conditionally_independent=False,
-                event_stack=tuple(h_0_t_mean[..., 0:1, :, :].shape),
+                conditionally_independent=True,
+                event_stack=tuple(h_0_t_mean[..., 0:1, :, :].shape[-3:]),
             )
         ),
     )
@@ -108,11 +110,15 @@ def construct_h_0_t(
                 "I_0_diff_add",
                 loc=0.0,
                 scale=1.0,
-                conditionally_independent=False,
-                event_stack=tuple(h_0_mean_diff.shape),
+                conditionally_independent=True,
+                event_stack=tuple(h_0_mean_diff.shape[-3:]),
             )
         ),
     )
+    log.debug(f"h_0_base:\n{h_0_base.shape}")
+    log.debug(f"h_0_base_add:\n{h_0_base_add.shape}")
+    log.debug(f"R_t:\n{R_t.shape}")
+
     h_0_t_rand = tf.math.cumsum(
         tf.concat([h_0_base, h_0_base_add,], axis=-3,), axis=-3
     )  # shape:  batch_dims x len_gen_interv_kernel x countries x age_groups
@@ -121,9 +127,10 @@ def construct_h_0_t(
         h_0_t_rand = tf.transpose(h_0_t_rand, perm=(1, 0, 2, 3))
     # Now: shape:  len_gen_interv_kernel x batch_dims x countries x age_groups
 
-    log.debug(f"h_0_t_rand:\n{h_0_t_rand}")
+    log.debug(f"h_0_t_rand:\n{h_0_t_rand.shape}")
     h_0_t = []
     batch_shape = R_t.shape[1:-2]
+    log.debug(f"batch_shape:\n{batch_shape}")
     total_len = R_t.shape[0]
     age_shape = R_t.shape[-1:]
     for i, i_begin in enumerate(i_sim_begin_list):

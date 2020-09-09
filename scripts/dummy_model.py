@@ -199,7 +199,7 @@ def test_model(modelParams):
 
     mean_delay = yield LogNormal(
         name="mean_delay",
-        loc=np.log(12),
+        loc=np.log(12, dtype="float32"),
         scale=0.1,
         event_shape=(modelParams.num_countries, 1),
     )
@@ -248,13 +248,7 @@ _, sample_state = pm.evaluate_model(test_model(modelParams))
 
 # Plot by name.
 # TODO:ADD THE R_T DISTRIBUTIONS i.e. alpha, d, l, sigma as deterministics
-dist_names = [
-    "R_0",
-    "I_0_diff_base",
-    "g_mu",
-    "g_theta",
-    "sigma",
-]
+dist_names = ["R_0", "I_0_diff_base", "g_mu", "g_theta", "sigma", "alpha_i_c_a"]
 
 dist_fig = {}
 for name in dist_names:

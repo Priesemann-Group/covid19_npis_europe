@@ -295,6 +295,13 @@ def construct_R_t(R_0, modelParams):
         alpha[i_name] = tf.math.sigmoid(alpha_cross_i_c_a)
         log.debug(f"Alpha_{i_name}\n{alpha[i_name]}")
 
+    alpha_i_c_a = yield Deterministic(
+        name="alpha_i_c_a",
+        value=tf.stack([alpha[key] for key in alpha], axis=-3),
+        shape=(len(alpha), modelParams.num_countries, modelParams.num_age_groups,),
+        shape_label=("intervention", "country", "age_group"),
+    )
+
     """ Construct l_{i,sign}
         Create length of the changepoints
     """

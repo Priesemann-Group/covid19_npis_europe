@@ -6,6 +6,7 @@ from .utils import (
     get_model_name_from_sample_state,
     get_dist_by_name_from_sample_state,
     check_for_shape_and_shape_label,
+    get_math_from_name,
 )
 
 import numpy as np
@@ -164,7 +165,16 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
             # Flatten chains and other sampling dimensions of df into one array
             array_posterior = posterior.to_numpy().flatten()
             array_prior = prior.to_numpy().flatten()
-            return _distribution(array_posterior, array_prior, dist.name, "x", ax=ax)
+            return (
+                fig,
+                _distribution(
+                    array_posterior=array_posterior,
+                    array_prior=array_prior,
+                    dist_name=dist.name,
+                    dist_math=get_math_from_name(dist.name),
+                    ax=ax,
+                ),
+            )
         else:
             for i, value in enumerate(
                 posterior.index.get_level_values(label1).unique()
@@ -173,10 +183,10 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
                 array_posterior = posterior.xs(value, level=label1).to_numpy().flatten()
                 array_prior = prior.xs(value, level=label1).to_numpy().flatten()
                 ax[i] = _distribution(
-                    array_posterior,
-                    array_prior,
-                    dist.name,
-                    "x",
+                    array_posterior=array_posterior,
+                    array_prior=array_prior,
+                    dist_name=dist.name,
+                    dist_math=get_math_from_name(dist.name),
                     ax=ax[i],
                     suffix=f"{i}",
                 )
@@ -185,7 +195,7 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
             for i in range(cols):
                 ax[i].set_xlabel(posterior.index.get_level_values(label1).unique()[i])
 
-            return ax
+            return fig, ax
 
     def dist_ndim_2():
 
@@ -220,10 +230,10 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
                 )
 
                 ax[j][i] = _distribution(
-                    arry_posterior,
-                    array_prior,
-                    dist.name,
-                    "x",
+                    array_posterior=arry_posterior,
+                    array_prior=array_prior,
+                    dist_name=dist.name,
+                    dist_math=get_math_from_name(dist.name),
                     ax=ax[j][i],
                     suffix=f"{i},{j}",
                 )
@@ -235,20 +245,27 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
         for i in range(rows):
             ax[i][0].set_ylabel(posterior.index.get_level_values(label2).unique()[i])
 
-        return ax
+        return fig, ax
 
     def dist_ndim_3():
-        return "TODO"
+        return "TODO", "TODO"
 
     # ------------------------------------------------------------------------------ #
     # CASES
     # ------------------------------------------------------------------------------ #
     if ndim == 1:
-        return dist_ndim_1()
+        fig, axes = dist_ndim_1()
     elif ndim == 2:
-        return dist_ndim_2()
+        fig, axes = dist_ndim_2()
     elif ndim == 3:
-        return dist_ndim_3()
+        fig, axes = dist_ndim_3()
+        return
+    # ------------------------------------------------------------------------------ #
+    # Titles and other
+    # ------------------------------------------------------------------------------ #
+    fig.suptitle(key)
+
+    return axes
 
 
 def _distribution(

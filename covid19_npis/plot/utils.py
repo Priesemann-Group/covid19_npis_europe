@@ -2,10 +2,11 @@
 # @Author:        Sebastian B. Mohr
 # @Email:
 # @Created:       2020-08-17 10:35:59
-# @Last Modified: 2020-08-17 12:41:54
+# @Last Modified: 2020-09-09 11:43:37
 # ------------------------------------------------------------------------------ #
 
 import logging
+import json
 
 log = logging.getLogger(__name__)
 
@@ -38,3 +39,39 @@ def check_for_shape_and_shape_label(dist):
         log.warning(
             f"'shape' not found in distribution {dist.name}, could yield to strange behaviour in plotting!"
         )
+
+
+def get_math_from_name(name):
+    """
+        Gets math string from distribution name.
+        Returns "name" if no mathkey is found!
+
+        Parameters
+        ----------
+        name : 
+            Name of the distribution/timeseries.
+        
+        Returns
+        -------
+        : str
+            Mathstring for plotting
+    """
+
+    # Latex $..$ get casted before plotting
+    math_keys = {
+        "g_mu": r"g_{\mu}",
+        "g_theta": r"g_{\theta}",
+        "I_0_diff_base": r"I_{0,\text{diff base}}",
+        "R_0": r"R_{0}",
+        "sigma": r"\sigma",
+        "new_cases": r"N",
+        "R_t": r"R_{t}",
+    }
+
+    if name not in math_keys:
+        log.warning(
+            f"Math key for distribution with name '{name}' not found! Expect strange behaviour."
+        )
+        return name
+    else:
+        return math_keys[name]

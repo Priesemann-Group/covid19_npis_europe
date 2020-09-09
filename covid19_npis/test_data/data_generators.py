@@ -180,10 +180,11 @@ def test_data(**in_params):
 
 def save_data(path, **params):
     """
-    Main entry point to generate test data. Passes params to generate function
-    and adds random noise to new cases.
+        Main entry point to generate test data. Passes params to generate function
+        and adds random noise to new cases.
 
-    Creates folder structure for two test countries.
+        Creates folder structure for two test countries and saves the generated
+        data to csv files.
     """
     new_cases, R_t, interv = test_data(**params)
 

@@ -59,7 +59,10 @@ def timeseries(trace, sample_state, key, plot_observed=False):
         df = df.unstack(level="time").T
         df.index = df.index.droplevel(0)
         # Plot model
-        return _timeseries(df.index, df.to_numpy(), what="model")
+        fig, axes = plt.subplots(1, 1, figsize=(6, 3))
+        axes = _timeseries(df.index, df.to_numpy(), ax=axes, what="model")
+
+        return fig, axes
 
     def timeseries_ndim_2():
         """
@@ -82,7 +85,7 @@ def timeseries(trace, sample_state, key, plot_observed=False):
             # Plot model
             axes[i] = _timeseries(df_t.index, df_t.to_numpy(), ax=axes[i], what="model")
             # Plot data
-        return axes
+        return fig, axes
 
     def timeseries_ndim_3():
         if hasattr(dist, "shape_label"):
@@ -125,17 +128,24 @@ def timeseries(trace, sample_state, key, plot_observed=False):
         for i in range(cols):
             axes[0][i].set_title(df.index.get_level_values(label1).unique()[i])
 
-        return axes
+        return fig, axes
 
     # ------------------------------------------------------------------------------ #
     # CASES
     # ------------------------------------------------------------------------------ #
     if ndim == 1:
-        return timeseries_ndim_1()
+        fig, axes = timeseries_ndim_1()
     elif ndim == 2:
-        return timeseries_ndim_2()
+        fig, axes = timeseries_ndim_2()
     elif ndim == 3:
-        return timeseries_ndim_3()
+        fig, axes = timeseries_ndim_3()
+
+    # ------------------------------------------------------------------------------ #
+    # Title and other
+    # ------------------------------------------------------------------------------ #
+    fig.suptitle(key)
+
+    return axes
 
 
 def _timeseries(

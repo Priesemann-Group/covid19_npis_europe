@@ -256,6 +256,7 @@ for name in dist_names:
         trace, trace_prior, sample_state=sample_state, key=name
     )
     # Save figure
+    plt.tight_layout()
     plt.savefig("figures/dist_" + name + ".pdf", dpi=300, transparent=True)
 
 

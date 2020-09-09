@@ -248,7 +248,57 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
         return fig, ax
 
     def dist_ndim_3():
-        return "TODO", "TODO"
+        # In the default case: label2 should be country and label3 should age_group
+        if hasattr(dist, "shape_label"):
+            label1, label2, label3 = dist.shape_label
+        else:
+            label1 = model_name + "/" + dist.name + "_dim_0"
+            label2 = model_name + "/" + dist.name + "_dim_1"
+            label3 = model_name + "/" + dist.name + "_dim_2"
+
+        # First label is rows
+        # Second label is columns
+        z, cols, rows = dist.shape
+        cols = cols
+        rows = rows * z
+
+        fig, ax = plt.subplots(rows, cols, figsize=(5 / 3 * cols, rows * 2),)
+        for i, value1 in enumerate(posterior.index.get_level_values(label1).unique()):
+            for j, value2 in enumerate(
+                posterior.index.get_level_values(label2).unique()
+            ):  # Cols
+                for k, value3 in enumerate(
+                    posterior.index.get_level_values(label3).unique()
+                ):  # Rows
+                    # Select values from datafram
+                    arry_posterior = (
+                        select_from_dataframe(
+                            posterior,
+                            **{label1: value1, label2: value2, label3: value3},
+                        )
+                        .to_numpy()
+                        .flatten()
+                    )
+                    array_prior = (
+                        select_from_dataframe(
+                            prior, **{label1: value1, label2: value2, label3: value3}
+                        )
+                        .to_numpy()
+                        .flatten()
+                    )
+
+                    # Flatten to 2d
+                    ax[k + rows * i][j] = _distribution(
+                        array_posterior=arry_posterior,
+                        array_prior=array_prior,
+                        dist_name=dist.name,
+                        dist_math=get_math_from_name(dist.name),
+                        ax=ax[k + rows * i][j],
+                        suffix=f"{j},{k + rows * i}",
+                    )
+                    ax[k + rows * i][j].set_title(f"{value1}\n{value2}\n{value3}")
+
+        return fig, ax
 
     # ------------------------------------------------------------------------------ #
     # CASES
@@ -259,7 +309,6 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
         fig, axes = dist_ndim_2()
     elif ndim == 3:
         fig, axes = dist_ndim_3()
-        return
     # ------------------------------------------------------------------------------ #
     # Titles and other
     # ------------------------------------------------------------------------------ #

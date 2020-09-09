@@ -1,5 +1,5 @@
 import logging
-from .reproduction_number import Change_point, get_R_t
+from .reproduction_number import Change_point
 import numpy as np
 from scipy.stats import gamma, nbinom
 from scipy.special import binom

@@ -158,6 +158,11 @@ def convert_trace_to_dataframe(trace, sample_state, key):
             modelParams.modelParams.data_summary["age_groups"], level="age_group_j"
         )
 
+    if r"intervention" in df.index.names:
+        df.index = df.index.set_levels(
+            modelParams.modelParams.data_summary["interventions"], level="intervention"
+        )
+
     # Convert time index to datetime starting at model begin
     if r"time" in df.index.names:
         df.index = df.index.set_levels(

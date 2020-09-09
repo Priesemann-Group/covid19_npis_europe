@@ -69,6 +69,14 @@ class ModelParams:
                 _df = country.data_new_cases
         self._dataframe = _df
 
+        # Join all interventions dataframes
+        for i, country in enumerate(self.countries):
+            if i > 0:
+                _int = _int.join(country.data_interventions)
+            else:
+                _int = country.data_interventions
+        self._interventions = _int
+
         """ # Update Data summary
         """
         data = {  # Is set on init
@@ -76,6 +84,7 @@ class ModelParams:
             "end": _df.index.max(),
             "age_groups": [],
             "countries": [],
+            "interventions": [],
         }
         # Create countries lookup list dynamic from data dataframe
         for i in range(len(_df.columns.levels[0])):
@@ -83,6 +92,10 @@ class ModelParams:
         # Create age group list dynamic from data dataframe
         for i in range(len(_df.columns.levels[1])):
             data["age_groups"].append(_df.columns.levels[1][i])
+        # Create interventions list dynamic from interventions dataframe
+        for i in range(len(_int.columns.levels[1])):
+            data["interventions"].append(_int.columns.levels[1][i])
+
         self._data_summary = data
 
         """ # Update Data Tensor

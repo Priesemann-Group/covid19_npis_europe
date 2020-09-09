@@ -21,15 +21,3 @@ def gamma_from_delta_t(t, begin, delta_t):
     sigmoid = 1.0 / (1.0 + np.exp(((t - begin) / delta_t * 4)))
 
     return sigmoid / np.linalg.norm(sigmoid, 1)
-
-
-def get_R_t(times, R_0, cps):
-
-    for t in times:
-        print(t.shape)
-        _sum = 0
-        for cp in cps:
-            alpha = np.expand_dims(cp.alpha, axis=-1)
-            _sum += alpha * cp.get_gamma(t)
-        R_t = np.append(R_t, [R_0 * np.exp(-_sum)], axis=0)
-    return R_t

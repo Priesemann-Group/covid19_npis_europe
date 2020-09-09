@@ -2,7 +2,7 @@
 # @Author:        Sebastian B. Mohr
 # @Email:
 # @Created:       2020-08-17 10:35:59
-# @Last Modified: 2020-09-09 11:43:37
+# @Last Modified: 2020-09-09 13:32:53
 # ------------------------------------------------------------------------------ #
 
 import logging
@@ -61,11 +61,12 @@ def get_math_from_name(name):
     math_keys = {
         "g_mu": r"g_{\mu}",
         "g_theta": r"g_{\theta}",
-        "I_0_diff_base": r"I_{0,\text{diff base}}",
+        "I_0_diff_base": r"I_{0,diff base}",
         "R_0": r"R_{0}",
         "sigma": r"\sigma",
         "new_cases": r"N",
         "R_t": r"R_{t}",
+        "alpha_i_c_a": r"\alpha_{i,c,a}",
     }
 
     if name not in math_keys:

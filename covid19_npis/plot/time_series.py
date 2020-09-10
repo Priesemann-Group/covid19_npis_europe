@@ -81,7 +81,9 @@ def timeseries(trace, sample_state, key, plot_observed=False):
         cols = 1
         rows = shape[1]  # not time
 
-        fig, axes = plt.subplots(rows, cols, figsize=(6, 3 * rows))
+        fig, axes = plt.subplots(
+            rows, cols, figsize=(6, 3 * rows), constrained_layout=True,
+        )
         for i, value in enumerate(df.index.get_level_values(label1).unique()):
             df_t = df.xs(value, level=label1)
             df_t = df_t.unstack(level="time").T
@@ -104,7 +106,9 @@ def timeseries(trace, sample_state, key, plot_observed=False):
         rows = shape[2]
 
         # Create figure
-        fig, axes = plt.subplots(rows, cols, figsize=(6 * cols, 3 * rows))
+        fig, axes = plt.subplots(
+            rows, cols, figsize=(6 * cols, 3 * rows), constrained_layout=True,
+        )
 
         # Loop threw all dimensions of variable
         for i, value1 in enumerate(df.index.get_level_values(label1).unique()):
@@ -148,9 +152,11 @@ def timeseries(trace, sample_state, key, plot_observed=False):
     # ------------------------------------------------------------------------------ #
     # Title and other
     # ------------------------------------------------------------------------------ #
-    fig.suptitle(key)
+    fig.suptitle(
+        key, verticalalignment="top", fontweight="bold",
+    )
 
-    return axes
+    return [fig], axes
 
 
 def _timeseries(

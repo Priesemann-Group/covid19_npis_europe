@@ -229,6 +229,7 @@ log.info("running time: {:.1f}s".format(end_time - begin_time))
 """ # Plotting
 """
 import matplotlib.pyplot as plt
+import pandas as pd
 
 """ ## Sample for prior plots and also covert to nice format
 """
@@ -244,36 +245,61 @@ _, sample_state = pm.evaluate_model(test_model(modelParams))
 
 
 # Plot by name.
-# TODO:ADD THE R_T DISTRIBUTIONS i.e. alpha, d, l, sigma as deterministics
+# TODO:ADD THE R_T DISTRIBUTIONS i.e. d, l, sigma as deterministics
 dist_names = ["R_0", "I_0_diff_base", "g_mu", "g_theta", "sigma", "alpha_i_c_a"]
 
 dist_fig = {}
+dist_axes = {}
 for name in dist_names:
-    dist_fig[name] = covid19_npis.plot.distribution(
+    dist_fig[name], dist_axes[name] = covid19_npis.plot.distribution(
         trace, trace_prior, sample_state=sample_state, key=name
     )
     # Save figure
-    plt.tight_layout()
-    plt.savefig("figures/dist_" + name + ".pdf", dpi=300, transparent=True)
+    for i, fig in enumerate(dist_fig[name]):
+        if len(dist_fig[name]) > 1:
+            subname = f"_{i}"
+        else:
+            subname = ""
+        fig.savefig(
+            f"figures/dist_{name}" + f"{subname}.pdf", dpi=300, transparent=True
+        )
 
 
 """ ## Plot time series
 """
 ts_names = ["new_I_t", "R_t"]
 ts_fig = {}
+ts_axes = {}
 for name in ts_names:
-    ts_fig[name] = covid19_npis.plot.timeseries(
+    ts_fig[name], ts_axes[name] = covid19_npis.plot.timeseries(
         trace, sample_state=sample_state, key=name
     )
     # plot data into new_cases
     if name == "new_I_t":
         for i, c in enumerate(modelParams.data_summary["countries"]):
             for j, a in enumerate(modelParams.data_summary["age_groups"]):
-                ts_fig["new_I_t"][j][i] = covid19_npis.plot.time_series._timeseries(
+                ts_axes["new_I_t"][j][i] = covid19_npis.plot.time_series._timeseries(
                     modelParams.dataframe.index[:],
                     modelParams.dataframe[(c, a)].to_numpy()[:],
-                    ax=ts_fig["new_I_t"][j][i],
+                    ax=ts_axes["new_I_t"][j][i],
                     alpha=0.5,
                 )
-    # Save figure
-    plt.savefig(f"figures/ts_{name}.pdf", dpi=300, transparent=True)
+
+    # plot R_t data into R_t plot --> testing
+    if name == "R_t":
+        # Load data
+        for i, c in enumerate(modelParams.data_summary["countries"]):
+            data = pd.read_csv(f"../data/test_country_{i+1}/reproduction_number.csv")
+            data["date"] = pd.to_datetime(data["date"], format="%d.%m.%y")
+            data = data.set_index("date")
+            for j, age_group in enumerate(data.columns):
+                ts_axes["R_t"][j][i] = covid19_npis.plot.time_series._timeseries(
+                    data.index, data[age_group], ax=ts_axes["R_t"][j][i], alpha=0.5,
+                )
+    # Save figures
+    for i, fig in enumerate(ts_fig[name]):
+        if len(ts_fig[name]) > 1:
+            subname = f"_{i}"
+        else:
+            subname = ""
+        fig.savefig(f"figures/ts_{name}" + f"{subname}.pdf", dpi=300, transparent=True)

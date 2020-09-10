@@ -158,13 +158,18 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
         else:
             label1 = f"{model_name}/{dist.name}_dim_0"
 
-        fig, ax = plt.subplots(rows, cols, figsize=(4.5 / 3 * cols, rows * 1))
+        fig, ax = plt.subplots(
+            rows,
+            cols,
+            figsize=(4.5 / 3 * cols, rows * 1 + 0.2),
+            constrained_layout=True,
+        )
         if rows == 1:
             # Flatten chains and other sampling dimensions of df into one array
             array_posterior = posterior.to_numpy().flatten()
             array_prior = prior.to_numpy().flatten()
             return (
-                fig,
+                [fig],
                 _distribution(
                     array_posterior=array_posterior,
                     array_prior=array_prior,
@@ -190,10 +195,13 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
                 )
 
             # Set labels on y-axis
-            for i in range(cols):
-                ax[i].set_xlabel(posterior.index.get_level_values(label1).unique()[i])
+            for i in range(rows):
+                ax[i].set_title(posterior.index.get_level_values(label1).unique()[i])
 
-            return fig, ax
+            fig.suptitle(
+                f"{key}", verticalalignment="top", fontweight="bold",
+            )
+            return [fig], ax
 
     def dist_ndim_2():
 
@@ -209,7 +217,10 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
         cols, rows = shape
 
         fig, ax = plt.subplots(
-            rows, cols, figsize=(4.5 / 3 * cols, rows * 1), constrained_layout=True,
+            rows,
+            cols,
+            figsize=(4.5 / 3 * cols, rows * 1 + 0.2),
+            constrained_layout=True,
         )
         for i, value1 in enumerate(posterior.index.get_level_values(label1).unique()):
             for j, value2 in enumerate(
@@ -244,7 +255,10 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
         for i in range(rows):
             ax[i][0].set_ylabel(posterior.index.get_level_values(label2).unique()[i])
 
-        return fig, ax
+        fig.suptitle(
+            f"{key}", verticalalignment="top", fontweight="bold",
+        )
+        return [fig], ax
 
     def dist_ndim_3():
         # In the default case: label2 should be country and label3 should age_group
@@ -257,18 +271,25 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
 
         # First label is rows
         # Second label is columns
-        z, cols, rows = shape
+        num_figs, cols, rows = shape
         cols = cols
-        rows = rows * z
-
-        fig, ax = plt.subplots(rows, cols, figsize=(5 / 3 * cols, rows * 2),)
-        for i, value1 in enumerate(posterior.index.get_level_values(label1).unique()):
-            for j, value2 in enumerate(
+        rows = rows
+        # Create a new figure for each dim_0 entry
+        figs = []
+        axes = []
+        for f, value1 in enumerate(posterior.index.get_level_values(label1).unique()):
+            fig, ax = plt.subplots(
+                rows,
+                cols,
+                figsize=(4.5 / 3 * cols, rows * 1 + 0.2),
+                constrained_layout=True,
+            )
+            for i, value2 in enumerate(
                 posterior.index.get_level_values(label2).unique()
-            ):  # Cols
-                for k, value3 in enumerate(
+            ):
+                for j, value3 in enumerate(
                     posterior.index.get_level_values(label3).unique()
-                ):  # Rows
+                ):
                     # Select values from datafram
                     arry_posterior = (
                         select_from_dataframe(
@@ -278,6 +299,7 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
                         .to_numpy()
                         .flatten()
                     )
+
                     array_prior = (
                         select_from_dataframe(
                             prior, **{label1: value1, label2: value2, label3: value3}
@@ -286,34 +308,33 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
                         .flatten()
                     )
 
-                    # Flatten to 2d
-                    ax[k + rows * i][j] = _distribution(
+                    ax[j][i] = _distribution(
                         array_posterior=arry_posterior,
                         array_prior=array_prior,
                         dist_name=dist.name,
                         dist_math=get_math_from_name(dist.name),
-                        ax=ax[k + rows * i][j],
-                        suffix=f"{j},{k + rows * i}",
+                        ax=ax[j][i],
+                        suffix=f"{i},{j}",
                     )
-                    ax[k + rows * i][j].set_title(f"{value1}\n{value2}\n{value3}")
+            fig.suptitle(
+                f"{key} {value1}", verticalalignment="top", fontweight="bold",
+            )
+            figs.append(fig)
+            axes.append(ax)
 
-        return fig, ax
+        return figs, axes
 
     # ------------------------------------------------------------------------------ #
     # CASES
     # ------------------------------------------------------------------------------ #
     if len(shape) == 1:
-        fig, axes = dist_ndim_1()
+        figs, axes = dist_ndim_1()
     elif len(shape) == 2:
-        fig, axes = dist_ndim_2()
+        figs, axes = dist_ndim_2()
     elif len(shape) == 3:
-        fig, axes = dist_ndim_3()
-    # ------------------------------------------------------------------------------ #
-    # Titles and other
-    # ------------------------------------------------------------------------------ #
-    fig.suptitle(key)
+        figs, axes = dist_ndim_3()
 
-    return axes
+    return figs, axes
 
 
 def _distribution(
@@ -392,7 +413,6 @@ def _distribution(
     # ------------------------------------------------------------------------------ #
     ax.xaxis.set_label_position("top")
     # ax.set_xlabel(dist["name"] + suffix)
-    ax.set_xlim(0)
 
     ax.tick_params(labelleft=False)
     ax.set_rasterization_zorder(rcParams.rasterization_zorder)

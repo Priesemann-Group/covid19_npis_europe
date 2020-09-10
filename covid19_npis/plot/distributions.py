@@ -274,6 +274,7 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
         num_figs, cols, rows = shape
         cols = cols
         rows = rows
+        print(shape)
         # Create a new figure for each dim_0 entry
         figs = []
         axes = []
@@ -308,14 +309,42 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
                         .flatten()
                     )
 
-                    ax[j][i] = _distribution(
-                        array_posterior=arry_posterior,
-                        array_prior=array_prior,
-                        dist_name=dist.name,
-                        dist_math=get_math_from_name(dist.name),
-                        ax=ax[j][i],
-                        suffix=f"{i},{j}",
-                    )
+                    if (cols == 1) and (rows == 1):
+                        ax = _distribution(
+                            array_posterior=arry_posterior,
+                            array_prior=array_prior,
+                            dist_name=dist.name,
+                            dist_math=get_math_from_name(dist.name),
+                            ax=ax,
+                            suffix=f"{i},{j}",
+                        )
+                    elif rows == 1:
+                        ax[i] = _distribution(
+                            array_posterior=arry_posterior,
+                            array_prior=array_prior,
+                            dist_name=dist.name,
+                            dist_math=get_math_from_name(dist.name),
+                            ax=ax[i],
+                            suffix=f"{i},{j}",
+                        )
+                    elif cols == 1:
+                        ax[j] = _distribution(
+                            array_posterior=arry_posterior,
+                            array_prior=array_prior,
+                            dist_name=dist.name,
+                            dist_math=get_math_from_name(dist.name),
+                            ax=ax[j],
+                            suffix=f"{i},{j}",
+                        )
+                    else:
+                        ax[j][i] = _distribution(
+                            array_posterior=arry_posterior,
+                            array_prior=array_prior,
+                            dist_name=dist.name,
+                            dist_math=get_math_from_name(dist.name),
+                            ax=ax[j][i],
+                            suffix=f"{i},{j}",
+                        )
             fig.suptitle(
                 f"{key} {value1}", verticalalignment="top", fontweight="bold",
             )

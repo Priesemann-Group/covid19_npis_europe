@@ -215,8 +215,8 @@ def test_model(modelParams):
 begin_time = time.time()
 trace = pm.sample(
     test_model(modelParams),
-    num_samples=100,
-    burn_in=200,
+    num_samples=200,
+    burn_in=400,
     use_auto_batching=False,
     num_chains=2,
     xla=True,
@@ -246,7 +246,16 @@ _, sample_state = pm.evaluate_model(test_model(modelParams))
 
 # Plot by name.
 # TODO:ADD THE R_T DISTRIBUTIONS i.e. d, l, sigma as deterministics
-dist_names = ["R_0", "I_0_diff_base", "g_mu", "g_theta", "sigma", "alpha_i_c_a"]
+dist_names = [
+    "R_0",
+    "I_0_diff_base",
+    "g_mu",
+    "g_theta",
+    "sigma",
+    "alpha_i_c_a",
+    "l_i,sign(Δγ)",
+    "d_i_c_p",
+]
 
 dist_fig = {}
 dist_axes = {}

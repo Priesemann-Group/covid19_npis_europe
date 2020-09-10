@@ -2,7 +2,7 @@
 # @Author:        Sebastian B. Mohr
 # @Email:
 # @Created:       2020-08-17 10:35:59
-# @Last Modified: 2020-09-10 12:08:54
+# @Last Modified: 2020-09-10 14:16:51
 # ------------------------------------------------------------------------------ #
 
 import logging
@@ -83,6 +83,7 @@ def get_math_from_name(name):
         "new_cases": r"N",
         "R_t": r"R_{t}",
         "alpha_i_c_a": r"\alpha_{i,c,a}",
+        "d_i_c_p": r"d_{i,c,p}",
     }
 
     if name not in math_keys:

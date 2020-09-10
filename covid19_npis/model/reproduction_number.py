@@ -295,6 +295,7 @@ def construct_R_t(R_0, modelParams):
         alpha[i_name] = tf.math.sigmoid(alpha_cross_i_c_a)
         log.debug(f"Alpha_{i_name}\n{alpha[i_name]}")
 
+    # Add to trace for plotting
     alpha_i_c_a = yield Deterministic(
         name="alpha_i_c_a",
         value=tf.stack([alpha[key] for key in alpha], axis=-3),
@@ -319,6 +320,13 @@ def construct_R_t(R_0, modelParams):
 
         length[i_name] = tf.math.softplus(l_cross_i_sign)
         log.debug(f"Length_{i_name}\n{length[i_name]}")
+
+    # Add to trace for plotting
+    l_i_sign = yield Deterministic(
+        name="l_i,sign(Δγ)",
+        value=tf.stack([length[key] for key in length], axis=-1),
+        shape_label=("intervention"),
+    )
 
     """ Construct d_i_c_p
         Create dates for each change point
@@ -349,6 +357,27 @@ def construct_R_t(R_0, modelParams):
                 # Add everything and append to dict
                 d[i_name][country.name].append(d_data + delta_d_i + delta_d_c_gather)
             log.debug(f"Date_{i_name}_{country.name}\n{d[i_name][country.name]}")
+
+    # Add to trace for plotting
+    # Nested tf.stack for change points, country and interventions
+    _d_temp = tf.stack(
+        [
+            tf.stack(
+                [
+                    tf.stack([d_p for d_p in d[i_name][country.name]], axis=-1)
+                    for country in modelParams.countries
+                ],
+                axis=-1,
+            )
+            for i_name, intervention in interventions.items()
+        ],
+        axis=-1,
+    )
+    d_i_c_p = yield Deterministic(
+        name="d_i_c_p",
+        value=_d_temp,
+        shape_label=("intervention", "country", "change_point"),
+    )
 
     """ Construct gamma_i_c_p
         Loop over interventions countries changepoints

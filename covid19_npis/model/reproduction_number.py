@@ -298,7 +298,6 @@ def construct_R_t(R_0, modelParams):
     alpha_i_c_a = yield Deterministic(
         name="alpha_i_c_a",
         value=tf.stack([alpha[key] for key in alpha], axis=-3),
-        shape=(len(alpha), modelParams.num_countries, modelParams.num_age_groups,),
         shape_label=("intervention", "country", "age_group"),
     )
 
@@ -406,14 +405,7 @@ def construct_R_t(R_0, modelParams):
     log.debug(f"R_eff\n{R_eff}")
 
     R_t = yield Deterministic(
-        name="R_t",
-        value=R_eff,
-        shape=(
-            modelParams.length,
-            modelParams.num_countries,
-            modelParams.num_age_groups,
-        ),
-        shape_label=("time", "country", "age_group"),
+        name="R_t", value=R_eff, shape_label=("time", "country", "age_group"),
     )
 
     R_t = tf.einsum("...tca -> t...ca", R_t)

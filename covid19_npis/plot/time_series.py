@@ -3,7 +3,8 @@ from ..data import convert_trace_to_dataframe, select_from_dataframe
 from .utils import (
     get_model_name_from_sample_state,
     get_dist_by_name_from_sample_state,
-    check_for_shape_and_shape_label,
+    check_for_shape_label,
+    get_shape_from_dataframe,
 )
 from .. import modelParams
 
@@ -39,15 +40,18 @@ def timeseries(trace, sample_state, key, plot_observed=False):
         Do you want to plot the new cases? May not work for 1 and 2 dim case.
     """
 
+    log.info(f"Creating timeseries plot for {key}")
+
+    # Convert trace to dataframe
     df = convert_trace_to_dataframe(trace, sample_state, key)
+
+    # Get other important properties
     model_name = get_model_name_from_sample_state(sample_state)
     dist = get_dist_by_name_from_sample_state(sample_state, key)
-    check_for_shape_and_shape_label(dist)
+    check_for_shape_label(dist)
+
+    shape = get_shape_from_dataframe(df)
     # Determine ndim:
-    if isinstance(dist.shape, int):
-        ndim = 1
-    else:
-        ndim = len(dist.shape)
 
     def timeseries_ndim_1():
         """
@@ -75,7 +79,7 @@ def timeseries(trace, sample_state, key, plot_observed=False):
             time = model_name + "/" + dist.name + "_dim_0"
             label1 = model_name + "/" + dist.name + "_dim_1"
         cols = 1
-        rows = dist.shape[1]  # not time
+        rows = shape[1]  # not time
 
         fig, axes = plt.subplots(rows, cols, figsize=(6, 3 * rows))
         for i, value in enumerate(df.index.get_level_values(label1).unique()):
@@ -95,8 +99,9 @@ def timeseries(trace, sample_state, key, plot_observed=False):
             label1 = model_name + "/" + dist.name + "_dim_1"
             label2 = model_name + "/" + dist.name + "_dim_2"
 
-        cols = dist.shape[1]
-        rows = dist.shape[2]
+        # shape[0] == time
+        cols = shape[1]
+        rows = shape[2]
 
         # Create figure
         fig, axes = plt.subplots(rows, cols, figsize=(6 * cols, 3 * rows))
@@ -133,11 +138,11 @@ def timeseries(trace, sample_state, key, plot_observed=False):
     # ------------------------------------------------------------------------------ #
     # CASES
     # ------------------------------------------------------------------------------ #
-    if ndim == 1:
+    if len(shape) == 1:
         fig, axes = timeseries_ndim_1()
-    elif ndim == 2:
+    elif len(shape) == 2:
         fig, axes = timeseries_ndim_2()
-    elif ndim == 3:
+    elif len(shape) == 3:
         fig, axes = timeseries_ndim_3()
 
     # ------------------------------------------------------------------------------ #

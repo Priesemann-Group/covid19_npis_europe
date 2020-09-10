@@ -39,13 +39,6 @@ class DistributionAdditions:
             self.shape_label = kwargs.get("shape_label")
             del kwargs["shape_label"]
 
-        if "event_stack" in kwargs:
-            self.shape = kwargs.get("event_stack")
-
-        if "shape" in kwargs:
-            self.shape = kwargs.get("shape")
-            del kwargs["shape"]
-
         if "transformation" in kwargs and "shape" in kwargs:
             if kwargs["transformation"]._reinterpreted_batch_ndims != len(self.shape):
                 log.warning(

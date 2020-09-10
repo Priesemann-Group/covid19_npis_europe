@@ -191,10 +191,7 @@ def test_model(modelParams):
     new_I_t = tf.clip_by_value(new_I_t, 1e-7, 1e9)
 
     new_I_t = yield Deterministic(
-        name="new_I_t",
-        value=new_I_t,
-        shape=modelParams.data_tensor.shape,
-        shape_label=("time", "country", "age_group"),
+        name="new_I_t", value=new_I_t, shape_label=("time", "country", "age_group"),
     )
 
     mean_delay = yield LogNormal(

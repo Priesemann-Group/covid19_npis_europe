@@ -5,8 +5,9 @@ from .. import modelParams
 from .utils import (
     get_model_name_from_sample_state,
     get_dist_by_name_from_sample_state,
-    check_for_shape_and_shape_label,
+    check_for_shape_label,
     get_math_from_name,
+    get_shape_from_dataframe,
 )
 
 import numpy as np
@@ -133,24 +134,23 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
         one figure for each country
 
     """
+    log.info(f"Creating distibution plot for {key}")
 
     # Get prior and posterior data for key
-    log.info(f"Creating distibution plot for {key}")
     posterior = convert_trace_to_dataframe(trace_posterior, sample_state, key)
     prior = convert_trace_to_dataframe(trace_prior, sample_state, key)
+
+    # Get other model parameters which we need
     model_name = get_model_name_from_sample_state(sample_state)
     dist = get_dist_by_name_from_sample_state(sample_state, key)
-    check_for_shape_and_shape_label(dist)
+    check_for_shape_label(dist)
 
-    # Get ndim of distribution i.e. event stack ndim
-    if isinstance(dist.shape, int):
-        ndim = 1
-    else:
-        ndim = len(dist.shape)
+    # Get shape from data, should be the same for posterior and prior
+    shape = get_shape_from_dataframe(posterior)
 
     def dist_ndim_1():
         # E.g. only age groups or only one value over all age groups
-        rows = dist.shape
+        rows = shape[0]
         cols = 1
 
         if hasattr(dist, "shape_label"):
@@ -158,9 +158,7 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
         else:
             label1 = f"{model_name}/{dist.name}_dim_0"
 
-        fig, ax = plt.subplots(
-            rows, cols, figsize=(4.5 / 3 * cols, rows * 1), constrained_layout=True
-        )
+        fig, ax = plt.subplots(rows, cols, figsize=(4.5 / 3 * cols, rows * 1))
         if rows == 1:
             # Flatten chains and other sampling dimensions of df into one array
             array_posterior = posterior.to_numpy().flatten()
@@ -208,7 +206,7 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
 
         # First label is rows
         # Second label is columns
-        cols, rows = dist.shape
+        cols, rows = shape
 
         fig, ax = plt.subplots(
             rows, cols, figsize=(4.5 / 3 * cols, rows * 1), constrained_layout=True,
@@ -223,6 +221,7 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
                     .to_numpy()
                     .flatten()
                 )
+
                 array_prior = (
                     select_from_dataframe(prior, **{label1: value1, label2: value2})
                     .to_numpy()
@@ -258,7 +257,7 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
 
         # First label is rows
         # Second label is columns
-        z, cols, rows = dist.shape
+        z, cols, rows = shape
         cols = cols
         rows = rows * z
 
@@ -303,11 +302,11 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
     # ------------------------------------------------------------------------------ #
     # CASES
     # ------------------------------------------------------------------------------ #
-    if ndim == 1:
+    if len(shape) == 1:
         fig, axes = dist_ndim_1()
-    elif ndim == 2:
+    elif len(shape) == 2:
         fig, axes = dist_ndim_2()
-    elif ndim == 3:
+    elif len(shape) == 3:
         fig, axes = dist_ndim_3()
     # ------------------------------------------------------------------------------ #
     # Titles and other

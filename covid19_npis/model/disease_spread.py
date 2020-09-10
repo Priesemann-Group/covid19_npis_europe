@@ -258,7 +258,6 @@ def construct_generation_interval(
         concentration=g["mu"]["k"],
         rate=1.0 / g["mu"]["θ"],
         conditionally_independent=True,
-        shape=(1),
     )
 
     # g_mu = tf.constant(5.0)
@@ -276,7 +275,6 @@ def construct_generation_interval(
         concentration=g["θ"]["k"],
         rate=1.0 / g["θ"]["θ"],
         conditionally_independent=True,
-        shape=(1),
     )
 
     log.debug(f"g_mu:\n{g_mu}")

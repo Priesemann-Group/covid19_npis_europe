@@ -4,7 +4,7 @@ import pandas as pd
 log = logging.getLogger(__name__)
 from . import modelParams
 
-from .plot.utils import check_for_shape_and_shape_label
+from .plot.utils import check_for_shape_label, get_shape_from_dataframe
 
 
 def convert_trace_to_dataframe_list(trace, sample_state):
@@ -105,7 +105,7 @@ def convert_trace_to_dataframe(trace, sample_state, key):
         dist = sample_state.deterministics[model_name + "/" + key]
 
     # Check if it has shape and shape_label
-    check_for_shape_and_shape_label(dist)
+    check_for_shape_label(dist)
     # convert to dataframe
     df = data[f"{model_name}/{dist.name}"].to_dataframe()
     num_of_levels = len(df.index.levels)
@@ -121,10 +121,7 @@ def convert_trace_to_dataframe(trace, sample_state, key):
 
     The last 3 can shift up to the number of labels 
     """
-    if isinstance(dist.shape, (tuple, list)):
-        ndim = len(dist.shape)
-    else:
-        ndim = 1
+    ndim = len(get_shape_from_dataframe(df))
 
     # Rename dimensions if shape labels are present
     if hasattr(dist, "shape_label"):

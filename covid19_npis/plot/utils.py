@@ -2,7 +2,7 @@
 # @Author:        Sebastian B. Mohr
 # @Email:
 # @Created:       2020-08-17 10:35:59
-# @Last Modified: 2020-09-09 13:32:53
+# @Last Modified: 2020-09-10 12:08:54
 # ------------------------------------------------------------------------------ #
 
 import logging
@@ -26,18 +26,34 @@ def get_dist_by_name_from_sample_state(sample_state, name):
     return dist
 
 
-def check_for_shape_and_shape_label(dist):
+def get_shape_from_dataframe(df):
+    """
+    Returns shape tuple from dataframe.
+
+    Return
+    ------
+    tuple: int
+
+    """
+    # Ndim of the dataframe minus chain and samples
+    ndim = len(df.index.levels) - 2
+
+    shape = ()
+    if ndim == 0:
+        shape = (1,)
+    else:
+        for i in reversed(range(0, ndim)):
+            shape = shape + (len(df.index.levels[-1 - i]),)
+    log.debug(f"Found shape '{shape}' for dataframe '{df.columns[0]}'.")
+    return shape
+
+
+def check_for_shape_label(dist):
     try:
         shape_label = dist.shape_label
     except AttributeError:
         log.warning(
             f"'shape_label' not found in distribution {dist.name}, could yield to strange behaviour in plotting!"
-        )
-    try:
-        shape = dist.shape
-    except Exception as e:
-        log.warning(
-            f"'shape' not found in distribution {dist.name}, could yield to strange behaviour in plotting!"
         )
 
 

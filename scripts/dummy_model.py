@@ -166,7 +166,7 @@ def test_model(modelParams):
     for i in range(C.shape[-2]):
         col = tf.gather(C, i, axis=-1)
         summed = tf.reduce_sum(col, axis=-1)
-        normalized_col = col / tf.expand_dims(summed, axis=-1) * np.sqrt(2)
+        normalized_col = col / tf.expand_dims(summed, axis=-1)
         new_C.append(normalized_col)
 
     C = tf.stack(new_C)  # shape batch, age_group, country, age_group
@@ -255,8 +255,8 @@ def test_model(modelParams):
 begin_time = time.time()
 trace = pm.sample(
     test_model(modelParams),
-    num_samples=200,
-    burn_in=400,
+    num_samples=100,
+    burn_in=200,
     use_auto_batching=False,
     num_chains=2,
     xla=True,

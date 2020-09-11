@@ -467,12 +467,20 @@ def construct_R_0(name, loc, scale, hn_scale, modelParams):
         Returns
         -------
         :
-            Generator for R_0 
+            Generator for R_0 |shape| batch, country, age_group
     """
 
     R_0_star = yield Normal(
         name="R_0^*", loc=loc, scale=scale, conditionally_independent=True,
     )
+    log.info(f"R_0_star\n{R_0_star}")
+    sigma_R_0_c = yield HalfNormal(
+        name="sigma_R_0_c",
+        scale=hn_scale,
+        conditionally_independent=True,
+        transform=transformations.SoftPlus(scale=hn_scale),
+    )
+
     ΔR_0_c = (
         yield Normal(
             name="ΔR_0_c",
@@ -482,16 +490,13 @@ def construct_R_0(name, loc, scale, hn_scale, modelParams):
             shape_label=("country"),
             conditionally_independent=True,
         )
-    ) * (
-        yield HalfNormal(
-            name="sigma_R_0_c", scale=hn_scale, conditionally_independent=True,
-        )
-    )
+    ) * tf.expand_dims(sigma_R_0_c, axis=-1)
 
-    # Add to trace
-
+    # Add to trace via deterministic
     R_0 = yield Deterministic(
-        name=name, value=R_0_star + ΔR_0_c, shape_label=("country")
+        name=name,
+        value=tf.expand_dims(R_0_star, axis=-1) + ΔR_0_c,
+        shape_label=("country"),
     )
 
     return tf.stack([R_0] * modelParams.num_age_groups, axis=-1)

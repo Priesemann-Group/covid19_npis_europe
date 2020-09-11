@@ -96,6 +96,7 @@ def test_model(modelParams):
     # Create Reproduction Number for every age group
     mean_R_0 = 2.5
     beta_R_0 = 2.0
+    """
     R_0 = yield covid19_npis.model.reproduction_number.construct_R_0(
         name="R_0",
         loc=2.0,
@@ -103,7 +104,17 @@ def test_model(modelParams):
         hn_scale=0.3,  # Scale parameter of HalfNormal for each country
         modelParams=modelParams,
     )
-    log.info(f"R_0:\n{R_0}")
+    """
+    R_0 = yield Gamma(
+        name="R_0",
+        concentration=mean_R_0 * beta_R_0,
+        rate=beta_R_0,
+        conditionally_independent=True,
+        event_stack=event_shape,
+        transform=transformations.SoftPlus(reinterpreted_batch_ndims=len(event_shape)),
+        shape_label=("country", "age_group"),
+    )
+    log.debug(f"R_0:\n{R_0}")
     batch_shape = list(R_0.shape[:-2])
     country_shape = [modelParams.num_countries]
     age_shape = [modelParams.num_age_groups]

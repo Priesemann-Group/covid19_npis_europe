@@ -7,7 +7,7 @@ from .disease_spread import (
 
 from .likelihood import studentT_likelihood
 
-from .reproduction_number import construct_R_t
+from .reproduction_number import construct_R_t, construct_R_0
 
 from .utils import convolution_with_fixed_kernel, convolution_with_varying_kernel
 

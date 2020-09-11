@@ -440,3 +440,58 @@ def construct_R_t(R_0, modelParams):
     R_t = tf.einsum("...tca -> t...ca", R_t)
 
     return R_t  # shape time, batch, country, age_group
+
+
+def construct_R_0(name, loc, scale, hn_scale, modelParams):
+    r"""
+        Constructs R_0 as follows:
+
+        .. math::
+
+            R^*_{0,c} &= R^*_0 + \Delta R^*_{0,c}, \\
+            R^*_0 &\sim \mathcal{N}\left(2,0.5\right)\\
+            \Delta R^*_{0,c} &\sim \mathcal{N}\left(0, \sigma_{R^*, \text{country}}\right)\quad \forall c,\\
+            \sigma_{R^*, \text{country}} &\sim HalfNormal\left(0.3\right)
+
+        Parameters
+        ----------
+        name: str
+            Name of the distribution (gets added to trace).
+        loc: number
+            Location parameter of the R^*_0 Normal distribution.
+        scale: number
+            Scale paramter of the R^*_0 Normal distribution.
+        hn_scale: number
+            Scale parameter of the \sigma_{R^*, \text{country}} HaflNormal distribution.
+
+        Returns
+        -------
+        :
+            Generator for R_0 
+    """
+
+    R_0_star = yield Normal(
+        name="R_0^*", loc=loc, scale=scale, conditionally_independent=True,
+    )
+    ΔR_0_c = (
+        yield Normal(
+            name="ΔR_0_c",
+            loc=0.0,
+            scale=1.0,
+            event_stack=(modelParams.num_countries),
+            shape_label=("country"),
+            conditionally_independent=True,
+        )
+    ) * (
+        yield HalfNormal(
+            name="sigma_R_0_c", scale=hn_scale, conditionally_independent=True,
+        )
+    )
+
+    # Add to trace
+
+    R_0 = yield Deterministic(
+        name=name, value=R_0_star + ΔR_0_c, shape_label=("country")
+    )
+
+    return tf.stack([R_0] * modelParams.num_age_groups, axis=-1)

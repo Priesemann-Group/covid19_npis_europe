@@ -96,16 +96,14 @@ def test_model(modelParams):
     # Create Reproduction Number for every age group
     mean_R_0 = 2.5
     beta_R_0 = 2.0
-    R_0 = yield Gamma(
+    R_0 = yield covid19_npis.model.reproduction_number.construct_R_0(
         name="R_0",
-        concentration=mean_R_0 * beta_R_0,
-        rate=beta_R_0,
-        conditionally_independent=True,
-        event_stack=event_shape,
-        transform=transformations.SoftPlus(reinterpreted_batch_ndims=len(event_shape)),
-        shape_label=("country", "age_group"),
+        loc=2.0,
+        scale=0.5,
+        hn_scale=0.3,  # Scale parameter of HalfNormal for each country
+        modelParams=modelParams,
     )
-    log.debug(f"R_0:\n{R_0}")
+    log.info(f"R_0:\n{R_0}")
     batch_shape = list(R_0.shape[:-2])
     country_shape = [modelParams.num_countries]
     age_shape = [modelParams.num_age_groups]
@@ -135,7 +133,38 @@ def test_model(modelParams):
         value=tf.einsum("...an,...bn->...ab", C, C),
         shape_label=("country", "age_group_i", "age_group_j"),
     )
+    # Normalize C
+
+    # Rows first
     log.debug(f"C:\n{C}")
+    new_C = []
+    for i in range(C.shape[-1]):
+        row = tf.gather(C, i, axis=-2)
+        summed = tf.reduce_sum(row, axis=-1)
+        normalized_row = row / tf.expand_dims(summed, axis=-1)
+        new_C.append(normalized_row)
+
+    C = tf.stack(new_C)  # shape age_group, country, age_group
+    if len(C.shape) == 3:
+        C = tf.transpose(C, perm=(1, 0, 2))
+    else:
+        C = tf.transpose(C, perm=(1, 2, 0, 3))
+
+    # Cols next
+    new_C = []
+    for i in range(C.shape[-2]):
+        col = tf.gather(C, i, axis=-1)
+        summed = tf.reduce_sum(col, axis=-1)
+        normalized_col = col / tf.expand_dims(summed, axis=-1) * np.sqrt(2)
+        new_C.append(normalized_col)
+
+    C = tf.stack(new_C)  # shape batch, age_group, country, age_group
+    if len(C.shape) == 3:
+        C = tf.transpose(C, perm=(1, 0, 2))
+    else:
+        C = tf.transpose(C, perm=(1, 2, 0, 3))
+
+    log.debug(f"C_normalized:\n{C}")
 
     # Create normalized pdf of generation interval
     (

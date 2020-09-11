@@ -14,6 +14,7 @@ import logging
 
 log = logging.getLogger(__name__)
 import pymc4 as pm
+import types
 
 __all__ = [
     "LogNormal",
@@ -52,18 +53,13 @@ class DistributionAdditions:
 # ------------------------------------------------------------------------------ #
 # Dynamically create classes
 # ------------------------------------------------------------------------------ #
-
+module = types.ModuleType("distributions")
 for dist_name in __all__:
     # Get pymc4 class
     pmdist = getattr(pm, dist_name)
-    # Create constructor/init function
-    def __constructor__(self, *args, **kwargs):
-        super(self.__class__, self).__init__(*args, **kwargs)
 
     # Add our own class to module scope
-    vars()[dist_name] = type(
-        dist_name, (DistributionAdditions, pmdist), {"__init__": __constructor__}
-    )
+    vars()[dist_name] = types.new_class(dist_name, (DistributionAdditions, pmdist))
 
 # ------------------------------------------------------------------------------ #
 # If we want to add some special behaviour

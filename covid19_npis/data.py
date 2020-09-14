@@ -109,21 +109,6 @@ def convert_trace_to_dataframe(trace, sample_state, key):
     # convert to dataframe
     df = data[f"{model_name}/{dist.name}"].to_dataframe()
 
-    """
-    Drop each level with only one unique entry
-    """
-    for ind in df.index.names:
-        if (
-            (len(df.index.get_level_values(ind).unique()) <= 1)
-            and (ind != "chain")
-            and (ind != "draw")
-        ):
-            df.index = df.index.droplevel(ind)
-            log.info(
-                f""""Dropped Multiindex {ind} because of size 1! Can yield an error if the 
-                shape_label is not set correctly!"""
-            )
-
     num_of_levels = len(df.index.levels)
     # Rename level to dimension labels
     """
@@ -142,21 +127,16 @@ def convert_trace_to_dataframe(trace, sample_state, key):
     if hasattr(dist, "shape_label"):
         for i in range(ndim):
             if isinstance(dist.shape_label, (list, tuple,)):
-                df.index.rename(
-                    dist.shape_label[i], level=i - ndim, inplace=True,
-                )
+                label = dist.shape_label[i]
+            else:
+                label = dist.shape_label
+            if label is None:
+                # Drop each level with "None" shape label
+                df.index = df.index.droplevel(i)
             else:
                 df.index.rename(
-                    dist.shape_label, level=i - ndim, inplace=True,
+                    label, level=i - ndim, inplace=True,
                 )
-    else:  # Fix default labels to start at dim 0
-        for i, ind in enumerate(df.index.names):
-            # Skip chain and draw
-            if (ind == "chain") or (ind == "draw"):
-                continue
-            df.index.rename(
-                f"{model_name}/{dist.name}_dim_{i-2}", level=i, inplace=True,
-            )
 
     # Rename country index to country names
     if r"country" in df.index.names:

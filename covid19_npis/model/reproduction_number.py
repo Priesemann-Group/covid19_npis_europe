@@ -104,7 +104,7 @@ def _create_distributions(modelParams):
         loc=0.0,
         scale=1.0,
         event_stack=(1, modelParams.num_countries, 1),  # intervention country age_group
-        shape_label=("country"),
+        shape_label=(None, "country", None),
         conditionally_independent=True,
     )
     delta_alpha_cross_a = Normal(
@@ -116,7 +116,7 @@ def _create_distributions(modelParams):
             1,
             modelParams.num_age_groups,
         ),  # intervention country age_group
-        shape_label=("age_group"),
+        shape_label=(None, None, "age_group"),
         conditionally_independent=True,
     )
     alpha_cross_i = Normal(
@@ -129,7 +129,7 @@ def _create_distributions(modelParams):
             1,
             1,
         ),  # intervention country age_group
-        shape_label=("intervention"),
+        shape_label=("intervention", None, None),
     )
 
     """
@@ -152,7 +152,7 @@ def _create_distributions(modelParams):
             1,
             1,
         ),  # intervention country age_group
-        shape_label=("intervention"),
+        shape_label=("intervention", None, None),
     )
     log.debug(f"sigma_l_interv\n{sigma_l_interv}")
     # Δl_i^cross was created in intervention class see above
@@ -183,7 +183,7 @@ def _create_distributions(modelParams):
         loc=0.0,
         scale=1.0,
         event_stack=(modelParams.num_interventions, 1, 1),
-        shape_label=("interventions"),
+        shape_label=("intervention", None, None),
         conditionally_independent=True,
     )
     delta_d_c = Normal(
@@ -191,7 +191,7 @@ def _create_distributions(modelParams):
         loc=0.0,
         scale=1.0,
         event_stack=(1, modelParams.num_countries, 1),
-        shape_label=("country"),
+        shape_label=(None, "country", None),
         conditionally_independent=True,
     )
 
@@ -263,9 +263,9 @@ def construct_R_t(R_0, modelParams):
     alpha_i_c_a = yield Deterministic(
         name="alpha_i_c_a",
         value=(yield alpha()),
-        shape_label=("intervention", "country", "age_group"),
+        shape_label=("intervention", "country", "age_group",),
     )
-    log.debug(f"alpha_i_c_a\n{alpha_i_c_a}")
+    log.debug(f"alpha_i_c_a\n{alpha_i_c_a.shape}")
 
     def length():
         """
@@ -286,7 +286,7 @@ def construct_R_t(R_0, modelParams):
         return tf.math.softplus(l_cross_i_sign)
 
     l_i_sign = yield Deterministic(
-        name="l_i,sign(Δγ)", value=(yield length()), shape_label=("intervention"),
+        name="l_i,sign(Δγ)", value=(yield length()),  # shape_label=("intervention"),
     )
     log.debug(f"l_i_sign\n{l_i_sign.shape}")
 
@@ -315,7 +315,7 @@ def construct_R_t(R_0, modelParams):
     d_i_c_p = yield Deterministic(
         name="d_i_c_p",
         value=(yield date()),
-        shape_label=("intervention", "country", "change_point"),
+        shape_label=("intervention", "country", "change_point",),
     )
     log.debug(f"d_i_c_p\n{d_i_c_p}")
 
@@ -365,7 +365,7 @@ def construct_R_t(R_0, modelParams):
 
     gamma_i_c = gamma(
         d_i_c_p
-    )  # no yield because we do not sampl anything in this function
+    )  # no yield because we do not sample anything in this function
     log.debug(f"gamma_i_c\n{gamma_i_c.shape}")
     log.debug(f"alpha_i_c_a\n{alpha_i_c_a.shape}")
     """ Calculate R_eff

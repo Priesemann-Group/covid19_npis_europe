@@ -274,7 +274,6 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
         num_figs, cols, rows = shape
         cols = cols
         rows = rows
-        print(shape)
         # Create a new figure for each dim_0 entry
         figs = []
         axes = []

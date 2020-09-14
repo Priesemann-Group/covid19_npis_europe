@@ -285,7 +285,6 @@ _, sample_state = pm.evaluate_model(test_model(modelParams))
 
 
 # Plot by name.
-# TODO:ADD THE R_T DISTRIBUTIONS i.e. d, l, sigma as deterministics
 dist_names = [
     "R_0",
     "I_0_diff_base",

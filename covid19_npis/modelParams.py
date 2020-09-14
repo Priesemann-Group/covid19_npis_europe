@@ -1,7 +1,7 @@
 import datetime
 import numpy as np
 import pandas as pd
-
+import tensorflow as tf
 import logging
 
 log = logging.getLogger(__name__)
@@ -142,6 +142,50 @@ class ModelParams:
         """
         return self._data_tensor
 
+    @property
+    def date_data_tensor(self):
+        """
+        Creates a tensor with dimension intervention, country, change_points
+        Padded with 0.0 for none existing change points
+        """
+        max_num_cp = self.max_num_cp
+        data = []
+        for i, intervention in enumerate(
+            self.countries[0].interventions
+        ):  # Should be same across all countries -> 0
+            d_c = []
+            for c, country in enumerate(self.countries):
+                d_cp = []
+                for p, cp in enumerate(country.change_points[intervention.name]):
+                    d_cp.append(self.date_to_index(cp.date_data))
+                if len(d_cp) < max_num_cp:
+                    d_cp.append([0.0] * (max_num_cp - len(d_cp)))
+                d_c.append(d_cp)
+            data.append(d_c)
+        return tf.constant(data, dtype="float32")
+
+    @property
+    def gamma_data_tensor(self):
+        """
+        Creates a ragged tensor with dimension intervention, country, change_points
+        The change points dimension can have different sizes.
+        """
+        max_num_cp = self.max_num_cp
+        data = []
+        for i, intervention in enumerate(
+            self.countries[0].interventions
+        ):  # Should be same across all countries -> 0
+            d_c = []
+            for c, country in enumerate(self.countries):
+                d_cp = []
+                for p, cp in enumerate(country.change_points[intervention.name]):
+                    d_cp.append(cp.gamma_max)
+                if len(d_cp) < max_num_cp:
+                    d_cp.append([0.0] * (max_num_cp - len(d_cp)))
+                d_c.append(d_cp)
+            data.append(d_c)
+        return tf.constant(data, dtype="float32")
+
     # ------------------------------------------------------------------------------ #
     # Additional properties
     # ------------------------------------------------------------------------------ #
@@ -163,6 +207,10 @@ class ModelParams:
         return len(self.data_summary["countries"])
 
     @property
+    def num_interventions(self):
+        return len(self.data_summary["interventions"])
+
+    @property
     def indices_begin_sim(self):
         return self._indices_begin_data
 
@@ -173,6 +221,20 @@ class ModelParams:
     @property
     def length(self):
         return len(self._dataframe)
+
+    @property
+    def max_num_cp(self):
+        data = []
+        for i, intervention in enumerate(
+            self.countries[0].interventions
+        ):  # Should be same across all countries -> 0
+            for c, country in enumerate(self.countries):
+                index = 0
+                for p, cp in enumerate(country.change_points[intervention.name]):
+                    index = index + 1
+                data.append(index)
+
+        return max(data)
 
     # ------------------------------------------------------------------------------ #
     # Methods

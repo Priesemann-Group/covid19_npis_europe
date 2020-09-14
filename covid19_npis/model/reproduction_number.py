@@ -46,87 +46,31 @@ def _fsigmoid(t, l, d):
     return tf.math.sigmoid(inside_exp_1 * inside_exp_2)
 
 
-class Intervention(object):
-    """
-        Intervention class, contains every variable that is only intervention dependent
-        and the change point for the intervention, i.e. the hyperprior distributions.
-
-        Parameters
-        ----------
-        name: str
-            Name of the intervention, get passed to the pymc4 functions with suffix.
-
-        alpha_loc_loc:
-            Location of hyperprior location for the effectivity of the intervention.
-
-        alpha_loc_scale:
-            Scale of hyperprior location for the effectivity of the intervention.
-
-        alpha_scale_loc:
-            Location of hyperprior sale for the effectivity of the intervention.
-
-        alpha_scale_scale:
-             Scale of hyperprior sale for the effectivity of the intervention.
-    """
-
-    def __init__(
-        self, name,
-    ):
-        self.name = name
-
-        # Distribution for alpha^cross
-        self._alpha_cross = Normal(
-            "alpha_cross_" + self.name,
-            loc=-1.0,  # See publication for reasoning behind -1 and 2
-            scale=2.0,
-            conditionally_independent=True,
-        )
-
-        # Distribution for delta_l_cross sigma_l gets multiplied at a later point for better sampling.
-        self._delta_l_cross = Normal(
-            "delta_l_cross_" + self.name,
-            loc=0.0,
-            scale=1.0,
-            conditionally_independent=True,
-        )
-
-        self._delta_d = Normal(
-            "delta_d_" + self.name, loc=0.0, scale=1.0, conditionally_independent=True,
-        )
-
-        log.debug(f"Created intervention with name: {name}")
-
-    @property
-    def alpha_cross(self):
-        r"""
-        Returns pymc4 generator for the effetivity :math:`\alpha_i`, i.e. a normal distribution. The priors
-        are set to loc=-1.0 and scale=2.0.
-        """
-
-        return (yield self._alpha_cross)
-
-    @property
-    def delta_l_cross(self):
-        r"""
-        Returns pymc4 generator for the effetivity :math:`\Delta l^\cross_i`, i.e. a normal distribution. The priors
-        are set to loc=0.0, scale=1.0. Should be multiplied with hyperdist.
-        """
-
-        return (yield self._delta_l_cross)
-
-    @property
-    def delta_d(self):
-        r"""
-        Returns pymc4 generator for the effetivity :math:`\Delta d_i`, i.e. a normal distribution. The priors
-        are set to loc=0.0, scale=1.0. Should be multiplied with hyperdist.
-        """
-
-        return (yield self._delta_d)
-
-
 def _create_distributions(modelParams):
-    """
-    Returns a dict of distributions and interventions for further processing/sampling.
+    r"""
+    Returns a dict of distributions for further processing/sampling with the following priors:
+
+    .. math::
+
+        \alpha^\dagger_i &\sim \mathcal{N}\left(-1, 2\right)\quad \forall i,\\
+        \Delta \alpha^\dagger_c &\sim \mathcal{N}\left(0, \sigma_{\alpha, \text{country}}\right) \quad \forall c, \\
+        \Delta \alpha^\dagger_a &\sim \mathcal{N}\left(0, \sigma_{\alpha, \text{age}}\right)\quad \forall a, \\
+        \sigma_{\alpha, \text{country}}  &\sim HalfNormal\left(0.1\right),\\
+        \sigma_{\alpha, \text{age}} &\sim HalfNormal\left(0.1\right)
+    
+    .. math::
+
+        l^\dagger_{\text{positive}} &\sim \mathcal{N}\left(3, 1\right),\\
+        l^\dagger_{\text{negative}} &\sim \mathcal{N}\left(5, 2\right),\\
+        \Delta l^\dagger_i &\sim \mathcal{N}\left(0,\sigma_{l, \text{interv.}} \right)\quad \forall i,\\
+        \sigma_{l, \text{interv.}}&\sim HalfNormal\left(1\right)
+
+    .. math::
+
+        \Delta d_i  &\sim \mathcal{N}\left(0, \sigma_{d, \text{interv.}}\right)\quad \forall i,\\
+        \Delta d_c &\sim \mathcal{N}\left(0, \sigma_{d, \text{country}}\right)\quad \forall c,\\
+        \sigma_{d, \text{interv.}}  &\sim HalfNormal\left(0.3\right),\\
+        \sigma_{d, \text{country}} &\sim HalfNormal\left(0.3\right)
 
     Parameter
     ---------
@@ -138,19 +82,6 @@ def _create_distributions(modelParams):
         interventions, distributions
     """
     log.debug("_create_distributions")
-
-    """
-    Get all interventions from the countries data objects
-    """
-    interventions_data = modelParams.countries[0].interventions
-
-    """
-    Create distributions for each interventions that beeing 
-    alpha_i and Δl_i^cross. Happens in the intervention class.
-    """
-    interventions = {}
-    for i in interventions_data:
-        interventions[i.name] = Intervention(name=i.name)
 
     """
         Δ Alpha cross for each country and age group with hyperdistributions
@@ -172,7 +103,7 @@ def _create_distributions(modelParams):
         "delta_alpha_cross_c",
         loc=0.0,
         scale=1.0,
-        event_stack=(modelParams.num_countries),
+        event_stack=(1, modelParams.num_countries, 1),  # intervention country age_group
         shape_label=("country"),
         conditionally_independent=True,
     )
@@ -180,9 +111,25 @@ def _create_distributions(modelParams):
         "delta_alpha_cross_a",
         loc=0.0,
         scale=1.0,
-        event_stack=(modelParams.num_age_groups),
+        event_stack=(
+            1,
+            1,
+            modelParams.num_age_groups,
+        ),  # intervention country age_group
         shape_label=("age_group"),
         conditionally_independent=True,
+    )
+    alpha_cross_i = Normal(
+        "alpha_cross_i",
+        loc=-1.0,  # See publication for reasoning behind -1 and 2
+        scale=2.0,
+        conditionally_independent=True,
+        event_stack=(
+            modelParams.num_interventions,
+            1,
+            1,
+        ),  # intervention country age_group
+        shape_label=("intervention"),
     )
 
     """
@@ -194,10 +141,27 @@ def _create_distributions(modelParams):
         transform=transformations.SoftPlus(),
         conditionally_independent=True,
     )
+
+    delta_l_cross_i = Normal(
+        "delta_l_cross_i",
+        loc=0.0,
+        scale=1.0,
+        conditionally_independent=True,
+        event_stack=(
+            modelParams.num_interventions,
+            1,
+            1,
+        ),  # intervention country age_group
+        shape_label=("intervention"),
+    )
     log.debug(f"sigma_l_interv\n{sigma_l_interv}")
     # Δl_i^cross was created in intervention class see above
-    l_positive_cross = Normal("l_positive_cross", loc=3.0, scale=1.0,)
-    l_negative_cross = Normal("l_negative_cross", loc=5.0, scale=2.0,)
+    l_positive_cross = Normal(
+        "l_positive_cross", loc=3.0, scale=1.0, event_stack=(1, 1, 1)
+    )
+    l_negative_cross = Normal(
+        "l_negative_cross", loc=5.0, scale=2.0, event_stack=(1, 1, 1)
+    )
 
     """
         date d distributions
@@ -214,12 +178,19 @@ def _create_distributions(modelParams):
         transform=transformations.SoftPlus(scale=0.3),
         conditionally_independent=True,
     )
-    # delta_d_i was set in intervention class see above
+    delta_d_i = Normal(
+        "delta_d_i",
+        loc=0.0,
+        scale=1.0,
+        event_stack=(modelParams.num_interventions, 1, 1),
+        shape_label=("interventions"),
+        conditionally_independent=True,
+    )
     delta_d_c = Normal(
         "delta_d_c",
         loc=0.0,
         scale=1.0,
-        event_stack=(modelParams.num_countries),
+        event_stack=(1, modelParams.num_countries, 1),
         shape_label=("country"),
         conditionally_independent=True,
     )
@@ -230,20 +201,24 @@ def _create_distributions(modelParams):
     distributions["sigma_a_a"] = sigma_a_a
     distributions["delta_alpha_cross_c"] = delta_alpha_cross_c
     distributions["delta_alpha_cross_a"] = delta_alpha_cross_a
+    distributions["alpha_cross_i"] = alpha_cross_i
     distributions["sigma_l_interv"] = sigma_l_interv
     distributions["l_positive_cross"] = l_positive_cross
     distributions["l_negative_cross"] = l_negative_cross
+    distributions["delta_l_cross_i"] = delta_l_cross_i
     distributions["sigma_d_interv"] = sigma_d_interv
     distributions["sigma_d_country"] = sigma_d_country
+    distributions["delta_d_i"] = delta_d_i
     distributions["delta_d_c"] = delta_d_c
 
-    return interventions, distributions
+    return distributions
 
 
 def construct_R_t(R_0, modelParams):
     """
     Constructs the time dependent reproduction number :math:`R(t)` for every country and age group.
 
+    
     Parameter
     ---------
 
@@ -259,178 +234,144 @@ def construct_R_t(R_0, modelParams):
         |shape| time, batch, country, age group
     """
     # Create distributions for date and hyperpriors.
-    interventions, distributions = _create_distributions(modelParams)
+    distributions = _create_distributions(modelParams)
 
     log.debug("construct_R_t")
 
-    """ Construct alpha_i_c_a
-    """
-    # Multiply distributions by hyperpriors
-    delta_alpha_cross_c = (yield distributions["delta_alpha_cross_c"]) * (
-        yield distributions["sigma_a_c"]
-    )[..., tf.newaxis]
+    def alpha():
+        """
+        Helper function to construct the alpha_i_c_a tensor
+        """
+        delta_alpha_cross_c = yield distributions["delta_alpha_cross_c"]
+        sigma_a_c = yield distributions["sigma_a_c"]
 
-    delta_alpha_cross_a = (yield distributions["delta_alpha_cross_a"]) * (
-        yield distributions["sigma_a_a"]
-    )[..., tf.newaxis]
-    log.debug(f"delta_alpha_cross_a:\n{delta_alpha_cross_a}")
+        delta_alpha_cross_c = tf.einsum(  # Multiply distribution by hyperprior
+            "...ica,...->...ica", delta_alpha_cross_c, sigma_a_c
+        )
 
-    # Stack distributions for easy addition in the loop (is there a better way?)
-    delta_alpha_cross_c = tf.stack(
-        [delta_alpha_cross_c] * modelParams.num_age_groups, axis=-1
-    )  # shape c,a
-    delta_alpha_cross_a = tf.stack(
-        [delta_alpha_cross_a] * modelParams.num_countries, axis=-2
-    )  # shape c,a
-
-    # For each intervention create alpha tensor of shape country, age_group and add it to the dict
-    alpha = {}  # i.e alpha_i_c_a
-    for i_name, intervention in interventions.items():
-        # Draw from distributions
-        alpha_cross_i = yield intervention.alpha_cross
-        # Add the country age and intervention distribution
-        alpha_cross_i = tf.expand_dims(alpha_cross_i, axis=-1)
-        alpha_cross_i = tf.expand_dims(alpha_cross_i, axis=-1)
+        delta_alpha_cross_a = yield distributions["delta_alpha_cross_a"]
+        sigma_a_a = yield distributions["sigma_a_a"]
+        delta_alpha_cross_a = tf.einsum(  # Multiply distribution by hyperprior
+            "...ica,...->...ica", delta_alpha_cross_a, sigma_a_a
+        )
+        # Draw for the interventions
+        alpha_cross_i = yield distributions["alpha_cross_i"]
+        # Add all together, dimensions are defined in _create_distributions
         alpha_cross_i_c_a = alpha_cross_i + delta_alpha_cross_c + delta_alpha_cross_a
-        alpha[i_name] = tf.math.sigmoid(alpha_cross_i_c_a)
-        log.debug(f"Alpha_{i_name}\n{alpha[i_name]}")
+        return tf.math.sigmoid(alpha_cross_i_c_a)
 
-    # Add to trace for plotting
     alpha_i_c_a = yield Deterministic(
         name="alpha_i_c_a",
-        value=tf.stack([alpha[key] for key in alpha], axis=-3),
+        value=(yield alpha()),
         shape_label=("intervention", "country", "age_group"),
     )
+    log.debug(f"alpha_i_c_a\n{alpha_i_c_a}")
 
-    """ Construct l_{i,sign}
-        Create length of the changepoints
-    """
-    sigma_l_interv = yield distributions["sigma_l_interv"]
-    log.debug(f"sigma_l_interv\n{sigma_l_interv}")
-    l_positive_cross = yield distributions["l_positive_cross"]
-    log.debug(f"l_positive_cross\n{l_positive_cross}")
-    l_negative_cross = yield distributions["l_negative_cross"]
-    # For each interventions we create a length l
-    length = {}  # i.e.
-    for i_name, intervention in interventions.items():
-        delta_l_cross = (yield intervention.delta_l_cross) * sigma_l_interv
-        log.debug(f"delta_l_cross_{i_name}\n{intervention.delta_l_cross}")
+    def length():
+        """
+        Helper function to construct the l_i,sign(Δγ) tensor
+        """
+        delta_l_cross_i = yield distributions["delta_l_cross_i"]
+        sigma_l_interv = yield distributions["sigma_l_interv"]
+        delta_l_cross_i = tf.einsum(  # Multiply distribution by hyperprior
+            "...ica,...->...ica", delta_l_cross_i, sigma_l_interv
+        )
+
+        l_positive_cross = yield distributions["l_positive_cross"]
+        l_negative_cross = yield distributions["l_negative_cross"]
+
         # TODO:  NEED TO DETECT WHEATHER TO USE POSITIVE OR NEGATIVE l_cross
-        l_cross_i_sign = l_positive_cross + delta_l_cross
+        l_cross_i_sign = l_positive_cross + delta_l_cross_i
 
-        length[i_name] = tf.math.softplus(l_cross_i_sign)
-        log.debug(f"Length_{i_name}\n{length[i_name]}")
+        return tf.math.softplus(l_cross_i_sign)
 
-    # Add to trace for plotting
     l_i_sign = yield Deterministic(
-        name="l_i,sign(Δγ)",
-        value=tf.stack([length[key] for key in length], axis=-1),
-        shape_label=("intervention"),
+        name="l_i,sign(Δγ)", value=(yield length()), shape_label=("intervention"),
     )
+    log.debug(f"l_i_sign\n{l_i_sign.shape}")
 
-    """ Construct d_i_c_p
-        Create dates for each change point
-    """
-    sigma_d_interv = yield distributions["sigma_d_interv"]
-    delta_d_c = (yield distributions["delta_d_c"]) * (  # shape country
-        yield distributions["sigma_d_country"]
-    )[..., tf.newaxis]
+    def date():
+        """
+        Helper funtion to return the date tensors.
+        Returns multiple tensors one for each change point.
+        """
+        delta_d_i = yield distributions["delta_d_i"]
+        sigma_d_interv = yield distributions["sigma_d_interv"]
+        delta_d_i = tf.einsum(  # Multiply distribution by hyperprior
+            "...ica,...->...ica", delta_d_i, sigma_d_interv
+        )
 
-    d = {}  # i.e. d_i_c_p
-    for i_name, intervention in interventions.items():
-        d[i_name] = {}
+        delta_d_c = yield distributions["delta_d_c"]
+        sigma_d_country = yield distributions["sigma_d_country"]
+        delta_d_c = tf.einsum(  # Multiply distribution by hyperprior
+            "...ica,...->...ica", delta_d_c, sigma_d_country
+        )
 
-        # Sample from intervention distribution
-        delta_d_i = (yield intervention.delta_d) * sigma_d_interv
+        # Get data tensor padded with 0 if the cp does not exist for an intervention/country combo
+        d_data = modelParams.date_data_tensor
 
-        country_index = 0
-        for country in modelParams.countries:
-            d[i_name][country.name] = []
-            # Get value from country distribution
-            delta_d_c_gather = tf.gather(delta_d_c, country_index, axis=-1)
-            country_index = country_index + 1
+        return d_data + delta_d_i + delta_d_c
 
-            for cp_index, change_point in enumerate(country.change_points[i_name]):
-                d_data = modelParams.date_to_index(
-                    country.change_points[i_name][cp_index].date_data
-                )
-                # Add everything and append to dict
-                d[i_name][country.name].append(d_data + delta_d_i + delta_d_c_gather)
-            log.debug(f"Date_{i_name}_{country.name}\n{d[i_name][country.name]}")
-
-    # Add to trace for plotting
-    # Nested tf.stack for change points, country and interventions
-    _d_temp = tf.stack(
-        [
-            tf.stack(
-                [
-                    tf.stack([d_p for d_p in d[i_name][country.name]], axis=-1)
-                    for country in modelParams.countries
-                ],
-                axis=-1,
-            )
-            for i_name, intervention in interventions.items()
-        ],
-        axis=-1,
-    )
     d_i_c_p = yield Deterministic(
         name="d_i_c_p",
-        value=_d_temp,
+        value=(yield date()),
         shape_label=("intervention", "country", "change_point"),
     )
+    log.debug(f"d_i_c_p\n{d_i_c_p}")
 
-    """ Construct gamma_i_c_p
-        Loop over interventions countries changepoints
-    """
-    # Create time index tensor of length modelParams.simlength
-    t = tf.range(0, modelParams.length, dtype="float32")
+    def gamma(d_i_c_p):
+        """ 
+        Helper function to construct gamma_i_c_p and calculate gamma_i_c
+        """
+        # Create time index tensor of length modelParams.simlength
+        t = tf.range(0, modelParams.length, dtype="float32")
 
-    gamma_i_c_p = {}  # i.e. gamma_i_c_p country change_point  batch time
-    for i_name, intervention in interventions.items():
-        gamma_i_c_p[i_name] = {}
-        for country in modelParams.countries:
-            gamma_i_c_p[i_name][country.name] = []
-            for cp_index, change_point in enumerate(country.change_points[i_name]):
-                delta_gamma_max_data = country.change_points[i_name][cp_index].gamma_max
+        # We need to expand the dims of d_icp because we need a additional time dimension
+        # for "t - d_icp"
+        d_i_c_p = tf.expand_dims(d_i_c_p, axis=-1)
 
-                gamma_i_c_p[i_name][country.name].append(
-                    _fsigmoid(t, length[i_name], d[i_name][country.name][cp_index])
-                    * delta_gamma_max_data
-                )
-
-            log.debug(
-                f"Gamma_i_c_p_{i_name}_{country.name}\n{gamma_i_c_p[i_name][country.name]}"
-            )
-
-    """ Calculate gamma_i_c from gamma_i_c_p
-
-        Iterate over all changepoints in an intervention and sum up over every change point.
-    """
-    gamma_i_c = {}
-    for i_name, intervention in interventions.items():
-        gamma_i_c[i_name] = []  # shape country
-        for country in modelParams.countries:
-            gamma_i_c[i_name].append(sum(gamma_i_c_p[i_name][country.name]))
-        gamma_i_c[i_name] = tf.convert_to_tensor(
-            gamma_i_c[i_name]
-        )  # shape country,batch, time
-
-        if len(gamma_i_c[i_name].shape) == 3:
-            gamma_i_c[i_name] = tf.transpose(gamma_i_c[i_name], perm=(1, 0, 2))
-
+        inner_sigmoid = 4.0 / (tf.expand_dims(l_i_sign, axis=-1) * (t - d_i_c_p))
+        gamma_data = tf.expand_dims(modelParams.gamma_data_tensor, axis=-1)
+        if len(inner_sigmoid.shape) == 5:
+            gamma_data = tf.expand_dims(gamma_data, axis=-1)
+        gamma_i_c_p = tf.math.sigmoid(inner_sigmoid) * gamma_data
         log.debug(
-            f"Gamma_i_c_{i_name}\n{gamma_i_c[i_name]}"
-        )  # shape batch, country, time
+            f"gamma_i_c_p\n{gamma_i_c_p}"
+        )  # shape inter, country, changepoint, time
 
+        """ Calculate gamma_i_c from gamma_i_c_p
+            Iterate over all changepoints in an intervention and sum up over every change point.
+            We padded the date tensor earlier so we do NOT want to sum over the additional entries!
+        """
+        list_gamma_i_c = []
+        for i, intervention in enumerate(
+            modelParams.countries[0].interventions
+        ):  # Should be same across all countries -> 0
+            list_gamma_c = []
+            gamma_c_p = tf.gather(gamma_i_c_p, i, axis=-4)
+            for c, country in enumerate(modelParams.countries):
+                gamma_p = tf.gather(gamma_c_p, c, axis=-3)
+                gamma_values = tf.math.reduce_sum(gamma_p, axis=-2)
+                list_gamma_c.append(gamma_values)
+            list_gamma_i_c.append(list_gamma_c)
+
+        gamma = tf.convert_to_tensor(list_gamma_i_c)
+
+        if len(gamma.shape) == 4:
+            gamma = tf.transpose(gamma, perm=(2, 0, 1, 3))
+
+        return gamma
+
+    gamma_i_c = gamma(
+        d_i_c_p
+    )  # no yield because we do not sampl anything in this function
+    log.debug(f"gamma_i_c\n{gamma_i_c.shape}")
+    log.debug(f"alpha_i_c_a\n{alpha_i_c_a.shape}")
     """ Calculate R_eff
-
-        Iterate over all interventions
     """
-    _sum = []
-    for i_name, intervention in interventions.items():
-        _sum.append(tf.einsum("...ct,...ca->...cat", gamma_i_c[i_name], alpha[i_name]))
+    exponent = tf.einsum("...ict,...ica->...cat", gamma_i_c, alpha_i_c_a)
 
-    R_eff = tf.einsum("...ca,...cat->...tca", R_0, tf.exp(sum(_sum)))
+    R_eff = tf.einsum("...ca,...cat->...tca", R_0, tf.exp(exponent))
     log.debug(f"R_eff\n{R_eff}")
 
     R_t = yield Deterministic(
@@ -473,7 +414,7 @@ def construct_R_0(name, loc, scale, hn_scale, modelParams):
     R_0_star = yield Normal(
         name="R_0^*", loc=loc, scale=scale, conditionally_independent=True,
     )
-    log.info(f"R_0_star\n{R_0_star}")
+
     sigma_R_0_c = yield HalfNormal(
         name="sigma_R_0_c",
         scale=hn_scale,

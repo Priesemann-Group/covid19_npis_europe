@@ -109,8 +109,8 @@ def test_data(**in_params):
     # Normalize
     gamma_pdf = gamma_pdf / np.linalg.norm(gamma_pdf, 1)
 
+    # Convolution
     for t_i in range(15, params["t_max"] + 15):
-
         I_n = np.zeros(params["I_0"].shape)
         for tau in range(15):
             I_n += I_t[t_i - tau] * gamma_pdf[tau]

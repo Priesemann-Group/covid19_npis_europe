@@ -331,10 +331,11 @@ def construct_R_t(R_0, modelParams):
         d_i_c_p = tf.expand_dims(d_i_c_p, axis=-1)
 
         inner_sigmoid = 4.0 / (tf.expand_dims(l_i_sign, axis=-1) * (t - d_i_c_p))
-        gamma_data = tf.expand_dims(modelParams.gamma_data_tensor, axis=-1)
-        if len(inner_sigmoid.shape) == 5:
-            gamma_data = tf.expand_dims(gamma_data, axis=-1)
-        gamma_i_c_p = tf.math.sigmoid(inner_sigmoid) * gamma_data
+        gamma_i_c_p = tf.einsum(
+            "...icpt,icp->...icpt",
+            tf.math.sigmoid(inner_sigmoid),
+            modelParams.gamma_data_tensor,
+        )
         log.debug(
             f"gamma_i_c_p\n{gamma_i_c_p}"
         )  # shape inter, country, changepoint, time

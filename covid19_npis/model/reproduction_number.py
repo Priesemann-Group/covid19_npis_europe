@@ -147,21 +147,13 @@ def _create_distributions(modelParams):
         loc=0.0,
         scale=1.0,
         conditionally_independent=True,
-        event_stack=(
-            modelParams.num_interventions,
-            1,
-            1,
-        ),  # intervention country age_group
-        shape_label=("intervention", None, None),
+        event_stack=(modelParams.num_interventions,),
+        shape_label=("intervention"),
     )
     log.debug(f"sigma_l_interv\n{sigma_l_interv}")
     # Δl_i^cross was created in intervention class see above
-    l_positive_cross = Normal(
-        "l_positive_cross", loc=3.0, scale=1.0, event_stack=(1, 1, 1)
-    )
-    l_negative_cross = Normal(
-        "l_negative_cross", loc=5.0, scale=2.0, event_stack=(1, 1, 1)
-    )
+    l_positive_cross = Normal("l_positive_cross", loc=3.0, scale=1.0, event_stack=(1,))
+    l_negative_cross = Normal("l_negative_cross", loc=5.0, scale=2.0, event_stack=(1,))
 
     """
         date d distributions
@@ -274,21 +266,21 @@ def construct_R_t(R_0, modelParams):
         delta_l_cross_i = yield distributions["delta_l_cross_i"]
         sigma_l_interv = yield distributions["sigma_l_interv"]
         delta_l_cross_i = tf.einsum(  # Multiply distribution by hyperprior
-            "...ica,...->...ica", delta_l_cross_i, sigma_l_interv
+            "...i,...->...i", delta_l_cross_i, sigma_l_interv
         )
-
         l_positive_cross = yield distributions["l_positive_cross"]
         l_negative_cross = yield distributions["l_negative_cross"]
-
         # TODO:  NEED TO DETECT WHEATHER TO USE POSITIVE OR NEGATIVE l_cross
         l_cross_i_sign = l_positive_cross + delta_l_cross_i
 
         return tf.math.softplus(l_cross_i_sign)
 
     l_i_sign = yield Deterministic(
-        name="l_i,sign(Δγ)", value=(yield length()),  # shape_label=("intervention"),
+        name="l_i_sign",
+        value=(yield length()),
+        shape_label=("intervention"),  # intervention country age_group
     )
-    log.debug(f"l_i_sign\n{l_i_sign.shape}")
+    log.info(f"l_i_sign\n{l_i_sign.shape}")
 
     def date():
         """
@@ -319,7 +311,7 @@ def construct_R_t(R_0, modelParams):
     )
     log.debug(f"d_i_c_p\n{d_i_c_p}")
 
-    def gamma(d_i_c_p):
+    def gamma(d_i_c_p, l_i_sign):
         """ 
         Helper function to construct gamma_i_c_p and calculate gamma_i_c
         """
@@ -329,14 +321,13 @@ def construct_R_t(R_0, modelParams):
         # We need to expand the dims of d_icp because we need a additional time dimension
         # for "t - d_icp"
         d_i_c_p = tf.expand_dims(d_i_c_p, axis=-1)
-
-        inner_sigmoid = 4.0 / (tf.expand_dims(l_i_sign, axis=-1) * (t - d_i_c_p))
+        inner_sigmoid = 4.0 / tf.einsum("...i,...icpt->...icpt", l_i_sign, t - d_i_c_p)
         gamma_i_c_p = tf.einsum(
             "...icpt,icp->...icpt",
             tf.math.sigmoid(inner_sigmoid),
             modelParams.gamma_data_tensor,
         )
-        log.debug(
+        log.info(
             f"gamma_i_c_p\n{gamma_i_c_p}"
         )  # shape inter, country, changepoint, time
 
@@ -364,7 +355,7 @@ def construct_R_t(R_0, modelParams):
         return gamma
 
     gamma_i_c = gamma(
-        d_i_c_p
+        d_i_c_p, l_i_sign
     )  # no yield because we do not sample anything in this function
     log.debug(f"gamma_i_c\n{gamma_i_c.shape}")
     log.debug(f"alpha_i_c_a\n{alpha_i_c_a.shape}")

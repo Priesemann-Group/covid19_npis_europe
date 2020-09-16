@@ -152,8 +152,20 @@ def _create_distributions(modelParams):
     )
     log.debug(f"sigma_l_interv\n{sigma_l_interv}")
     # Δl_i^cross was created in intervention class see above
-    l_positive_cross = Normal("l_positive_cross", loc=3.0, scale=1.0, event_stack=(1,))
-    l_negative_cross = Normal("l_negative_cross", loc=5.0, scale=2.0, event_stack=(1,))
+    l_positive_cross = Normal(
+        "l_positive_cross",
+        loc=3.0,
+        scale=1.0,
+        conditionally_independent=True,
+        event_stack=(1,),
+    )
+    l_negative_cross = Normal(
+        "l_negative_cross",
+        loc=5.0,
+        scale=2.0,
+        conditionally_independent=True,
+        event_stack=(1,),
+    )
 
     """
         date d distributions
@@ -300,7 +312,9 @@ def construct_R_t(R_0, modelParams):
         )
 
         # Get data tensor padded with 0 if the cp does not exist for an intervention/country combo
-        d_data = modelParams.date_data_tensor
+        d_data = (
+            modelParams.date_data_tensor
+        )  # shape intervention, country, change_points
 
         return d_data + delta_d_i + delta_d_c
 
@@ -321,13 +335,13 @@ def construct_R_t(R_0, modelParams):
         # We need to expand the dims of d_icp because we need a additional time dimension
         # for "t - d_icp"
         d_i_c_p = tf.expand_dims(d_i_c_p, axis=-1)
-        inner_sigmoid = 4.0 / tf.einsum("...i,...icpt->...icpt", l_i_sign, t - d_i_c_p)
+        inner_sigmoid = tf.einsum("...i,...icpt->...icpt", 4.0 / l_i_sign, t - d_i_c_p)
         gamma_i_c_p = tf.einsum(
             "...icpt,icp->...icpt",
             tf.math.sigmoid(inner_sigmoid),
             modelParams.gamma_data_tensor,
         )
-        log.info(
+        log.debug(
             f"gamma_i_c_p\n{gamma_i_c_p}"
         )  # shape inter, country, changepoint, time
 
@@ -343,14 +357,21 @@ def construct_R_t(R_0, modelParams):
             gamma_c_p = tf.gather(gamma_i_c_p, i, axis=-4)
             for c, country in enumerate(modelParams.countries):
                 gamma_p = tf.gather(gamma_c_p, c, axis=-3)
+
+                # Cut gamma_p to get only the used change points values
+                # i.e remove padding!
+                num_change_points = len(country.change_points[intervention.name])
+                gamma_p = gamma_p[..., 0:num_change_points, :]
+
+                # Calculate the sum over all change points
                 gamma_values = tf.math.reduce_sum(gamma_p, axis=-2)
                 list_gamma_c.append(gamma_values)
             list_gamma_i_c.append(list_gamma_c)
 
         gamma = tf.convert_to_tensor(list_gamma_i_c)
 
-        if len(gamma.shape) == 4:
-            gamma = tf.transpose(gamma, perm=(2, 0, 1, 3))
+        # Transpose batch into front
+        gamma = tf.einsum("ic...t -> ...ict", gamma)
 
         return gamma
 
@@ -363,7 +384,7 @@ def construct_R_t(R_0, modelParams):
     """
     exponent = tf.einsum("...ict,...ica->...cat", gamma_i_c, alpha_i_c_a)
 
-    R_eff = tf.einsum("...ca,...cat->...tca", R_0, tf.exp(exponent))
+    R_eff = tf.einsum("...ca,...cat->...tca", R_0, tf.exp(-exponent))
     log.debug(f"R_eff\n{R_eff}")
 
     R_t = yield Deterministic(

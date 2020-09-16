@@ -36,7 +36,7 @@ print(tf.config.optimizer.get_experimental_options())
 sys.path.append("../")
 
 # Needed to set logging level before importing other modules
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
 import covid19_npis

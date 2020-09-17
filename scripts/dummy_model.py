@@ -146,34 +146,7 @@ def test_model(modelParams):
     )
     # Normalize C
 
-    # Rows first
-    log.debug(f"C:\n{C}")
-    new_C = []
-    for i in range(C.shape[-1]):
-        row = tf.gather(C, i, axis=-2)
-        summed = tf.reduce_sum(row, axis=-1)
-        normalized_row = row / tf.expand_dims(summed, axis=-1)
-        new_C.append(normalized_row)
-
-    C = tf.stack(new_C)  # shape age_group, country, age_group
-    if len(C.shape) == 3:
-        C = tf.transpose(C, perm=(1, 0, 2))
-    else:
-        C = tf.transpose(C, perm=(1, 2, 0, 3))
-
-    # Cols next
-    new_C = []
-    for i in range(C.shape[-2]):
-        col = tf.gather(C, i, axis=-1)
-        summed = tf.reduce_sum(col, axis=-1)
-        normalized_col = col / tf.expand_dims(summed, axis=-1)
-        new_C.append(normalized_col)
-
-    C = tf.stack(new_C)  # shape batch, age_group, country, age_group
-    if len(C.shape) == 3:
-        C = tf.transpose(C, perm=(1, 0, 2))
-    else:
-        C = tf.transpose(C, perm=(1, 2, 0, 3))
+    C, _ = tf.linalg.normalize(C, axis=-2)
 
     log.debug(f"C_normalized:\n{C}")
 
@@ -253,12 +226,13 @@ def test_model(modelParams):
 """
 
 begin_time = time.time()
+
 trace = pm.sample(
     test_model(modelParams),
     num_samples=100,
     burn_in=200,
     use_auto_batching=False,
-    num_chains=3,
+    num_chains=2,
     xla=True,
 )
 

@@ -292,7 +292,7 @@ def construct_R_t(R_0, modelParams):
         value=(yield length()),
         shape_label=("intervention"),  # intervention country age_group
     )
-    log.info(f"l_i_sign\n{l_i_sign.shape}")
+    log.debug(f"l_i_sign\n{l_i_sign}")
 
     def date():
         """

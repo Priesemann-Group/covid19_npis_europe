@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from scipy import stats
+from scipy.linalg import LinAlgError
 
 import logging
 
@@ -50,8 +51,10 @@ def _plot_prior(x, ax=None, **kwargs):
         # may need to convert axes values, and restore xlimits after adding prior
         xlim = ax.get_xlim()
         reset_xlim = True
-
-    prior = stats.kde.gaussian_kde(x)
+    try:
+        prior = stats.kde.gaussian_kde(x)
+    except LinAlgError:  # Probably only one value of x
+        return ax
     x_for_ax = np.linspace(*xlim, num=1000)
     x_for_pr = x_for_ax
 

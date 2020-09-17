@@ -5,6 +5,9 @@ from scipy.stats import gamma, nbinom
 from scipy.special import binom
 import pandas as pd
 import datetime
+import tensorflow as tf
+import pymc4 as pm
+import arviz as az
 
 log = logging.getLogger(__name__)
 
@@ -176,6 +179,49 @@ def test_data(**in_params):
     )
 
     return df_new_cases.sort_index(), df_R_t, df_interv
+
+
+def test_data2(**in_params):
+    # ------------------------------------------------------------------------------ #
+    # Set params for the test dataset
+    # ------------------------------------------------------------------------------ #
+    params = {
+        # population size per country and age group
+        "N": np.array([[1e15, 1e15, 1e15, 1e15], [1e15, 1e15, 1e15, 1e15]]),
+        # Reproduction number at t=0 per country and age group
+        "R_0": np.array([[2.31, 2.32, 2.33, 2.34], [2.31, 2.32, 2.33, 2.34]]),
+        # Initial infected
+        "I_0": np.array([[10, 10, 10, 10], [10, 10, 10, 10]], dtype="float64"),
+        # Change point date/index
+        "d_cp": np.array([[15, 16, 18, 20], [15, 16, 18, 20]]),
+        # Length of the change point
+        "l_cp": 5.2,
+        # Alpha value of the change point
+        "alpha_cp": np.array([[0.73, 0.72, 0.74, 0.75], [0.73, 0.72, 0.74, 0.75]]),
+        "C": np.array(
+            [
+                [1, 0.1, 0.1, 0.1],
+                [0.1, 1, 0.1, 0.1],
+                [0.1, 0.1, 1, 0.1],
+                [0.1, 0.1, 0.1, 1],
+            ]
+        ),
+        # Number of timesteps
+        "t_max": 80,
+        # Number of Nans before data (cuts t_max)
+        "num_nans": 10,
+        # Generation interval
+        "g": 4.0,
+    }
+
+    trace = pm.sample_posterior_predictive(
+        test_model(),
+        az.from_dict(posterior={"test_model/b": np.array([1.0])}),
+        var_names=("test_model/like", "test_model/R_t"),
+        use_auto_batching=False,
+    )
+
+    new_cases = trace.posterior_predictive["test_model/like"]
 
 
 def save_data(path, **params):

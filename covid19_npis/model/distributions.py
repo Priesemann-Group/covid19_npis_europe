@@ -14,16 +14,17 @@ import logging
 
 log = logging.getLogger(__name__)
 import pymc4 as pm
+from pymc4 import Distribution
 import types
+import tensorflow_probability as tfp
 
-__all__ = [
+dists_to_modify = [
     "LogNormal",
     "Normal",
     "LKJCholesky",
     "HalfCauchy",
     "StudentT",
     "Gamma",
-    "Deterministic",
     "HalfNormal",
 ]
 
@@ -54,10 +55,9 @@ class DistributionAdditions:
 # Dynamically create classes
 # ------------------------------------------------------------------------------ #
 module = types.ModuleType("distributions")
-for dist_name in __all__:
+for dist_name in dists_to_modify:
     # Get pymc4 class
     pmdist = getattr(pm, dist_name)
-
     # Add our own class to module scope
     vars()[dist_name] = types.new_class(dist_name, (DistributionAdditions, pmdist))
 
@@ -71,6 +71,22 @@ def other_init(self, *args, **kwargs):
     kwargs["validate_args"] = True
     super(self.__class__, self).__init__(*args, **kwargs)
     # print("This is a modified __init__")
+
+
+class Deterministic(Distribution):
+    def __init__(self, name, value, **kwargs):
+        super().__init__(name, loc=value, **kwargs)
+
+    @staticmethod
+    def _init_distribution(conditions, **kwargs):
+        loc = conditions["loc"]
+        return tfp.distributions.VectorDeterministic(loc=loc, **kwargs)
+
+
+vars()["Deterministic"] = types.new_class(
+    "Deterministic", (DistributionAdditions, Deterministic)
+)
+__all__ = dists_to_modify + ["Deterministic"]
 
 
 LogNormal.__init__ = other_init

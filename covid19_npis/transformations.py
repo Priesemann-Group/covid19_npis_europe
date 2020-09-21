@@ -32,6 +32,39 @@ class Log(Transform):
         )
 
 
+class Normal(Transform):
+    name = "normal"
+    JacobianPreference = JacobianPreference.Backward
+
+    def __init__(self, shift=None, scale=None, reinterpreted_batch_ndims=0):
+        if scale is None:
+            scaling = tfb.Identity()
+        else:
+            scaling = tfb.Scale(scale)
+        if shift is None:
+            shifting = tfb.Identity()
+        else:
+            shifting = tfb.Shift(shift)
+        self._transform = tfb.Chain([scaling, shifting])
+        self._reinterpreted_batch_ndims = reinterpreted_batch_ndims
+
+    def forward(self, x):
+        return self._transform.inverse(x)
+
+    def inverse(self, z):
+        return self._transform.forward(z)
+
+    def forward_log_det_jacobian(self, x):
+        return self._transform.inverse_log_det_jacobian(
+            x, self._transform.inverse_min_event_ndims + self._reinterpreted_batch_ndims
+        )
+
+    def inverse_log_det_jacobian(self, z):
+        return self._transform.forward_log_det_jacobian(
+            z, self._transform.forward_min_event_ndims + self._reinterpreted_batch_ndims
+        )
+
+
 class SoftPlus(Transform):
     name = "SoftPlus"
     JacobianPreference = JacobianPreference.Backward

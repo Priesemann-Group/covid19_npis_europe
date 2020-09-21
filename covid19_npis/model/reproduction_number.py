@@ -426,7 +426,11 @@ def construct_R_0(name, loc, scale, hn_scale, modelParams):
     """
 
     R_0_star = yield Normal(
-        name="R_0^*", loc=loc, scale=scale, conditionally_independent=True,
+        name="R_0^*",
+        loc=loc,
+        scale=scale,
+        conditionally_independent=True,
+        transform=transformations.Normal(shift=loc),
     )
 
     sigma_R_0_c = yield HalfNormal(

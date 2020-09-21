@@ -94,9 +94,6 @@ def test_model(modelParams):
     len_gen_interv_kernel = 12
 
     # Create Reproduction Number for every age group
-    mean_R_0 = 2.5
-    beta_R_0 = 2.0
-    """
     R_0 = yield covid19_npis.model.reproduction_number.construct_R_0(
         name="R_0",
         loc=2.0,
@@ -104,29 +101,14 @@ def test_model(modelParams):
         hn_scale=0.3,  # Scale parameter of HalfNormal for each country
         modelParams=modelParams,
     )
-    """
-    R_0 = yield Gamma(
-        name="R_0",
-        concentration=mean_R_0 * beta_R_0,
-        rate=beta_R_0,
-        conditionally_independent=True,
-        event_stack=event_shape,
-        transform=transformations.SoftPlus(reinterpreted_batch_ndims=len(event_shape)),
-        shape_label=("country", "age_group"),
-    )
     log.debug(f"R_0:\n{R_0}")
-    batch_shape = list(R_0.shape[:-2])
-    country_shape = [modelParams.num_countries]
-    age_shape = [modelParams.num_age_groups]
 
     # Create interventions and change points from model parameters. Combine to R_t
     R_t = yield covid19_npis.model.reproduction_number.construct_R_t(R_0, modelParams)
-    # R_t = tf.stack([R_0] * 50)
     log.debug(f"R_t:\n{R_t}")
 
     # Create Contact matrix
     # Use Cholesky version as the non Cholesky version uses tf.linalg.slogdet which isn't implemented in JAX
-
     C = yield LKJCholesky(
         name="C_cholesky",
         dimension=modelParams.num_age_groups,
@@ -137,7 +119,6 @@ def test_model(modelParams):
         transform=transformations.CorrelationCholesky(reinterpreted_batch_ndims=1),
         shape_label=("country", "age_group_i", "age_group_j"),
     )  # |shape| batch_dims, num_countries, num_age_groups, num_age_groups
-    # C = tf.ones(batch_shape + country_shape + 2 * age_shape)
 
     C = yield Deterministic(
         name="C",
@@ -145,8 +126,7 @@ def test_model(modelParams):
         shape_label=("country", "age_group_i", "age_group_j"),
     )
     # Normalize C
-
-    C, _ = tf.linalg.normalize(C, axis=-2)
+    C, _ = tf.linalg.normalize(C, ord=1, axis=(-2, -1))
 
     log.debug(f"C_normalized:\n{C}")
 

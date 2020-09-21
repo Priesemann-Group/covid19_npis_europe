@@ -423,7 +423,7 @@ def construct_R_0(name, loc, scale, hn_scale, modelParams):
         :
             Generator for R_0 |shape| batch, country, age_group
     """
-
+    """
     R_0_star = yield Normal(
         name="R_0^*", loc=loc, scale=scale, conditionally_independent=True,
     )
@@ -452,5 +452,18 @@ def construct_R_0(name, loc, scale, hn_scale, modelParams):
         value=tf.expand_dims(R_0_star, axis=-1) + ΔR_0_c,
         shape_label=("country"),
     )
-
     return tf.stack([R_0] * modelParams.num_age_groups, axis=-1)
+    """
+    """ Fix for now since the things above are not working yet"""
+    mean_R_0 = 2.5
+    beta_R_0 = 2.0
+    R_0 = yield Gamma(
+        name="R_0",
+        concentration=mean_R_0 * beta_R_0,
+        rate=beta_R_0,
+        conditionally_independent=True,
+        event_stack=event_shape,
+        transform=transformations.SoftPlus(reinterpreted_batch_ndims=len(event_shape)),
+        shape_label=("country", "age_group"),
+    )
+    return R_0

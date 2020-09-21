@@ -21,7 +21,9 @@ import logging
 log = logging.getLogger(__name__)
 
 
-def timeseries(trace, sample_state, key, plot_observed=False):
+def timeseries(
+    trace, sample_state, key, plot_observed=False, plot_chain_separated=False
+):
     """
     Create time series overview for a a give variable, i.e. plot for every additional dimension.
     Should only done to variables with a time shape label at position 0!
@@ -44,7 +46,7 @@ def timeseries(trace, sample_state, key, plot_observed=False):
 
     # Convert trace to dataframe
     df = convert_trace_to_dataframe(trace, sample_state, key)
-
+    # log.info(df)
     # Get other important properties
     model_name = get_model_name_from_sample_state(sample_state)
     dist = get_dist_by_name_from_sample_state(sample_state, key)
@@ -62,10 +64,22 @@ def timeseries(trace, sample_state, key, plot_observed=False):
 
         df = df.unstack(level="time").T
         df.index = df.index.droplevel(0)
-        # Plot model
+        # Plot model once for each chain
         fig, axes = plt.subplots(1, 1, figsize=(6, 3))
+        # Plot each chain
         axes = _timeseries(df.index, df.to_numpy(), ax=axes, what="model")
 
+        if plot_chain_separated:
+            for c in df.column.get_level_values("chain").unique():
+                axes = _timeseries(
+                    df.index,
+                    df.xs(c, level="chain", axis=1).to_numpy(),
+                    ax=axes,
+                    what="model",
+                    color=None,
+                    label=f"Chain {c}",
+                )
+                axes.legend()
         return fig, axes
 
     def timeseries_ndim_2():
@@ -90,7 +104,18 @@ def timeseries(trace, sample_state, key, plot_observed=False):
             df_t.index = df_t.index.droplevel(0)
             # Plot model
             axes[i] = _timeseries(df_t.index, df_t.to_numpy(), ax=axes[i], what="model")
-            # Plot data
+
+            if plot_chain_separated:
+                for c in df.index.get_level_values("chain").unique():
+                    axes[i] = _timeseries(
+                        df_t.index,
+                        df_t.xs(c, level="chain", axis=1).to_numpy(),
+                        ax=axes[i],
+                        what="model",
+                        color=None,
+                        label=f"Chain {c}",
+                    )
+                    axes[i].legend()
         return fig, axes
 
     def timeseries_ndim_3():
@@ -129,6 +154,17 @@ def timeseries(trace, sample_state, key, plot_observed=False):
                         ax=axes[j][i],
                         what="data",
                     )
+                if plot_chain_separated:
+                    for c in df.index.get_level_values("chain").unique():
+                        axes[j][i] = _timeseries(
+                            model.index,
+                            model.xs(c, level="chain", axis=1).to_numpy(),
+                            ax=axes[j][i],
+                            what="model",
+                            color=None,
+                            label=f"Chain {c}",
+                        )
+                        axes[j][i].legend()
 
                 # Set labels on y-axis
         for i in range(rows):

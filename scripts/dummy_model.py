@@ -280,7 +280,7 @@ ts_fig = {}
 ts_axes = {}
 for name in ts_names:
     ts_fig[name], ts_axes[name] = covid19_npis.plot.timeseries(
-        trace, sample_state=sample_state, key=name
+        trace, sample_state=sample_state, key=name, plot_chain_separated=True,
     )
     # plot data into new_cases
     if name == "new_I_t":

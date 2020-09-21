@@ -13,6 +13,7 @@ from covid19_npis.model.distributions import (
     LogNormal,
     Deterministic,
     HalfNormal,
+    Gamma,
 )
 from .. import modelParams
 
@@ -423,7 +424,7 @@ def construct_R_0(name, loc, scale, hn_scale, modelParams):
         :
             Generator for R_0 |shape| batch, country, age_group
     """
-    """
+
     R_0_star = yield Normal(
         name="R_0^*", loc=loc, scale=scale, conditionally_independent=True,
     )
@@ -447,20 +448,21 @@ def construct_R_0(name, loc, scale, hn_scale, modelParams):
     ) * tf.expand_dims(sigma_R_0_c, axis=-1)
 
     # Add to trace via deterministic
-    R_0 = yield Deterministic(
-        name=name,
-        value=tf.expand_dims(R_0_star, axis=-1) + ΔR_0_c,
-        shape_label=("country"),
-    )
-    return tf.stack([R_0] * modelParams.num_age_groups, axis=-1)
-    """
-    """ Fix for now since the things above are not working yet"""
-    mean_R_0 = 2.5
-    beta_R_0 = 2.0
+    R_0 = tf.expand_dims(R_0_star, axis=-1) + ΔR_0_c
+    # Softplus because we want to make sure that R_0 > 0.
+    R_0 = 0.1 * tf.math.softplus(10 * R_0)
+    R_0 = yield Deterministic(name=name, value=R_0, shape_label=("country"),)
+
+    return tf.repeat(R_0[..., tf.newaxis], repeats=modelParams.num_age_groups, axis=-1)
+
+
+def construct_R_0_old(name, mean, beta, modelParams):
+    """Old constructor of R_0 using gamma distribution """
+    event_shape = (modelParams.num_countries, modelParams.num_age_groups)
     R_0 = yield Gamma(
-        name="R_0",
-        concentration=mean_R_0 * beta_R_0,
-        rate=beta_R_0,
+        name=name,
+        concentration=mean * beta,
+        rate=beta,
         conditionally_independent=True,
         event_stack=event_shape,
         transform=transformations.SoftPlus(reinterpreted_batch_ndims=len(event_shape)),

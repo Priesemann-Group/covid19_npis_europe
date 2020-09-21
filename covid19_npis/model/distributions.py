@@ -26,6 +26,7 @@ dists_to_modify = [
     "StudentT",
     "Gamma",
     "HalfNormal",
+    "Deterministic",
 ]
 
 
@@ -73,6 +74,7 @@ def other_init(self, *args, **kwargs):
     # print("This is a modified __init__")
 
 
+"""
 class Deterministic(Distribution):
     def __init__(self, name, value, **kwargs):
         super().__init__(name, loc=value, **kwargs)
@@ -87,7 +89,7 @@ vars()["Deterministic"] = types.new_class(
     "Deterministic", (DistributionAdditions, Deterministic)
 )
 __all__ = dists_to_modify + ["Deterministic"]
-
+"""
 
 LogNormal.__init__ = other_init
 Normal.__init__ = other_init

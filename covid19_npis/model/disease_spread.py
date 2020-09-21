@@ -1,7 +1,7 @@
 import tensorflow as tf
 import logging
 import pymc4 as pm
-from .utils import gamma
+from .utils import gamma, convolution_with_fixed_kernel
 import numpy as np
 import tensorflow_probability as tfp
 
@@ -331,11 +331,6 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
                     \tilde{I}(t) &= \frac{S(t)}{N} \cdot R_{eff} \cdot \sum_{\tau=0}^{t} \tilde{I}(t-1-\tau) g(\tau) \\
                     S(t) &= S(t-1) - \tilde{I}(t-1)
 
-    TODO
-    ----
-    - rewrite while loop to tf.scan function
-
-
     Parameters
     ----------
     I_0:
@@ -370,11 +365,12 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
         # Internal state
         f = S_t / N
 
-        # These are the infections over which the convolution is done
-        # log.debug(f"I_lastv: {I_lastv}")
+        # Convolution:
 
+        log.info(f"I_t {I_t}")
         # Calc "infectious" people, weighted by serial_p (country x age_group)
-        infectious = tf.einsum("t...ca,...t->...ca", I_lastv, gen_kernel)
+
+        infectious = tf.einsum("t...ca,...t->...ca", I_lastv, gen_kernel)  # Convolution
 
         # Calculate effective R_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
         R_sqrt = tf.math.sqrt(R)
@@ -392,7 +388,7 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
         new = tf.einsum("...ci,...cij,...cj->...cj", infectious, R_eff, f) + h
         new = tf.clip_by_value(new, 0, 1e9)
 
-        log.debug(f"new:\n{new}")
+        log.debug(f"new:\n{new}")  # kernel_time,batch,country,age_group
         I_nextv = tf.concat(
             [new[tf.newaxis, ...], I_lastv[:-1, ...],], axis=0,
         )  # Create new infected population for new step, insert latest at front
@@ -425,8 +421,7 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
     )
 
     # Transpose tensor in order to have batch dim before time dim
-    if len(daily_infections_final.shape) == 4:
-        daily_infections_final = tf.transpose(daily_infections_final, perm=(1, 0, 2, 3))
+    daily_infections_final = tf.einsum("t...ca->...tca", daily_infections_final)
 
     return daily_infections_final  # batch_dims x time x country x age
 

@@ -29,5 +29,6 @@ params = {
     "g": 4.0,
 }
 
-
+# Create test country dataset with params above
+# One intervention and changepoint
 covid19_npis.test_data.data_generators.save_data("../data", **params)

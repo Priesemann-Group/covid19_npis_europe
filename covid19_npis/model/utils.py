@@ -229,10 +229,10 @@ def einsum_indexed(
     outer_tensor = 0
     tensor1_broadcast_to = [None for _ in range(len(tensor1.shape))]
     tensor2_broadcast_to = [None for _ in range(len(tensor2.shape))]
-
+    """
     print(ind_inputs1)
     print(ind_inputs2)
-
+    """
     for i in range(1, max(len(tensor1.shape), len(tensor2.shape)) + 1):
         input1_end = i > len(tensor1.shape)
         input2_end = i > len(tensor2.shape)
@@ -283,7 +283,7 @@ def einsum_indexed(
                 broadcast_dim = max(
                     tensor2.shape[-i], tensor1.shape[broadcasting_index]
                 )
-                print(broadcast_dim)
+                # print(broadcast_dim)
                 tensor2_broadcast_to[-i] = broadcast_dim
                 tensor1_broadcast_to[broadcasting_index] = broadcast_dim
 

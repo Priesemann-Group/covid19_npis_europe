@@ -94,6 +94,7 @@ def test_model(modelParams):
     len_gen_interv_kernel = 12
 
     # Create Reproduction Number for every age group
+
     R_0 = yield covid19_npis.model.reproduction_number.construct_R_0(
         name="R_0",
         loc=2.0,
@@ -101,7 +102,12 @@ def test_model(modelParams):
         hn_scale=0.3,  # Scale parameter of HalfNormal for each country
         modelParams=modelParams,
     )
-    log.debug(f"R_0:\n{R_0}")
+    """
+    R_0 = yield covid19_npis.model.reproduction_number.construct_R_0_old(
+        "R_0", 2.5, 2.0, modelParams
+    )
+    """
+    log.info(f"R_0:\n{R_0}")
 
     # Create interventions and change points from model parameters. Combine to R_t
     R_t = yield covid19_npis.model.reproduction_number.construct_R_t(R_0, modelParams)
@@ -126,9 +132,9 @@ def test_model(modelParams):
         shape_label=("country", "age_group_i", "age_group_j"),
     )
     # Normalize C
-    C, _ = tf.linalg.normalize(C, ord=1, axis=(-2, -1))
+    C, _ = tf.linalg.normalize(C, ord=1, axis=-1)
 
-    log.debug(f"C_normalized:\n{C}")
+    log.info(f"C_normalized:\n{C}")
 
     # Create normalized pdf of generation interval
     (
@@ -195,7 +201,7 @@ def test_model(modelParams):
     )
 
     # kernel =
-    # new_cases = covid19_npis.model.utils.convolution_with_fixed_kernel(new_I_t, )
+    # new_cases = covid19_npis.model.utils.convolution_with_fixed_kernel(new_I_t, kernel)
 
     likelihood = yield covid19_npis.model.studentT_likelihood(modelParams, new_I_t)
 
@@ -269,7 +275,7 @@ for name in dist_names:
 
 """ ## Plot time series
 """
-ts_names = ["new_I_t", "R_t"]
+ts_names = ["new_I_t", "R_t", "h_0_t"]
 ts_fig = {}
 ts_axes = {}
 for name in ts_names:

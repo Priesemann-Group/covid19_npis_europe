@@ -56,7 +56,7 @@ from covid19_npis.model.distributions import (
 """ # Debugging and other snippets
 """
 # For eventual debugging:
-# tf.config.run_functions_eagerly(True)
+tf.config.run_functions_eagerly(True)
 # tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
 
 # Force CPU
@@ -122,7 +122,7 @@ def test_model(modelParams):
         conditionally_independent=True,
         event_stack=modelParams.num_countries,
         validate_args=True,
-        transform=transformations.CorrelationCholesky(reinterpreted_batch_ndims=1),
+        transform=transformations.CorrelationCholesky(),
         shape_label=("country", "age_group_i", "age_group_j"),
     )  # |shape| batch_dims, num_countries, num_age_groups, num_age_groups
 

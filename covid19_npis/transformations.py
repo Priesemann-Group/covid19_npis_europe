@@ -1,42 +1,13 @@
-from pymc4.distributions.transforms import Transform, JacobianPreference
+from pymc4.distributions.transforms import BackwardTransform, JacobianPreference
 from tensorflow_probability import bijectors as tfb
 
 
-class Log(Transform):
-    name = "log"
+
+class Normal(BackwardTransform):
+    name = "Normal"
     JacobianPreference = JacobianPreference.Backward
 
-    def __init__(self, scale=None, reinterpreted_batch_ndims=0):
-        # NOTE: We actually need the inverse to match PyMC3, do we?
-        if scale is None:
-            scaling = tfb.Identity()
-        else:
-            scaling = tfb.Scale(scale)
-        self._transform = tfb.Chain([scaling, tfb.Exp()])
-        self._reinterpreted_batch_ndims = reinterpreted_batch_ndims
-
-    def forward(self, x):
-        return self._transform.inverse(x)
-
-    def inverse(self, z):
-        return self._transform.forward(z)
-
-    def forward_log_det_jacobian(self, x):
-        return self._transform.inverse_log_det_jacobian(
-            x, self._transform.inverse_min_event_ndims + self._reinterpreted_batch_ndims
-        )
-
-    def inverse_log_det_jacobian(self, z):
-        return self._transform.forward_log_det_jacobian(
-            z, self._transform.forward_min_event_ndims + self._reinterpreted_batch_ndims
-        )
-
-
-class Normal(Transform):
-    name = "normal"
-    JacobianPreference = JacobianPreference.Backward
-
-    def __init__(self, shift=None, scale=None, reinterpreted_batch_ndims=0):
+    def __init__(self, shift=None, scale=None,  **kwargs):
         if scale is None:
             scaling = tfb.Identity()
         else:
@@ -45,141 +16,69 @@ class Normal(Transform):
             shifting = tfb.Identity()
         else:
             shifting = tfb.Shift(shift)
-        self._transform = tfb.Chain([scaling, shifting])
-        self._reinterpreted_batch_ndims = reinterpreted_batch_ndims
-
-    def forward(self, x):
-        return self._transform.inverse(x)
-
-    def inverse(self, z):
-        return self._transform.forward(z)
-
-    def forward_log_det_jacobian(self, x):
-        return self._transform.inverse_log_det_jacobian(
-            x, self._transform.inverse_min_event_ndims + self._reinterpreted_batch_ndims
-        )
-
-    def inverse_log_det_jacobian(self, z):
-        return self._transform.forward_log_det_jacobian(
-            z, self._transform.forward_min_event_ndims + self._reinterpreted_batch_ndims
-        )
+        transform = tfb.Chain([scaling, shifting])
+        super().__init__(transform, **kwargs)
 
 
-class SoftPlus(Transform):
+class SoftPlus(BackwardTransform):
     name = "SoftPlus"
     JacobianPreference = JacobianPreference.Backward
 
-    def __init__(self, scale=None, reinterpreted_batch_ndims=0):
+    def __init__(self, scale=None, **kwargs):
         if scale is None:
             scaling = tfb.Identity()
         else:
             scaling = tfb.Scale(scale)
-        self._transform = tfb.Chain([scaling, tfb.Softplus()])
-        self._reinterpreted_batch_ndims = reinterpreted_batch_ndims
-
-    def forward(self, x):
-        return self._transform.inverse(x)
-
-    def inverse(self, z):
-        return self._transform.forward(z)
-
-    def forward_log_det_jacobian(self, x):
-        return self._transform.inverse_log_det_jacobian(
-            x, self._transform.inverse_min_event_ndims + self._reinterpreted_batch_ndims
-        )
-
-    def inverse_log_det_jacobian(self, z):
-        return self._transform.forward_log_det_jacobian(
-            z, self._transform.forward_min_event_ndims + self._reinterpreted_batch_ndims
-        )
+        transform = tfb.Chain([scaling, tfb.Softplus()])
+        super().__init__(transform, **kwargs)
 
 
-class SoftPlus_SinhArcsinh(Transform):
+
+
+class SoftPlus_SinhArcsinh(BackwardTransform):
     name = "SoftPlus_SinhTanh"
     JacobianPreference = JacobianPreference.Backward
 
     def __init__(
-        self, scale=None, skewness=None, tailweight=None, reinterpreted_batch_ndims=0
+        self, scale=None, skewness=None, tailweight=None, **kwargs
     ):
         if scale is None:
             scaling = tfb.Identity()
         else:
             scaling = tfb.Scale(scale)
-        self._transform = tfb.Chain(
+        transform = tfb.Chain(
             [scaling, tfb.Softplus(), tfb.SinhArcsinh(skewness, tailweight,),]
         )
-        self._reinterpreted_batch_ndims = reinterpreted_batch_ndims
-
-    def forward(self, x):
-        return self._transform.inverse(x)
-
-    def inverse(self, z):
-        return self._transform.forward(z)
-
-    def forward_log_det_jacobian(self, x):
-        return self._transform.inverse_log_det_jacobian(
-            x, self._transform.inverse_min_event_ndims + self._reinterpreted_batch_ndims
-        )
-
-    def inverse_log_det_jacobian(self, z):
-        return self._transform.forward_log_det_jacobian(
-            z, self._transform.forward_min_event_ndims + self._reinterpreted_batch_ndims
-        )
+        super().__init__(transform, **kwargs)
 
 
-class Deterministic(Transform):
+
+
+class Deterministic(BackwardTransform):
     name = "SoftPlus_SinhTanh"
     JacobianPreference = JacobianPreference.Backward
 
     def __init__(
-        self, scale=None, skewness=None, tailweight=None, reinterpreted_batch_ndims=0
+        self, scale=None, skewness=None, tailweight=None, **kwargs
     ):
         if scale is None:
             scaling = tfb.Identity()
         else:
             scaling = tfb.Scale(scale)
-        self._transform = tfb.Chain(
+        transform = tfb.Chain(
             [scaling, tfb.Softplus(), tfb.SinhArcsinh(skewness, tailweight,),]
         )
-        self._reinterpreted_batch_ndims = reinterpreted_batch_ndims
-
-    def forward(self, x):
-        return self._transform.inverse(x)
-
-    def inverse(self, z):
-        return self._transform.forward(z)
-
-    def forward_log_det_jacobian(self, x):
-        return self._transform.inverse_log_det_jacobian(
-            x, self._transform.inverse_min_event_ndims + self._reinterpreted_batch_ndims
-        )
-
-    def inverse_log_det_jacobian(self, z):
-        return self._transform.forward_log_det_jacobian(
-            z, self._transform.forward_min_event_ndims + self._reinterpreted_batch_ndims
-        )
+        super().__init__(transform, **kwargs)
 
 
-class CorrelationCholesky(Transform):
+
+
+class CorrelationCholesky(BackwardTransform):
     name = "CorrelationCholesky"
     JacobianPreference = JacobianPreference.Backward
 
-    def __init__(self, reinterpreted_batch_ndims=0):
-        self._transform = tfb.CorrelationCholesky()
-        self._reinterpreted_batch_ndims = reinterpreted_batch_ndims
+    def __init__(self, **kwargs):
+        transform = tfb.CorrelationCholesky()
+        super().__init__(transform, **kwargs)
 
-    def forward(self, x):
-        return self._transform.inverse(x)
 
-    def inverse(self, z):
-        return self._transform.forward(z)
-
-    def forward_log_det_jacobian(self, x):
-        return self._transform.inverse_log_det_jacobian(
-            x, self._transform.inverse_min_event_ndims + self._reinterpreted_batch_ndims
-        )
-
-    def inverse_log_det_jacobian(self, z):
-        return self._transform.forward_log_det_jacobian(
-            z, self._transform.forward_min_event_ndims + self._reinterpreted_batch_ndims
-        )

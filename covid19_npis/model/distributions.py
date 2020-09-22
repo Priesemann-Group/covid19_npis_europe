@@ -17,8 +17,10 @@ import pymc4 as pm
 from pymc4 import Distribution
 import types
 import tensorflow_probability as tfp
+import tensorflow as tf
 
 dists_to_modify = [
+    "Deterministic",
     "LogNormal",
     "Normal",
     "LKJCholesky",
@@ -40,14 +42,9 @@ class DistributionAdditions:
 
         if "shape_label" in kwargs:
             self.shape_label = kwargs.get("shape_label")
+            event_ndim = len(self.shape_label)
             del kwargs["shape_label"]
 
-        if "transformation" in kwargs and "shape" in kwargs:
-            if kwargs["transformation"]._reinterpreted_batch_ndims != len(self.shape):
-                log.warning(
-                    f"Automatically setting reinterpreted_batch_ndims to length of event_stack in transofrmation for {self.name}"
-                )
-                kwargs["transformation"]._reinterpreted_batch_ndims = len(self.shape)
 
         super().__init__(*args, **kwargs)
 
@@ -77,12 +74,13 @@ def other_init(self, *args, **kwargs):
 """
 class Deterministic(Distribution):
     def __init__(self, name, value, **kwargs):
-        super().__init__(name, loc=value, **kwargs)
+        with tf.name_scope(name):
+            super().__init__(name, loc=value, **kwargs)
 
     @staticmethod
     def _init_distribution(conditions, **kwargs):
         loc = conditions["loc"]
-        return tfp.distributions.VectorDeterministic(loc=loc, **kwargs)
+        return tfp.distributions.Deterministic(loc=loc, **kwargs)
 
 
 vars()["Deterministic"] = types.new_class(

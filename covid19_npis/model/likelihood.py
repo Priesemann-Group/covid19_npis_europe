@@ -19,7 +19,7 @@ def studentT_likelihood(modelParams, new_cases):
         scale=50.0,
         event_stack=modelParams.num_countries,
         conditionally_independent=True,
-        transform=transformations.SoftPlus(reinterpreted_batch_ndims=1),
+        transform=transformations.SoftPlus(),
         shape_label="country",
     )
     sigma = sigma[..., tf.newaxis, :, tf.newaxis]

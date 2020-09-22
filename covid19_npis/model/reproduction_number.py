@@ -469,7 +469,7 @@ def construct_R_0_old(name, mean, beta, modelParams):
         rate=beta,
         conditionally_independent=True,
         event_stack=event_shape,
-        transform=transformations.SoftPlus(reinterpreted_batch_ndims=len(event_shape)),
+        transform=transformations.SoftPlus(),
         shape_label=("country", "age_group"),
     )
     return R_0

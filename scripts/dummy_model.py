@@ -107,7 +107,7 @@ def test_model(modelParams):
         "R_0", 2.5, 2.0, modelParams
     )
     """
-    log.info(f"R_0:\n{R_0}")
+    log.debug(f"R_0:\n{R_0}")
 
     # Create interventions and change points from model parameters. Combine to R_t
     R_t = yield covid19_npis.model.reproduction_number.construct_R_t(R_0, modelParams)
@@ -134,7 +134,7 @@ def test_model(modelParams):
     # Normalize C
     C, _ = tf.linalg.normalize(C, ord=1, axis=-1)
 
-    log.info(f"C_normalized:\n{C}")
+    log.debug(f"C_normalized:\n{C}")
 
     # Create normalized pdf of generation interval
     (
@@ -215,10 +215,10 @@ begin_time = time.time()
 
 trace = pm.sample(
     test_model(modelParams),
-    num_samples=100,
-    burn_in=200,
+    num_samples=50,
+    burn_in=100,
     use_auto_batching=False,
-    num_chains=2,
+    num_chains=3,
     xla=True,
 )
 

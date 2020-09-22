@@ -367,7 +367,7 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
 
         # Convolution:
 
-        log.info(f"I_t {I_t}")
+        log.debug(f"I_t {I_t}")
         # Calc "infectious" people, weighted by serial_p (country x age_group)
 
         infectious = tf.einsum("t...ca,...t->...ca", I_lastv, gen_kernel)  # Convolution
@@ -413,6 +413,7 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
         as well as time evolution of susceptibles
         as lists
     """
+
     initial = (tf.zeros(S_initial.shape, dtype=S_initial.dtype), I_0_initial, S_initial)
     out = tf.scan(fn=loop_body, elems=(R_t_for_loop, h_t_for_loop), initializer=initial)
     daily_infections_final = out[0]

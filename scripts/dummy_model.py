@@ -66,6 +66,8 @@ covid19_npis.utils.force_cpu_for_tensorflow()
 """ # 1. Data Retrieval
     Load data for different countries/regions, for now we have to define every
     country by hand maybe we want to automatize that at some point.
+
+    TODO: maybe we want to outsource that to a different file at some point
 """
 
 # Load our data from csv files into our own custom data classes
@@ -84,17 +86,16 @@ c2 = covid19_npis.data.Country(
 modelParams = covid19_npis.ModelParams(countries=[c1, c2])
 
 
-""" # Construct pymc4 model
+""" # 2. Construct pymc4 model
 """
 
 
 @pm.model()
 def test_model(modelParams):
-    event_shape = (modelParams.num_countries, modelParams.num_age_groups)
-    len_gen_interv_kernel = 12
 
-    # Create Reproduction Number for every age group
-
+    """ # Create initial Reproduction Number R_0:
+    The returned R_0 tensor has the |shape| batch, country, age_group.
+    """
     R_0 = yield covid19_npis.model.reproduction_number.construct_R_0(
         name="R_0",
         loc=2.0,
@@ -102,19 +103,20 @@ def test_model(modelParams):
         hn_scale=0.3,  # Scale parameter of HalfNormal for each country
         modelParams=modelParams,
     )
-    """
-    R_0 = yield covid19_npis.model.reproduction_number.construct_R_0_old(
-        "R_0", 2.5, 2.0, modelParams
-    )
-    """
     log.debug(f"R_0:\n{R_0}")
 
-    # Create interventions and change points from model parameters. Combine to R_t
+    """ # Create time dependent reproduction number R(t):
+    Create interventions and change points from model parameters and initial reproduction number.
+    Finally combine to R(t).
+    The returned R(t) tensor has the |shape| time, batch, country, age_group.
+    """
     R_t = yield covid19_npis.model.reproduction_number.construct_R_t(R_0, modelParams)
     log.debug(f"R_t:\n{R_t}")
 
-    # Create Contact matrix
-    # Use Cholesky version as the non Cholesky version uses tf.linalg.slogdet which isn't implemented in JAX
+    """ # Create Contact matrix C:
+    We use the Cholesky version as the non Cholesky version uses tf.linalg.slogdet which isn't implemented in JAX.
+    The returned tensor has the |shape| batch, country, age_group, age_group.
+    """
     C = yield LKJCholesky(
         name="C_cholesky",
         dimension=modelParams.num_age_groups,
@@ -124,18 +126,20 @@ def test_model(modelParams):
         validate_args=True,
         transform=transformations.CorrelationCholesky(),
         shape_label=("country", "age_group_i", "age_group_j"),
-    )  # |shape| batch_dims, num_countries, num_age_groups, num_age_groups
-
+    )
+    # We add C to the trace via Deterministics
     C = yield Deterministic(
         name="C",
         value=tf.einsum("...an,...bn->...ab", C, C),
         shape_label=("country", "age_group_i", "age_group_j"),
     )
-    # Normalize C
+    # Finally we normalize C
     C, _ = tf.linalg.normalize(C, ord=1, axis=-1)
-
     log.debug(f"C_normalized:\n{C}")
 
+    """ # Create generation interval g:
+    """
+    len_gen_interv_kernel = 12
     # Create normalized pdf of generation interval
     (
         gen_kernel,  # shape: countries x len_gen_interv,
@@ -143,44 +147,39 @@ def test_model(modelParams):
     ) = yield covid19_npis.model.construct_generation_interval(l=len_gen_interv_kernel)
     log.debug(f"gen_interv:\n{gen_kernel}")
 
-    # Generate exponential distribution with initial infections as external input
-
+    """ # Generate exponential distribution initial infections h_0(t):
+    We need to generate initial infectious before our data starts, because we do a convolution
+    in the infectiousmodel loops. This convolution needs start values which we do not want
+    to set to 0!
+    The returned h_0(t) tensor has the |shape| time, batch, country, age_group.
+    """
     h_0_t = yield covid19_npis.model.construct_h_0_t(
         modelParams=modelParams,
         len_gen_interv_kernel=len_gen_interv_kernel,
         R_t=R_t,
         mean_gen_interv=mean_gen_interv,
         mean_test_delay=0,
-    )  # |shape| time, batch, countries, age_groups
-
+    )
+    # Add h_0(t) to trace
     yield Deterministic(
         "h_0_t",
         tf.einsum("t...ca->...tca", h_0_t),
         shape_label=("time", "country", "age_group"),
     )
+    log.debug(f"h_0(t):\n{h_0_t}")
 
+    """ # Create population size tensor (vector) N:
+    Should be done earlier in the real model i.e. in the modelParams
+    The N tensor has the |shape| country, age_group.
     """
-    h_0 = yield HalfCauchy(
-        name="I_0",
-        event_stack=(modelParams.num_countries, modelParams.num_age_groups),
-        scale=20,
-        transformation=transformations.SoftPlus(reinterpreted_batch_ndims=2),
-        shape_label=("country", "age_group"),
-        conditionally_independent=True,
-    )
-    if len(R_0.shape) == 3:
-        h_0 = tf.ones((3, 2, 4), dtype="float32")
-    else:
-        h_0 = tf.ones((2, 4), dtype="float32")
-    h_0_t = tf.stack([h_0] * 50)
-    """
-
-    # Create N tensor (vector)
-    # should be done earlier in the real model
     N = tf.convert_to_tensor([1e12, 1e12, 1e12, 1e12] * modelParams.num_countries)
-    N = tf.reshape(N, event_shape)
+    N = tf.reshape(N, (modelParams.num_countries, modelParams.num_age_groups))
     log.debug(f"N:\n{N}")
-    # Calculate new cases
+
+    """ # Create new cases new_I(t):
+    This is done via Infection dynamics in InfectionModel, see describtion
+    The returned tensor has the |shape| batch, time,country, age_group.
+    """
     new_I_t = covid19_npis.model.InfectionModel(
         N=N, h_0_t=h_0_t, R_t=R_t, C=C, gen_kernel=gen_kernel  # default valueOp:AddV2
     )
@@ -189,10 +188,14 @@ def test_model(modelParams):
     # Clip in order to avoid infinities
     new_I_t = tf.clip_by_value(new_I_t, 1e-7, 1e9)
 
+    # Add new_I_t to trace
     new_I_t = yield Deterministic(
         name="new_I_t", value=new_I_t, shape_label=("time", "country", "age_group"),
     )
 
+    """ # Reporting delay d:
+    TODO: implement
+    """
     mean_delay = yield LogNormal(
         name="mean_delay",
         loc=np.log(12, dtype="float32"),
@@ -215,8 +218,8 @@ begin_time = time.time()
 
 trace = pm.sample(
     test_model(modelParams),
-    num_samples=50,
-    burn_in=100,
+    num_samples=200,
+    burn_in=400,
     use_auto_batching=False,
     num_chains=3,
     xla=True,

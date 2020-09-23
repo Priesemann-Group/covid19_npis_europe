@@ -10,6 +10,13 @@ Disease spread
 
 .. autofunction:: covid19_npis.model.disease_spread.construct_h_0_t
 
+Reproduction number
+^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: covid19_npis.model.reproduction_number
+	:members:
+	:private-members: _create_distributions
+
 Utility
 ^^^^^^^
 

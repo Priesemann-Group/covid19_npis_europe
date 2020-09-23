@@ -76,6 +76,7 @@ autodoc_mock_imports = [
     "pymc3",
     "theano",
     "pandas",
+    "arviz",
 ]
 
 # Add any paths that contain templates here, relative to this directory.

@@ -49,38 +49,40 @@ def _fsigmoid(t, l, d):
 
 def _create_distributions(modelParams):
     r"""
-    Returns a dict of distributions for further processing/sampling with the following priors:
+        Returns a dict of distributions for further processing/sampling with the following priors:
 
-    .. math::
+        .. math::
 
-        \alpha^\dagger_i &\sim \mathcal{N}\left(-1, 2\right)\quad \forall i,\\
-        \Delta \alpha^\dagger_c &\sim \mathcal{N}\left(0, \sigma_{\alpha, \text{country}}\right) \quad \forall c, \\
-        \Delta \alpha^\dagger_a &\sim \mathcal{N}\left(0, \sigma_{\alpha, \text{age}}\right)\quad \forall a, \\
-        \sigma_{\alpha, \text{country}}  &\sim HalfNormal\left(0.1\right),\\
-        \sigma_{\alpha, \text{age}} &\sim HalfNormal\left(0.1\right)
-    
-    .. math::
+            \alpha^\dagger_i &\sim \mathcal{N}\left(-1, 2\right)\quad \forall i,\\
+            \Delta \alpha^\dagger_c &\sim \mathcal{N}\left(0, \sigma_{\alpha, \text{country}}\right) \quad \forall c, \\
+            \Delta \alpha^\dagger_a &\sim \mathcal{N}\left(0, \sigma_{\alpha, \text{age}}\right)\quad \forall a, \\
+            \sigma_{\alpha, \text{country}}  &\sim HalfNormal\left(0.1\right),\\
+            \sigma_{\alpha, \text{age}} &\sim HalfNormal\left(0.1\right)
+        
+        .. math::
 
-        l^\dagger_{\text{positive}} &\sim \mathcal{N}\left(3, 1\right),\\
-        l^\dagger_{\text{negative}} &\sim \mathcal{N}\left(5, 2\right),\\
-        \Delta l^\dagger_i &\sim \mathcal{N}\left(0,\sigma_{l, \text{interv.}} \right)\quad \forall i,\\
-        \sigma_{l, \text{interv.}}&\sim HalfNormal\left(1\right)
+            l^\dagger_{\text{positive}} &\sim \mathcal{N}\left(3, 1\right),\\
+            l^\dagger_{\text{negative}} &\sim \mathcal{N}\left(5, 2\right),\\
+            \Delta l^\dagger_i &\sim \mathcal{N}\left(0,\sigma_{l, \text{interv.}} \right)\quad \forall i,\\
+            \sigma_{l, \text{interv.}}&\sim HalfNormal\left(1\right)
 
-    .. math::
+        .. math::
 
-        \Delta d_i  &\sim \mathcal{N}\left(0, \sigma_{d, \text{interv.}}\right)\quad \forall i,\\
-        \Delta d_c &\sim \mathcal{N}\left(0, \sigma_{d, \text{country}}\right)\quad \forall c,\\
-        \sigma_{d, \text{interv.}}  &\sim HalfNormal\left(0.3\right),\\
-        \sigma_{d, \text{country}} &\sim HalfNormal\left(0.3\right)
+            \Delta d_i  &\sim \mathcal{N}\left(0, \sigma_{d, \text{interv.}}\right)\quad \forall i,\\
+            \Delta d_c &\sim \mathcal{N}\left(0, \sigma_{d, \text{country}}\right)\quad \forall c,\\
+            \sigma_{d, \text{interv.}}  &\sim HalfNormal\left(0.3\right),\\
+            \sigma_{d, \text{country}} &\sim HalfNormal\left(0.3\right)
 
-    Parameter
-    ---------
-    modelParams
+        Parameters
+        ----------
+        modelParams: :py:class:`covid19_npis.ModelParams`
+            Instance of modelParams, mainly used for number of age groups and
+            number of countries. 
 
-    Return
-    ------
-    :
-        interventions, distributions
+        Return
+        ------
+        :
+            interventions, distributions
     """
     log.debug("_create_distributions")
 
@@ -220,23 +222,60 @@ def _create_distributions(modelParams):
 
 
 def construct_R_t(R_0, modelParams):
-    """
-    Constructs the time dependent reproduction number :math:`R(t)` for every country and age group.
+    r"""
+        Constructs the time dependent reproduction number :math:`R(t)` for every country and age group.
+        There are a lot of things happening here be sure to check our paper for more indepth explanations! 
 
-    
-    Parameter
-    ---------
+        We build the effectivity in an hierarchical manner in the unbounded space:
 
-    R_0:
-        |shape| batch, country, age group
+        .. math::
 
-    modelParams: 
+            \alpha_{i,c,a} &= \frac{1}{1+e^{-\alpha^\dagger_{i,c,a}}},\\
+            \alpha^\dagger_{i,c,a} &= \alpha^\dagger_i + \Delta \alpha^\dagger_c + \Delta \alpha^\dagger_{a}
+        
+        The length of the change point depends on the intervention and whether the
+        strength is increasing or decreasing:
 
-    Return
-    ------
-    R_t:
-        Reproduction number matrix.
-        |shape| time, batch, country, age group
+        .. math::
+
+            l_{i, \text{sign}\left(\Delta \gamma\right)} &= \ln\left(1 + e^{l^\dagger_{i, \text{sign}\left(\Delta \gamma\right)}}\right),\\
+            l^\dagger_{i, \text{sign}\left(\Delta \gamma\right)} &= l^\dagger_{\text{sign}\left(\Delta \gamma\right)} + \Delta l^\dagger_i,
+
+        The date of the begin of the intervention is also allowed to vary slightly around the date :math:`d^{\text{data}}_{i,c}`
+        given by the Oxford government response tracker:
+
+        .. math::
+
+            d_{i,c,p} &= d^{\text{data}}_{i,c,p} + \Delta d_i +\Delta d_c
+
+        And finally the time dependent reproduction number :math:`R^*_e`:
+
+        .. math::
+            
+            \gamma_{i,c,p}(t) &= \frac{1}{1+e^{-4/l_{i, \text{sign}\left(\Delta \gamma\right)} \cdot (t - d_{i,c,p})}} \cdot \Delta \gamma_{i,c,p}^{\text{data}}\\
+            \gamma_{i,c}(t) &= \sum_p \gamma_{i,c,p}(t)\\
+            R^*_e &= R^*_0 e^{-\sum_i^{N_i}\alpha_{i, c, a} \gamma_{i,c}(t)}
+
+        We also sometimes call the time dependent reproduction number R_t!
+
+
+        Parameters
+        ----------
+
+        R_0: tf.tensor
+            Initial reproduction number. Should be constructed using 
+            :py:func:`construct_R_0` or :py:func:`construct_R_0_old`.
+            |shape| batch, country, age group
+
+        modelParams: :py:class:`covid19_npis.ModelParams`
+            Instance of modelParams, mainly used for number of age groups and
+            number of countries. 
+
+        Return
+        ------
+        :
+            Time dependent reproduction number tensor :math:`R(t)`.
+            |shape| time, batch, country, age group
     """
     # Create distributions for date and hyperpriors.
     distributions = _create_distributions(modelParams)
@@ -399,7 +438,7 @@ def construct_R_t(R_0, modelParams):
 
 def construct_R_0(name, loc, scale, hn_scale, modelParams):
     r"""
-        Constructs R_0 as follows:
+        Constructs R_0 in the following hierarchical manner:
 
         .. math::
 
@@ -422,7 +461,7 @@ def construct_R_0(name, loc, scale, hn_scale, modelParams):
         Returns
         -------
         :
-            Generator for R_0 |shape| batch, country, age_group
+            R_0 tensor |shape| batch, country, age_group
     """
 
     R_0_star = yield Normal(
@@ -461,7 +500,28 @@ def construct_R_0(name, loc, scale, hn_scale, modelParams):
 
 
 def construct_R_0_old(name, mean, beta, modelParams):
-    """Old constructor of R_0 using gamma distribution """
+    r"""
+        Old constructor of :math:`R_0` using a gamma distribution:
+
+        .. math::
+            
+            R_0 &\sim Gamma\left(\mu=2.5,\beta=2.0\right)
+
+        Parameters
+        ----------
+        name: string
+            Name of the distribution for trace and debugging.
+        mean: 
+            Mean :math:`\mu` of the gamma distribution.
+        beta:
+            Rate :math:`\beta` of the gamma distribution.
+
+        Returns
+        -------
+        : 
+            R_0 tensor |shape| batch, country, age_group
+
+    """
     event_shape = (modelParams.num_countries, modelParams.num_age_groups)
     R_0 = yield Gamma(
         name=name,

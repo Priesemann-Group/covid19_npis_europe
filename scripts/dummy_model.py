@@ -194,7 +194,7 @@ def test_model(modelParams):
     )
 
     """ # Reporting delay d:
-    TODO: implement
+    TODO: implement -> maybe function in disease spread
     """
     mean_delay = yield LogNormal(
         name="mean_delay",
@@ -211,7 +211,7 @@ def test_model(modelParams):
     return likelihood
 
 
-""" # MCMC Sampling
+""" # 3. MCMC Sampling
 """
 
 begin_time = time.time()
@@ -229,7 +229,7 @@ end_time = time.time()
 log.info("running time: {:.1f}s".format(end_time - begin_time))
 
 
-""" # Plotting
+""" # 4. Plotting
 """
 import matplotlib.pyplot as plt
 import pandas as pd

@@ -9,16 +9,9 @@ log = logging.getLogger(__name__)
 
 class ModelParams:
     """ 
-        Class for all model parameters is used to among others add data and 
-        distrbution names/dimensions to the model.
-        Is also used by the plotting routines as references to distribution names etc.
-
-        Distribution params can be changed by overwriting the defaults
-
-        .. code-block::
-
-            params = ModelParams()
-            params.distributions["I_0"]["name"] = "my new fancy name"
+        This is a class for all model parameters. It is mainly used to have a convenient
+        to access data in model wide parameters e.g. start date for simulation.
+        
 
         This class also contains the data used for fitting. `dataframe` is the original
         dataframe. `data_tensor` is a tensor in the correct shape (time x countries x age)
@@ -48,6 +41,13 @@ class ModelParams:
 
     @property
     def countries(self):
+        """
+        Return
+        ------
+        :
+            List of all country objects.
+            See :py:class:`covid19_npis.data.Country`.
+        """
         return self._countries
 
     @countries.setter

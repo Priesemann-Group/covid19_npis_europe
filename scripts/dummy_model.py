@@ -51,7 +51,7 @@ from covid19_npis.model.distributions import (
     Normal,
     LogNormal,
 )
-
+from covid19_npis.model.utils import convolution_with_fixed_kernel
 
 """ # Debugging and other snippets
 """
@@ -194,19 +194,33 @@ def test_model(modelParams):
     )
 
     """ # Reporting delay d:
-    TODO: implement -> maybe function in disease spread
     """
-    mean_delay = yield LogNormal(
-        name="mean_delay",
+    delay = yield covid19_npis.model.construct_delay_kernel(
+        name="delay",
         loc=np.log(12, dtype="float32"),
-        scale=0.1,
-        event_shape=(modelParams.num_countries, 1),
+        scale=2.3,
+        length_kernel=12,
+        modelParams=modelParams,
     )
+    log.debug(f"delay kernel\n{delay}")
 
-    # kernel =
-    # new_cases = covid19_npis.model.utils.convolution_with_fixed_kernel(new_I_t, kernel)
-
-    likelihood = yield covid19_npis.model.studentT_likelihood(modelParams, new_I_t)
+    # Convolution with new_I_t:
+    if new_I_t.shape == 4:
+        filter_axes_data = (
+            -4,
+            -2,
+            -1,
+        )
+    else:
+        filter_axes_data = (
+            -2,
+            -1,
+        )
+    new_cases = convolution_with_fixed_kernel(
+        data=new_I_t, kernel=delay, data_time_axis=-3, filter_axes_data=filter_axes_data
+    )
+    log.info(f"new_cases\n{new_cases.shape}")
+    likelihood = yield covid19_npis.model.studentT_likelihood(modelParams, new_cases)
 
     return likelihood
 

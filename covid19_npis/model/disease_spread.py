@@ -534,3 +534,62 @@ def InfectionModel_unrolled(N, I_0, R_t, C, g_p):
         S_t = S_t - new_I
 
     return I_t  # batch_dims x time x country x age
+
+
+def construct_delay_kernel(name, loc, scale, length_kernel, modelParams):
+    r"""
+        Constructs delay :math:`d` in hierarchical manner:
+        
+        .. math::
+
+            \mu_{c}^d &\sim LogNormal\left(\mu=2.5,\sigma=0.1)\right \quad \forall c,\\
+            \sigma^d_c &\sim ? \\
+            d_{c} &= \text{PDF-Gamma}(\mu^d_c,\sigma_d)
+
+        Parameters
+        ----------
+        name:
+            Name of the delay distribution
+        loc:
+            Location of the hierarchical Lognormal distribution for the mean of the delay.
+        scale:
+            Theta parameter for now#
+        length_kernel:
+            Length of the delay kernel in days.
+        modelParams: :py:class:`covid19_npis.ModelParams`
+            Instance of modelParams, mainly used for number of age groups and
+            number of countries. 
+        Returns
+        -------
+        :
+            Generator for gamma probability density function.
+            |shape| batch, country, length_kernel
+
+        TODO
+        ----
+        Think about sigma distribution and how to parameterize it. Also implement that.
+
+    """
+    mean_delay = yield Normal(
+        name="mean_delay",
+        loc=loc,
+        scale=0.1,
+        event_stack=(
+            modelParams.num_countries,
+            1,
+        ),  # country, time placeholder -> we do not want to do tf.expanddims
+        transform=transformations.Normal(shift=loc, scale=0.1),
+    )
+    theta_delay = scale  # For now
+
+    # Time tensor
+    t = tf.range(0.0, length_kernel, 1.0, dtype="float32")
+
+    # Create gamma pdf from sampled mean and scale.
+    delay = gamma(t, mean_delay / theta_delay, 1.0 / theta_delay)
+
+    # Reshape delay i.e. add age group such that |shape| batch, time, country, age group
+    delay = tf.stack([delay] * modelParams.num_age_groups, axis=-1)
+    delay = tf.einsum("...cta->...cat", delay)
+
+    return delay

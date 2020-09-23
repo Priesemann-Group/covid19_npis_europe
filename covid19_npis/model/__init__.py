@@ -3,6 +3,7 @@ from .disease_spread import (
     construct_generation_interval,
     InfectionModel_unrolled,
     construct_h_0_t,
+    construct_delay_kernel,
 )
 
 from .likelihood import studentT_likelihood

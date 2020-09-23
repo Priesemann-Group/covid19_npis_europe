@@ -535,3 +535,34 @@ def convolution_with_varying_kernel(data, kernel, data_time_axis, filter_axes_da
         vec2=data_time_axis,
     )
     return result
+
+
+def convolution_with_map(data, kernel, modelParams):
+    """
+    Parameters
+    ----------
+    data: 
+    """
+    kernel_len = kernel.shape[-1]
+    shape_padding = []
+    for i in data.shape:
+        shape_padding.append(i)
+    shape_padding[-1] = kernel_len
+    data_shift = tf.concat(
+        values=[tf.zeros(shape_padding, dtype="float32"), data], axis=-1, name="concat"
+    )
+    log.info(data_shift.shape)
+    log.info(kernel.shape)
+
+    convolution = tf.map_fn(
+        fn=lambda tau: tf.einsum(
+            "...cat,...ct->...ca", data_shift[..., tau - kernel_len : tau], kernel,
+        ),
+        elems=tf.convert_to_tensor(
+            np.arange(kernel_len, modelParams.length + kernel_len)
+        ),
+        dtype="float32",
+    )
+    log.info(convolution.shape)
+    convolution = tf.einsum("t...ca->...tca", convolution)
+    return convolution

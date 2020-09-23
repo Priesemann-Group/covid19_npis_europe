@@ -9,7 +9,11 @@ from .likelihood import studentT_likelihood
 
 from .reproduction_number import construct_R_t, construct_R_0
 
-from .utils import convolution_with_fixed_kernel, convolution_with_varying_kernel
+from .utils import (
+    convolution_with_fixed_kernel,
+    convolution_with_varying_kernel,
+    convolution_with_map,
+)
 
 # We need a workaround for the documentation here this is maybe fixed in a newer sphinx version...
 import sys

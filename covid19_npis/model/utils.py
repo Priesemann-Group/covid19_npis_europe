@@ -416,6 +416,10 @@ def convolution_with_fixed_kernel(
     len_kernel = kernel.shape[-1]
     len_time = data.shape[data_time_axis]
 
+    # Add batch shapes to filter axes
+    while len(filter_axes_data) < len(data.shape) - 1:
+        filter_axes_data = [0] + list(filter_axes_data)
+
     data_time_axis = positive_axes(data_time_axis, ndim=len(data.shape))
 
     if padding is None:
@@ -430,9 +434,7 @@ def convolution_with_fixed_kernel(
     # if a filter_axis is larger then the data_time_axis, it has to be increased by one, as
     # the kernel gained a dimension:
     if filter_axes_data:
-        filter_axes_data = positive_axes(
-            filter_axes_data, np.array(data.shape)[np.array(filter_axes_data)]
-        )
+        filter_axes_data = positive_axes(filter_axes_data, len(data.shape))
         filter_axes_data_for_frame = filter_axes_data
         filter_axes_data_for_frame[filter_axes_data_for_frame > data_time_axis] += 1
     else:
@@ -500,6 +502,9 @@ def convolution_with_varying_kernel(data, kernel, data_time_axis, filter_axes_da
         len_time == kernel.shape[-1]
     ), "kernel time axis is not equal to data time axis"
 
+    # Add batch shapes to filter axes
+    while len(filter_axes_data) < len(data.shape) - 1:
+        filter_axes_data = [0] + list(filter_axes_data)
     data_time_axis = positive_axes(data_time_axis, ndim=len(data.shape))
 
     kernel = tf.linalg.diag(
@@ -509,9 +514,7 @@ def convolution_with_varying_kernel(data, kernel, data_time_axis, filter_axes_da
     # if a filter_axis is larger then the data_time_axis, it has to be increased by one, as
     # the kernel gained a dimension:
     if filter_axes_data:
-        filter_axes_data = positive_axes(
-            filter_axes_data, np.array(data.shape)[np.array(filter_axes_data)]
-        )
+        filter_axes_data = positive_axes(filter_axes_data, len(data.shape))
         filter_axes_data_for_conv = filter_axes_data
         filter_axes_data_for_conv[filter_axes_data_for_conv > data_time_axis] += 1
     else:

@@ -7,7 +7,7 @@ import tensorflow_probability as tfp
 
 
 from covid19_npis import transformations
-from covid19_npis.model.distributions import HalfCauchy, Normal, Gamma
+from covid19_npis.model.distributions import HalfCauchy, Normal, Gamma, LogNormal
 
 
 log = logging.getLogger(__name__)
@@ -570,24 +570,25 @@ def construct_delay_kernel(name, loc, scale, length_kernel, modelParams):
         Think about sigma distribution and how to parameterize it. Also implement that.
 
     """
-    mean_delay = yield Normal(
+    mean_delay = yield LogNormal(
         name="mean_delay",
-        loc=loc,
+        loc=np.log(loc, dtype="float32"),
         scale=0.1,
         event_stack=(
             modelParams.num_countries,
             1,
         ),  # country, time placeholder -> we do not want to do tf.expanddims
-        transform=transformations.Normal(shift=loc, scale=0.1),
     )
     theta_delay = scale  # For now
 
     # Time tensor
-    t = tf.range(0.0, length_kernel, 1.0, dtype="float32")
-
+    t = tf.range(
+        0.1, length_kernel + 0.1, 1.0, dtype="float32"
+    )  # The gamma function does not like 0!
+    log.debug(f"time\n{t}")
     # Create gamma pdf from sampled mean and scale.
     delay = gamma(t, mean_delay / theta_delay, 1.0 / theta_delay)
-
+    log.debug(f"delay\n{delay}")
     # Reshape delay i.e. add age group such that |shape| batch, time, country, age group
     delay = tf.stack([delay] * modelParams.num_age_groups, axis=-1)
     delay = tf.einsum("...cta->...cat", delay)

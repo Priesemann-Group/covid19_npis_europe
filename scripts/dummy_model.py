@@ -127,6 +127,7 @@ def test_model(modelParams):
         transform=transformations.CorrelationCholesky(),
         shape_label=("country", "age_group_i", "age_group_j"),
     )
+    log.debug(f"C:\n{C}")
     # We add C to the trace via Deterministics
     C = yield Deterministic(
         name="C",
@@ -219,7 +220,7 @@ def test_model(modelParams):
     new_cases = convolution_with_fixed_kernel(
         data=new_I_t, kernel=delay, data_time_axis=-3, filter_axes_data=filter_axes_data
     )
-    log.info(f"new_cases\n{new_cases.shape}")
+    log.debug(f"new_cases\n{new_cases}")
     likelihood = yield covid19_npis.model.studentT_likelihood(modelParams, new_cases)
 
     return likelihood

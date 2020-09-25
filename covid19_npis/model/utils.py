@@ -75,12 +75,13 @@ def match_axes(tensor, target_axes, ndim=None):
     ### Preparation
 
     # One larger than positive values or equal to the negative values
-    ndim_inferred = max(max(target_axes) + 1, max(-np.array(target_axes)))
+    target_axes = np.array(target_axes, dtype="int32")
+    ndim_inferred = max(max(target_axes) + 1, max(-target_axes) + 0)
     if ndim is None:
         ndim = ndim_inferred
     else:
         assert ndim >= max(
-            max(target_axes) + 1, max(-np.array(target_axes))
+            max(target_axes) + 1, max(-target_axes) + 0
         ), "ndim is smaller then the number of inferred axes from target_axes"
 
     target_axes = np.array(positive_axes(target_axes, ndim))
@@ -233,7 +234,7 @@ def einsum_indexed(
     print(ind_inputs1)
     print(ind_inputs2)
     """
-    for i in range(1, max(len(tensor1.shape), len(tensor2.shape)) + 1):
+    for i in range(1, max(len(tensor1.shape) + 0, len(tensor2.shape)) + 1):
         input1_end = i > len(tensor1.shape)
         input2_end = i > len(tensor2.shape)
 
@@ -423,7 +424,7 @@ def convolution_with_fixed_kernel(
     data_time_axis = positive_axes(data_time_axis, ndim=len(data.shape))
 
     if padding is None:
-        padding = np.ceil(len_time / 4).astype("int")
+        padding = np.ceil(len_time / 4).astype("int32")
 
     kernel_for_frame = tf.repeat(kernel[..., tf.newaxis], repeats=padding, axis=-1)
 
@@ -449,10 +450,10 @@ def convolution_with_fixed_kernel(
 
     data_framed = tf.signal.frame(
         data,
-        frame_length=len_kernel + padding - 1,
-        frame_step=padding,
+        frame_length=tf.cast(len_kernel + padding - 1, "int32"),
+        frame_step=tf.cast(padding, "int32"),
         pad_end=True,
-        axis=data_time_axis,
+        axis=tf.cast(data_time_axis, "int32"),
     )
 
     result = einsum_indexed(

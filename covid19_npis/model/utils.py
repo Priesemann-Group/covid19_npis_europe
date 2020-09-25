@@ -543,7 +543,9 @@ def convolution_with_map(data, kernel, modelParams):
     Parameters
     ----------
     data: 
+        |shape| batch, time, country, agegroup 
     """
+    data = tf.einsum("...tca->...cat", data)
     kernel_len = kernel.shape[-1]
     shape_padding = []
     for i in data.shape:
@@ -552,17 +554,32 @@ def convolution_with_map(data, kernel, modelParams):
     data_shift = tf.concat(
         values=[tf.zeros(shape_padding, dtype="float32"), data], axis=-1, name="concat"
     )
+    # Transpose to get the time dimension to the back
+
     log.info(data_shift.shape)
     log.info(kernel.shape)
 
+    if len(data.shape) == 4:
+        output_shape = (
+            data.shape[0],
+            modelParams.num_countries,
+            modelParams.num_age_groups,
+        )
+    else:
+        output_shape = (
+            modelParams.num_countries,
+            modelParams.num_age_groups,
+        )
+
+    data_conv = []
+    for tau in np.arange(kernel_len, modelParams.length + kernel_len):
+        data_conv.append(data_shift[..., tau - kernel_len : tau])
+
     convolution = tf.map_fn(
-        fn=lambda tau: tf.einsum(
-            "...cat,...ct->...ca", data_shift[..., tau - kernel_len : tau], kernel,
-        ),
-        elems=tf.convert_to_tensor(
-            np.arange(kernel_len, modelParams.length + kernel_len)
-        ),
+        fn=lambda data_conv: tf.einsum("...cat,...cat->...ca", data_conv, kernel,),
+        elems=tf.convert_to_tensor(data_conv),
         dtype="float32",
+        fn_output_signature=tf.TensorSpec(shape=output_shape, dtype="float32"),
     )
     log.info(convolution.shape)
     convolution = tf.einsum("t...ca->...tca", convolution)

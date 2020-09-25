@@ -287,7 +287,7 @@ def construct_generation_interval(
         generation distribution
     """
 
-    g = gamma(tf.range(1, l + 1, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
+    g = gamma(tf.range(0.1, l + 0.1, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
     # g = weibull(tf.range(1, l, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
 
     # Get the pdf and normalize
@@ -406,7 +406,6 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
 
     R_t_for_loop = R_t[len_gen_interv_kernel:]
     h_t_for_loop = h_0_t[len_gen_interv_kernel:]
-
     # Initial susceptible population = total - infected
 
     """ Calculate time evolution of new, daily infections
@@ -542,8 +541,8 @@ def construct_delay_kernel(name, loc, scale, length_kernel, modelParams):
         
         .. math::
 
-            \mu_{c}^d &\sim LogNormal\left(\mu=2.5,\sigma=0.1)\right \quad \forall c,\\
-            \sigma^d_c &\sim ? \\
+            \mu_c^d &\sim \text{LogNormal}\left(\mu=2.5,\sigma=0.1\right) \quad \forall c \\
+            \sigma^d_c &\sim \\
             d_{c} &= \text{PDF-Gamma}(\mu^d_c,\sigma_d)
 
         Parameters
@@ -563,7 +562,7 @@ def construct_delay_kernel(name, loc, scale, length_kernel, modelParams):
         -------
         :
             Generator for gamma probability density function.
-            |shape| batch, country, length_kernel
+            |shape| batch, country, kernel(time)
 
         TODO
         ----

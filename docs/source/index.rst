@@ -10,6 +10,14 @@ Welcome to COVID-19 NPIS's documentation!
 
     self
    
+
+.. toctree::
+    :titlesonly:
+    :maxdepth: 2
+    :caption: Overview
+
+    doc/getting_started
+
 .. toctree::
     :maxdepth: 2
     :caption: Reference

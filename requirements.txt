@@ -1,5 +1,5 @@
 # Pymc4 version 4.0a2
-git+git://github.com/jdehning/pymc4.git@84e97d884c26d4d80bcd3a33968bf6392e890375
+git+git://github.com/jdehning/pymc4.git@ae4bbbbf4d558d28cf9427636d9fe3e576e11b24
 numpy
 matplotlib
 pandas

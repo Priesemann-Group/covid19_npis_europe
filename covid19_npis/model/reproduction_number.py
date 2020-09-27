@@ -330,7 +330,7 @@ def construct_R_t(R_0, modelParams):
     l_i_sign = yield Deterministic(
         name="l_i_sign",
         value=(yield length()),
-        shape_label=("intervention"),  # intervention country age_group
+        shape_label=("intervention"),  # intervention
     )
     log.debug(f"l_i_sign\n{l_i_sign}")
 
@@ -350,7 +350,6 @@ def construct_R_t(R_0, modelParams):
         delta_d_c = tf.einsum(  # Multiply distribution by hyperprior
             "...ica,...->...ica", delta_d_c, sigma_d_country
         )
-
         # Get data tensor padded with 0 if the cp does not exist for an intervention/country combo
         d_data = (
             modelParams.date_data_tensor

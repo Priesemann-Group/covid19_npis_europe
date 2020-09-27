@@ -181,74 +181,40 @@ def test_data(**in_params):
     return df_new_cases.sort_index(), df_R_t, df_interv
 
 
-def test_data2(modelParams, **in_params):
+def test_data_from_model(model, modelParams, params_dict):
     # ------------------------------------------------------------------------------ #
     # Set params for the test dataset
     # ------------------------------------------------------------------------------ #
     len_gen_interv_kernel = 12
     num_interventions = 2
-    params = {
-        # population size per country and age group
-        "N": np.array([[1e15, 1e15, 1e15, 1e15], [1e15, 1e15, 1e15, 1e15]]),
-        # Reproduction number at t=0 per country and age group
-        "R_0": np.array([[2.31, 2.32, 2.33, 2.34], [2.31, 2.32, 2.33, 2.34]]),
-        # Initial infected
-        "I_0_diff_base": np.array([[[0, 1, 0, -1], [1, -1, 0, 0]]]),
-        "I_0_diff_add": np.zeros(
-            (
-                len_gen_interv_kernel - 1,
-                modelParams.num_countries,
-                modelParams.num_age_groups,
-            )
-        ),
-        # Change point date/index
-        "delta_d_i": np.zeros((modelParams.num_interventions, 1, 1)),
-        "delta_d_c": np.zeros((1, modelParams.num_countries, 1)),
-        "sigma_d_interv": 0.3,
-        "sigma_d_country": 0.3,
-        # Length of the change point
-        "l_i_sign": 4
-        * np.ones(
-            (
-                modelParams.num_interventions,
-                modelParams.num_countries,
-                modelParams.num_age_groups,
-            )
-        ),
-        # Alpha value of the change point
-        "alpha_i_c_a": np.array(
-            [
-                [[0.73, 0.72, 0.74, 0.75], [0.73, 0.72, 0.74, 0.75]],
-                [[0.73, 0.52, 0.54, 0.55], [0.53, 0.52, 0.54, 0.55]],
-            ]
-        ),
-        "C": np.array(
-            [
-                [1, 0.1, 0.1, 0.1],
-                [0.1, 1, 0.1, 0.1],
-                [0.1, 0.1, 1, 0.1],
-                [0.1, 0.1, 0.1, 1],
-            ]
-        ),
-        # Number of timesteps
-        # Number of Nans before data (cuts t_max)
-        # Generation interval
-        "g": 4.0,
-    }
 
-    model_name = "test_model"
+    model_name = model(modelParams).name
+
+    dict_with_model_name = {
+        f"{model_name}/{key}": tf.cast(value, "float32")[tf.newaxis, tf.newaxis]
+        for key, value in params_dict.items()
+    }
+    trace = az.from_dict(posterior=dict_with_model_name,)
+    print(trace.posterior)
 
     trace = pm.sample_posterior_predictive(
-        test_model(modelParams),
-        az.from_dict(posterior={f"{model_name}/b": np.array([1.0])}),
-        var_names=(f"{test_model}/like", "test_model/R_t"),
+        model(modelParams),
+        trace,
+        var_names=[
+            f"{model_name}/new_cases_inferred",
+            f"{model_name}/R_t",
+            f"{model_name}/g",
+        ],
         use_auto_batching=False,
     )
 
-    new_cases = trace.posterior_predictive["test_model/like"]
+    new_cases = trace.posterior_predictive[f"{model_name}/new_cases_inferred"]
+    R_t = trace.posterior_predictive[f"{model_name}/R_t"]
+    interv = trace.posterior_predictive[f"{model_name}/g"]
+    return new_cases, R_t, interv
 
 
-def save_data(path, **params):
+def save_data(path, new_cases, R_t, interv):
     """
         Main entry point to generate test data. Passes params to generate function
         and adds random noise to new cases.
@@ -256,9 +222,6 @@ def save_data(path, **params):
         Creates folder structure for two test countries and saves the generated
         data to csv files.
     """
-    new_cases, R_t, interv = test_data(**params)
-
-    new_cases = _random_noise(new_cases, 0.00001)
 
     # Save new_Cases
     new_cases.xs("country_1", 1).to_csv(

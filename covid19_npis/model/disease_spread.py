@@ -7,7 +7,13 @@ import tensorflow_probability as tfp
 
 
 from covid19_npis import transformations
-from covid19_npis.model.distributions import HalfCauchy, Normal, Gamma, LogNormal
+from covid19_npis.model.distributions import (
+    HalfCauchy,
+    Normal,
+    Gamma,
+    LogNormal,
+    Deterministic,
+)
 
 
 log = logging.getLogger(__name__)
@@ -123,9 +129,9 @@ def construct_h_0_t(
         tf.concat([h_0_base, h_0_base_add,], axis=-3,), axis=-3
     )  # shape:  batch_dims x len_gen_interv_kernel x countries x age_groups
 
-    if len(h_0_t_rand.shape) == 4:
-        h_0_t_rand = tf.transpose(h_0_t_rand, perm=(1, 0, 2, 3))
-    # Now: shape:  len_gen_interv_kernel x batch_dims x countries x age_groups
+    h_0_t_rand = tf.einsum(
+        "...kca->k...ca", h_0_t_rand
+    )  # Now: shape:  len_gen_interv_kernel x batch_dims x countries x age_groups
 
     log.debug(f"h_0_t_rand:\n{h_0_t_rand.shape}")
     h_0_t = []
@@ -296,7 +302,7 @@ def construct_generation_interval(
         g = g / tf.expand_dims(tf.reduce_sum(g, axis=-1), axis=-1)
     else:
         g = g / tf.reduce_sum(g)
-
+    g = yield Deterministic("g", g)
     return (
         g,
         tf.expand_dims(g_mu, axis=-1),

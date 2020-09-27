@@ -16,6 +16,8 @@ from .utils import (
     convolution_with_map,
 )
 
+from .model import main_model
+
 # We need a workaround for the documentation here this is maybe fixed in a newer sphinx version...
 import sys
 

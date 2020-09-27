@@ -37,6 +37,14 @@ def studentT_likelihood(modelParams, new_cases):
         f"new_cases w. mask:\n{tf.boolean_mask(new_cases, mask, axis=len_batch_shape)}"
     )
 
+    new_cases_inferred = yield pm.StudentT(
+        name="new_cases_inferred",
+        loc=new_cases,
+        scale=sigma * tf.sqrt(new_cases) + 1,
+        reinterpreted_batch_ndims=3,
+        df=4,
+    )
+
     likelihood = yield pm.StudentT(
         name="like",
         loc=tf.boolean_mask(new_cases, mask, axis=len_batch_shape),

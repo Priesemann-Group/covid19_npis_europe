@@ -45,7 +45,6 @@ class DistributionAdditions:
             event_ndim = len(self.shape_label)
             del kwargs["shape_label"]
 
-
         super().__init__(*args, **kwargs)
 
 

@@ -309,7 +309,7 @@ def construct_R_t(R_0, modelParams):
         value=(yield alpha()),
         shape_label=("intervention", "country", "age_group",),
     )
-    log.debug(f"alpha_i_c_a\n{alpha_i_c_a.shape}")
+    log.debug(f"alpha_i_c_a\n{alpha_i_c_a}")
 
     def length():
         """
@@ -418,8 +418,8 @@ def construct_R_t(R_0, modelParams):
     gamma_i_c = gamma(
         d_i_c_p, l_i_sign
     )  # no yield because we do not sample anything in this function
-    log.debug(f"gamma_i_c\n{gamma_i_c.shape}")
-    log.debug(f"alpha_i_c_a\n{alpha_i_c_a.shape}")
+    log.debug(f"gamma_i_c\n{gamma_i_c}")
+    log.debug(f"alpha_i_c_a\n{alpha_i_c_a}")
     """ Calculate R_eff
     """
     exponent = tf.einsum("...ict,...ica->...cat", gamma_i_c, alpha_i_c_a)

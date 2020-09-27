@@ -181,23 +181,47 @@ def test_data(**in_params):
     return df_new_cases.sort_index(), df_R_t, df_interv
 
 
-def test_data2(**in_params):
+def test_data2(modelParams, **in_params):
     # ------------------------------------------------------------------------------ #
     # Set params for the test dataset
     # ------------------------------------------------------------------------------ #
+    len_gen_interv_kernel = 12
+    num_interventions = 2
     params = {
         # population size per country and age group
         "N": np.array([[1e15, 1e15, 1e15, 1e15], [1e15, 1e15, 1e15, 1e15]]),
         # Reproduction number at t=0 per country and age group
         "R_0": np.array([[2.31, 2.32, 2.33, 2.34], [2.31, 2.32, 2.33, 2.34]]),
         # Initial infected
-        "I_0": np.array([[10, 10, 10, 10], [10, 10, 10, 10]], dtype="float64"),
+        "I_0_diff_base": np.array([[[0, 1, 0, -1], [1, -1, 0, 0]]]),
+        "I_0_diff_add": np.zeros(
+            (
+                len_gen_interv_kernel - 1,
+                modelParams.num_countries,
+                modelParams.num_age_groups,
+            )
+        ),
         # Change point date/index
-        "d_cp": np.array([[15, 16, 18, 20], [15, 16, 18, 20]]),
+        "delta_d_i": np.zeros((modelParams.num_interventions, 1, 1)),
+        "delta_d_c": np.zeros((1, modelParams.num_countries, 1)),
+        "sigma_d_interv": 0.3,
+        "sigma_d_country": 0.3,
         # Length of the change point
-        "l_cp": 5.2,
+        "l_i_sign": 4
+        * np.ones(
+            (
+                modelParams.num_interventions,
+                modelParams.num_countries,
+                modelParams.num_age_groups,
+            )
+        ),
         # Alpha value of the change point
-        "alpha_cp": np.array([[0.73, 0.72, 0.74, 0.75], [0.73, 0.72, 0.74, 0.75]]),
+        "alpha_i_c_a": np.array(
+            [
+                [[0.73, 0.72, 0.74, 0.75], [0.73, 0.72, 0.74, 0.75]],
+                [[0.73, 0.52, 0.54, 0.55], [0.53, 0.52, 0.54, 0.55]],
+            ]
+        ),
         "C": np.array(
             [
                 [1, 0.1, 0.1, 0.1],
@@ -207,17 +231,17 @@ def test_data2(**in_params):
             ]
         ),
         # Number of timesteps
-        "t_max": 80,
         # Number of Nans before data (cuts t_max)
-        "num_nans": 10,
         # Generation interval
         "g": 4.0,
     }
 
+    model_name = "test_model"
+
     trace = pm.sample_posterior_predictive(
-        test_model(),
-        az.from_dict(posterior={"test_model/b": np.array([1.0])}),
-        var_names=("test_model/like", "test_model/R_t"),
+        test_model(modelParams),
+        az.from_dict(posterior={f"{model_name}/b": np.array([1.0])}),
+        var_names=(f"{test_model}/like", "test_model/R_t"),
         use_auto_batching=False,
     )
 

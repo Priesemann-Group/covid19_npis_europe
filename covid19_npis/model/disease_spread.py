@@ -577,6 +577,7 @@ def construct_delay_kernel(name, loc, scale, length_kernel, modelParams):
             modelParams.num_countries,
             1,
         ),  # country, time placeholder -> we do not want to do tf.expanddims
+        conditionally_independent=True,
     )
     theta_delay = scale  # For now
 

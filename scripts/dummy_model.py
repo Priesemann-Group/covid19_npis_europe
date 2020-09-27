@@ -56,7 +56,7 @@ from covid19_npis.model.utils import convolution_with_fixed_kernel
 """ # Debugging and other snippets
 """
 # For eventual debugging:
-tf.config.run_functions_eagerly(True)
+# tf.config.run_functions_eagerly(True)
 # tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
 
 # Force CPU
@@ -206,7 +206,7 @@ def test_model(modelParams):
     log.debug(f"delay kernel\n{delay}")
 
     # Convolution with new_I_t:
-    if new_I_t.shape == 4:
+    if len(new_I_t.shape) == 4:
         filter_axes_data = (
             -4,
             -2,
@@ -234,7 +234,7 @@ begin_time = time.time()
 trace = pm.sample(
     test_model(modelParams),
     num_samples=200,
-    burn_in=400,
+    burn_in=200,
     use_auto_batching=False,
     num_chains=3,
     xla=True,
@@ -252,7 +252,7 @@ import pandas as pd
 """ ## Sample for prior plots and also covert to nice format
 """
 trace_prior = pm.sample_prior_predictive(
-    test_model(modelParams), sample_shape=1000, use_auto_batching=False
+    test_model(modelParams), sample_shape=(1000,), use_auto_batching=False
 )
 _, sample_state = pm.evaluate_model(test_model(modelParams))
 

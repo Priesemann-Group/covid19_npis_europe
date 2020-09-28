@@ -1,13 +1,14 @@
-import logging
 from .reproduction_number import Change_point
 import numpy as np
 from scipy.stats import gamma, nbinom
-from scipy.special import binom
 import pandas as pd
 import datetime
 import tensorflow as tf
 import pymc4 as pm
 import arviz as az
+import os
+from .. import data
+import logging
 
 log = logging.getLogger(__name__)
 
@@ -182,6 +183,20 @@ def test_data(**in_params):
 
 
 def test_data_from_model(model, modelParams, params_dict):
+    """
+    Generates a test dataset from our model! Needs some pregenerated
+    data file which is quite strange but only uses it to cast the right dimensions!
+
+    Parameters
+    ----------
+    model: pymc4 model
+        The model to sample from
+    modelParams: :py:class:`covid19_npis.ModelParams`
+        Instance of modelParams, mainly used for number of age groups and
+        number of countries.
+    prams_dict: dictionary
+        Parameters for the test run.
+    """
     # ------------------------------------------------------------------------------ #
     # Set params for the test dataset
     # ------------------------------------------------------------------------------ #
@@ -194,24 +209,58 @@ def test_data_from_model(model, modelParams, params_dict):
         f"{model_name}/{key}": tf.cast(value, "float32")[tf.newaxis, tf.newaxis]
         for key, value in params_dict.items()
     }
+
     trace = az.from_dict(posterior=dict_with_model_name,)
-    print(trace.posterior)
 
     trace = pm.sample_posterior_predictive(
         model(modelParams),
         trace,
         var_names=[
-            f"{model_name}/new_cases_inferred",
+            f"{model_name}/R_0",
+            f"{model_name}/new_I_t",
             f"{model_name}/R_t",
             f"{model_name}/g",
+            f"{model_name}/d_i_c_p",
         ],
         use_auto_batching=False,
     )
 
-    new_cases = trace.posterior_predictive[f"{model_name}/new_cases_inferred"]
-    R_t = trace.posterior_predictive[f"{model_name}/R_t"]
-    interv = trace.posterior_predictive[f"{model_name}/g"]
-    return new_cases, R_t, interv
+    # Convert to pandas
+    _, sample_state = pm.evaluate_model(model(modelParams))
+    new_I_t = data.convert_trace_to_dataframe(
+        trace,
+        sample_state=sample_state,
+        key="new_I_t",
+        data_type="posterior_predictive",
+    )
+    new_I_t.index = new_I_t.index.droplevel(["chain", "draw"])
+    new_I_t = new_I_t.stack().unstack(level="time").T
+    new_I_t.columns = new_I_t.columns.droplevel(
+        -1
+    )  # stack adds an additional dimension
+
+    R_t = data.convert_trace_to_dataframe(
+        trace, sample_state=sample_state, key="R_t", data_type="posterior_predictive",
+    )
+    R_t.index = R_t.index.droplevel(["chain", "draw"])
+    R_t = R_t.stack().unstack(level="time").T
+    R_t.columns = R_t.columns.droplevel(-1)  # stack adds an additional dimension
+
+    d = data.convert_trace_to_dataframe(
+        trace,
+        sample_state=sample_state,
+        key="d_i_c_p",
+        data_type="posterior_predictive",
+    )
+
+    # Take intervention array from model params
+    for c, country in enumerate(modelParams.countries):
+        if c == 0:
+            interv = country.data_interventions
+        else:
+            interv = interv.join(country.data_interventions)
+
+    return new_I_t, R_t, interv
 
 
 def save_data(path, new_cases, R_t, interv):
@@ -222,30 +271,31 @@ def save_data(path, new_cases, R_t, interv):
         Creates folder structure for two test countries and saves the generated
         data to csv files.
     """
+    # Generate folders if they do not exist:
+    for country_name in new_cases.columns.get_level_values("country").unique():
+        if not os.path.exists(path + "/" + country_name):
+            os.makedirs(path + "/" + country_name)
+            log.debug(f"Created folder {path}/{country_name}")
 
     # Save new_Cases
-    new_cases.xs("country_1", 1).to_csv(
-        path + "/test_country_1/new_cases.csv", date_format="%d.%m.%y"
-    )
-    new_cases.xs("country_2", 1).to_csv(
-        path + "/test_country_2/new_cases.csv", date_format="%d.%m.%y"
-    )
+    for country_name in new_cases.columns.get_level_values("country").unique():
+        new_cases.xs(country_name, axis=1, level="country").to_csv(
+            path + f"/{country_name}/new_cases.csv", date_format="%d.%m.%y",
+        )
 
     # Save interventions
-    interv.xs("country_1", 1).to_csv(
-        path + "/test_country_1/interventions.csv", date_format="%d.%m.%y"
-    )
-    interv.xs("country_2", 1).to_csv(
-        path + "/test_country_2/interventions.csv", date_format="%d.%m.%y"
-    )
+    for country_name in interv.columns.get_level_values("country").unique():
+        interv.xs(country_name, axis=1, level="country").to_csv(
+            path + f"/{country_name}/interventions.csv", date_format="%d.%m.%y",
+        )
 
     # Save R_t
-    R_t.xs("country_1", 1).to_csv(
-        path + "/test_country_1/reproduction_number.csv", date_format="%d.%m.%y"
-    )
-    R_t.xs("country_2", 1).to_csv(
-        path + "/test_country_2/reproduction_number.csv", date_format="%d.%m.%y"
-    )
+    for country_name in R_t.columns.get_level_values("country").unique():
+        R_t.xs(country_name, axis=1, level="country").to_csv(
+            path + f"/{country_name}/reproduction_number.csv", date_format="%d.%m.%y",
+        )
+
+    log.info(f"Saved data in {os.path.abspath(path)}.")
 
 
 def _random_noise(df, noise_factor):

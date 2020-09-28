@@ -1,4 +1,5 @@
 import sys
+import logging
 
 sys.path.append("../")
 
@@ -71,4 +72,7 @@ params = {
 new_cases, R_t, interv = covid19_npis.test_data.data_generators.test_data_from_model(
     main_model, modelParams, params
 )
-covid19_npis.test_data.data_generators.save_data("../data", new_cases, R_t, interv)
+
+covid19_npis.test_data.data_generators.save_data(
+    "../data/test_data_from_model", new_cases, R_t, interv
+)

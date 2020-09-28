@@ -299,7 +299,9 @@ def construct_generation_interval(
     # Get the pdf and normalize
     # g_p, norm = tf.linalg.normalize(g, 1)
     if len(g.shape) > 1:
-        g = g / tf.expand_dims(tf.reduce_sum(g, axis=-1) + 1e-5, axis=-1)
+        g = g / tf.expand_dims(
+            tf.reduce_sum(g, axis=-1) + 1e-5, axis=-1
+        )  # Adding 1e5 to prevent nans i.e. x/0
     else:
         g = g / tf.reduce_sum(g)
     g = yield Deterministic("g", g)

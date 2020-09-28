@@ -1,5 +1,5 @@
 from .rcParams import *
-from ..data import convert_trace_to_dataframe, select_from_dataframe
+from .. import data
 from .. import modelParams
 
 from .utils import (
@@ -140,8 +140,8 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
     log.info(f"Creating distibution plot for {key}")
 
     # Get prior and posterior data for key
-    posterior = convert_trace_to_dataframe(trace_posterior, sample_state, key)
-    prior = convert_trace_to_dataframe(trace_prior, sample_state, key)
+    posterior = data.convert_trace_to_dataframe(trace_posterior, sample_state, key)
+    prior = data.convert_trace_to_dataframe(trace_prior, sample_state, key)
 
     # Get other model parameters which we need
     model_name = get_model_name_from_sample_state(sample_state)
@@ -231,13 +231,17 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
             ):
                 # Select values from datafram
                 arry_posterior = (
-                    select_from_dataframe(posterior, **{label1: value1, label2: value2})
+                    data.select_from_dataframe(
+                        posterior, **{label1: value1, label2: value2}
+                    )
                     .to_numpy()
                     .flatten()
                 )
 
                 array_prior = (
-                    select_from_dataframe(prior, **{label1: value1, label2: value2})
+                    data.select_from_dataframe(
+                        prior, **{label1: value1, label2: value2}
+                    )
                     .to_numpy()
                     .flatten()
                 )
@@ -295,7 +299,7 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
                 ):
                     # Select values from datafram
                     arry_posterior = (
-                        select_from_dataframe(
+                        data.select_from_dataframe(
                             posterior,
                             **{label1: value1, label2: value2, label3: value3},
                         )
@@ -304,7 +308,7 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
                     )
 
                     array_prior = (
-                        select_from_dataframe(
+                        data.select_from_dataframe(
                             prior, **{label1: value1, label2: value2, label3: value3}
                         )
                         .to_numpy()

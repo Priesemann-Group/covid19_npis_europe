@@ -52,7 +52,7 @@ def convert_trace_to_dataframe_list(trace, sample_state):
     return dfs
 
 
-def convert_trace_to_dataframe(trace, sample_state, key):
+def convert_trace_to_dataframe(trace, sample_state, key, data_type=None):
     r"""
     Converts the pymc4 arviz trace for a single key to a pandas dataframes.
     Also sets the right labels for the  dimensions i.e splits data by
@@ -68,7 +68,12 @@ def convert_trace_to_dataframe(trace, sample_state, key):
 
     key: str
         Name of variable in modelParams
-        
+
+    data_type: str
+        Type of trace, gets detected automatically normally.
+        Possible values are: "posterior", "prior_predictive", "posterior_predictive".
+        Overwrites automatic behaviour!
+        default: None
     Returns
     -------
     pd.DataFrame
@@ -77,12 +82,21 @@ def convert_trace_to_dataframe(trace, sample_state, key):
 
     """
     # Try to get posterior and prior data
-    if hasattr(trace, "posterior"):
+    if data_type is None:
+        if hasattr(trace, "posterior"):
+            data_type == "posterior"
+        if hasattr(trace, "prior_predictive"):
+            data_type = "prior_predictive"
+
+    if data_type == "posterior":
         log.info("Found posterior in trace.")
         data = trace.posterior.data_vars
-    if hasattr(trace, "prior_predictive"):
+    elif data_type == "prior_predictive":
         log.info("Found prior_predictive in trace.")
         data = trace.prior_predictive.data_vars
+    elif data_type == "posterior_predictive":
+        log.info("Using posterior_predictive from trace as data!")
+        data = trace.posterior_predictive.data_vars
 
     # Get model and var names a bit hacky but works
     for var in data:

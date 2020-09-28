@@ -1,5 +1,5 @@
 from .rcParams import *
-from ..data import convert_trace_to_dataframe, select_from_dataframe
+from .. import data
 from .utils import (
     get_model_name_from_sample_state,
     get_dist_by_name_from_sample_state,
@@ -45,7 +45,7 @@ def timeseries(
     log.info(f"Creating timeseries plot for {key}")
 
     # Convert trace to dataframe
-    df = convert_trace_to_dataframe(trace, sample_state, key)
+    df = data.convert_trace_to_dataframe(trace, sample_state, key)
     # log.info(df)
     # Get other important properties
     model_name = get_model_name_from_sample_state(sample_state)
@@ -140,7 +140,9 @@ def timeseries(
             for j, value2 in enumerate(df.index.get_level_values(label2).unique()):
 
                 # Plot model
-                model = select_from_dataframe(df, **{label1: value1, label2: value2})
+                model = data.select_from_dataframe(
+                    df, **{label1: value1, label2: value2}
+                )
                 model = model.unstack(level="time").T
                 model.index = model.index.droplevel(0)
                 axes[j][i] = _timeseries(

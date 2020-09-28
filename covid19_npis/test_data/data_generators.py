@@ -194,8 +194,12 @@ def test_data_from_model(model, modelParams, params_dict):
     modelParams: :py:class:`covid19_npis.ModelParams`
         Instance of modelParams, mainly used for number of age groups and
         number of countries.
-    prams_dict: dictionary
+    params_dict: dictionary
         Parameters for the test run.
+
+    Returns
+    -------
+    : new_cases_inferred, R_t, interventions
     """
     # ------------------------------------------------------------------------------ #
     # Set params for the test dataset
@@ -209,33 +213,34 @@ def test_data_from_model(model, modelParams, params_dict):
         f"{model_name}/{key}": tf.cast(value, "float32")[tf.newaxis, tf.newaxis]
         for key, value in params_dict.items()
     }
-
     trace = az.from_dict(posterior=dict_with_model_name,)
 
+    # Sample
     trace = pm.sample_posterior_predictive(
         model(modelParams),
         trace,
         var_names=[
             f"{model_name}/R_0",
-            f"{model_name}/new_I_t",
+            f"{model_name}/new_cases_inferred",
             f"{model_name}/R_t",
             f"{model_name}/g",
             f"{model_name}/d_i_c_p",
+            f"{model_name}/new_I_t",
         ],
         use_auto_batching=False,
     )
 
     # Convert to pandas
     _, sample_state = pm.evaluate_model(model(modelParams))
-    new_I_t = data.convert_trace_to_dataframe(
+    new_cases_inferred = data.convert_trace_to_dataframe(
         trace,
         sample_state=sample_state,
-        key="new_I_t",
+        key="new_cases_inferred",
         data_type="posterior_predictive",
     )
-    new_I_t.index = new_I_t.index.droplevel(["chain", "draw"])
-    new_I_t = new_I_t.stack().unstack(level="time").T
-    new_I_t.columns = new_I_t.columns.droplevel(
+    new_cases_inferred.index = new_cases_inferred.index.droplevel(["chain", "draw"])
+    new_cases_inferred = new_cases_inferred.stack().unstack(level="time").T
+    new_cases_inferred.columns = new_cases_inferred.columns.droplevel(
         -1
     )  # stack adds an additional dimension
 
@@ -259,8 +264,7 @@ def test_data_from_model(model, modelParams, params_dict):
             interv = country.data_interventions
         else:
             interv = interv.join(country.data_interventions)
-
-    return new_I_t, R_t, interv
+    return new_cases_inferred, R_t, interv
 
 
 def save_data(path, new_cases, R_t, interv):

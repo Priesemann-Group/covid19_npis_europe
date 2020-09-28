@@ -1,11 +1,11 @@
 import sys
-import logging
 
 sys.path.append("../")
 
 import covid19_npis
 from covid19_npis.model import main_model
 import numpy as np
+
 
 # Load our data from csv files into our own custom data classes
 c1 = covid19_npis.data.Country(
@@ -66,13 +66,17 @@ params = {
     "g_mu": 4.0,
     "g_theta": 1.0,
     "mean_delay": np.array([[12.0], [12.5]]),
-    "sigma": 0.001,
+    "sigma": 0.1,
 }
 
-new_cases, R_t, interv = covid19_npis.test_data.data_generators.test_data_from_model(
+(
+    new_cases_inferred,
+    R_t,
+    interv,
+) = covid19_npis.test_data.data_generators.test_data_from_model(
     main_model, modelParams, params
 )
 
 covid19_npis.test_data.data_generators.save_data(
-    "../data/test_data_from_model", new_cases, R_t, interv
+    "../data/test_data_from_model", new_cases_inferred, R_t, interv
 )

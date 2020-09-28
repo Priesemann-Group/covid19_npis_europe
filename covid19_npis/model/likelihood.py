@@ -6,7 +6,7 @@ import numpy as np
 
 from covid19_npis import transformations
 
-from covid19_npis.model.distributions import HalfCauchy
+from covid19_npis.model.distributions import HalfCauchy, StudentT
 
 log = logging.getLogger(__name__)
 
@@ -37,15 +37,16 @@ def studentT_likelihood(modelParams, new_cases):
         f"new_cases w. mask:\n{tf.boolean_mask(new_cases, mask, axis=len_batch_shape)}"
     )
 
-    new_cases_inferred = yield pm.StudentT(
+    new_cases_inferred = yield StudentT(
         name="new_cases_inferred",
         loc=new_cases,
         scale=sigma * tf.sqrt(new_cases) + 1,
         reinterpreted_batch_ndims=3,
         df=4,
+        shape_label=("time", "country", "age_group"),
     )
 
-    likelihood = yield pm.StudentT(
+    likelihood = yield StudentT(
         name="like",
         loc=tf.boolean_mask(new_cases, mask, axis=len_batch_shape),
         scale=tf.boolean_mask(

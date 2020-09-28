@@ -29,5 +29,13 @@ Utility
 TESTING DRAFT(WIP)
 ^^^^^^^^^^^^^^^^^^
 
+Functions with the prefix "calc" take pymc4 generator functions as input and calculate new
+(from the generator distributions depending) variables.
+
+Functions with the prefix "construct" generate pymc4 generator functions for different distributions, without a lot of mathematical logic.
+
+
+
 .. automodule:: covid19_npis.model.number_of_tests
 	:members:
+	:private-members:

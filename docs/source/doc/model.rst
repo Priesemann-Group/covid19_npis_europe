@@ -24,4 +24,10 @@ Utility
 
 .. automodule:: covid19_npis.model.utils
 	:members:
-	
+
+
+TESTING DRAFT(WIP)
+^^^^^^^^^^^^^^^^^^
+
+.. automodule:: covid19_npis.model.number_of_tests
+	:members:

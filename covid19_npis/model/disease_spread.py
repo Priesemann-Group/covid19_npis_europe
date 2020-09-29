@@ -109,7 +109,7 @@ def construct_h_0_t(
             )
         ),
     )
-    h_0_mean_diff = h_0_t_mean[..., :-1, :, :] - h_0_t_mean[..., 1:, :, :]
+    h_0_mean_diff = h_0_t_mean[..., 1:, :, :] - h_0_t_mean[..., :-1, :, :]
     h_0_base_add = h_0_mean_diff * tf.exp(
         (
             yield Normal(

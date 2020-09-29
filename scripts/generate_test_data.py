@@ -31,6 +31,6 @@ params = {
 
 # Create test country dataset with params above
 # One intervention and changepoint
-new_cases, R_t, interv = covid19_npis.test_data.data_generators.test_data(**params)
-new_cases = covid19_npis.data_generators._random_noise(new_cases, 0.00001)
-covid19_npis.test_data.data_generators.save_data("../data", new_cases, R_t, interv)
+new_cases, R_t, interv = covid19_npis.test_data.test_data(**params)
+new_cases = covid19_npis.test_data._random_noise(new_cases, 0.00001)
+covid19_npis.test_data.save_data("../data", new_cases, R_t, interv)

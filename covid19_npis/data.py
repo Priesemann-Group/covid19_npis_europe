@@ -82,9 +82,10 @@ def convert_trace_to_dataframe(trace, sample_state, key, data_type=None):
 
     """
     # Try to get posterior and prior data
+    data = []
     if data_type is None:
         if hasattr(trace, "posterior"):
-            data_type == "posterior"
+            data_type = "posterior"
         if hasattr(trace, "prior_predictive"):
             data_type = "prior_predictive"
 

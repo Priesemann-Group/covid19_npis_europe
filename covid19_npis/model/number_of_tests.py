@@ -1,4 +1,4 @@
-from .distributions import HalfCauchy, Normal, StudentT, HalfNormal
+from .distributions import HalfCauchy, Normal, StudentT, HalfNormal, LKJCholesky
 
 
 def calc_positive_tests(name, new_cases_delayed, phi_plus, phi_age, modelParams):
@@ -397,6 +397,61 @@ def _construct_testing_state(
             \: \eta_{\text{traced},c,b},\: \xi_{c,b},\: m^\ast_{D_\text{test},c,b}).`
             |shape| 4 x (batch, country * spline)
     """
+
+    # sigma
+    sigma_m = yield HalfNormal(
+        name=f"sigma_m", scale=sigma_m_scale, conditionally_independent=True
+    )
+    sigma_phi = yield HalfCauchy(
+        name=f"sigma_phi", scale=sigma_cross_scale, conditionally_independent=True
+    )
+    sigma_eta = yield HalfCauchy(
+        name=f"sigma_eta", scale=sigma_cross_scale, conditionally_independent=True
+    )
+    sigma_xi = yield HalfCauchy(
+        name=f"sigma_xi", scale=sigma_cross_scale, conditionally_independent=True
+    )
+
+    Sigma = yield LKJCholesky(
+        name="Sigma_cholesky",
+        dimension=4,
+        concentration=2,  # eta
+        validate_args=True,
+        transform=transformations.CorrelationCholesky(),
+    )
+    Sigma = tf.einsum("...ij,...j->...ij",Sigma,tf.stack([sigma_phi,sigma_eta,sigma_xi,sigma_m],axis=-1))
+
+    # mu
+    mu_phi_cross = yield Normal(
+        name="mu_phi_cross",
+        loc=mu_cross_loc,
+        scale=mu_cross_scale,
+        conditionally_independent=True,
+    )
+    mu_eta_cross = yield Normal(
+        name="mu_eta_cross",
+        loc=mu_cross_loc,
+        scale=mu_cross_scale,
+        conditionally_independent=True,
+    )
+    mu_xi_cross = yield Normal(
+        name="mu_xi_cross",
+        loc=mu_cross_loc,
+        scale=mu_cross_scale,
+        conditionally_independent=True,
+    )
+    mu_m = yield Normal(
+        name="mu_m_cross",
+        loc=mu_m_loc,
+        scale=mu_m_scale,
+        conditionally_independent=True,
+    )
+
+
+
+
+    state = StudentT(name=name, loc=(), scale=)
+
     return
 
 

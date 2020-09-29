@@ -30,7 +30,7 @@ params = {
     # Reproduction number at t=0 per country and age group
     "R_0": np.array([2.3, 2.4]),
     # Initial infected
-    "I_0_diff_base": np.array([[[0, 1, 0, -1], [1, -1, 0, 0]]]),
+    "I_0_diff_base": 5 * np.array([[[1, 1, 1, 1], [1, 1, 1, 1]]]),
     "I_0_diff_add": np.zeros(
         (
             len_gen_interv_kernel - 1,

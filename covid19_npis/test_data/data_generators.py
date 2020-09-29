@@ -226,6 +226,7 @@ def test_data_from_model(model, modelParams, params_dict):
             f"{model_name}/g",
             f"{model_name}/d_i_c_p",
             f"{model_name}/new_I_t",
+            f"{model_name}/h_0_t",
         ],
         use_auto_batching=False,
     )

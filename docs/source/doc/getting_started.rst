@@ -8,7 +8,7 @@ We use some functions of our `toolbox for inference and forecast of the spread o
 
 .. code-block:: console
 
-		git clone --recurse-submodules git@github.com/Priesemann-Group/covid19_npis_europe.git
+		git clone --recurse-submodules git@github.com:Priesemann-Group/covid19_npis_europe.git
 
 Next we install all required python libaries and should be ready to run the scripts afterwards.
 

@@ -37,7 +37,15 @@ def calc_positive_tests(name, new_cases_delayed, phi_plus, phi_age, modelParams)
             :math:`n_{{+}, {c,a}}(t)`
             |shape| batch, time, country, age_group
     """
-    return
+
+    n_plus = tf.einsum(
+        "...tca,...tc,...a->...tca", new_cases_delayed, phi_plus, phi_age
+    )
+
+    n_plus = yield Deterministic(
+        name=name, value=n_plus, shape_label=("time", "country", "age_group")
+    )
+    return n_plus
 
 
 def calc_total_number_of_tests_performed(
@@ -89,7 +97,19 @@ def calc_total_number_of_tests_performed(
             :math:`n_{\Sigma, c,a}(t)`
             |shape| batch, time, country, age_group
     """
-    return
+
+    inner = (
+        tf.einsum("...tca,...tc->...tca", new_cases_delayed, phi_plus)
+        + tf.einsum("...tca,...tc,...tc->...tca", new_cases_delayed, phi_plus, eta)
+        + xi
+    )
+    n_Sigma = yield Deterministic(
+        name=name,
+        value=tf.einsum("...c,...tca->...tca", phi_tests_reported, inner),
+        shape_label=("time", "country", "age_group"),
+    )
+
+    return n_Sigma
 
 
 def _construct_phi_tests_reported(
@@ -419,7 +439,11 @@ def _construct_testing_state(
         validate_args=True,
         transform=transformations.CorrelationCholesky(),
     )
-    Sigma = tf.einsum("...ij,...j->...ij",Sigma,tf.stack([sigma_phi,sigma_eta,sigma_xi,sigma_m],axis=-1))
+    Sigma = tf.einsum(
+        "...ij,...j->...ij",
+        Sigma,
+        tf.stack([sigma_phi, sigma_eta, sigma_xi, sigma_m], axis=-1),
+    )
 
     # mu
     mu_phi_cross = yield Normal(
@@ -447,12 +471,11 @@ def _construct_testing_state(
         conditionally_independent=True,
     )
 
+    mu = tf.stack([mu_phi_cross, mu_eta_cross, mu_xi_cross, mu_m], axis=-1)
 
+    state = StudentT(name=name, loc=mu, scale=Sigma, conditionally_independent=True)
 
-
-    state = StudentT(name=name, loc=(), scale=)
-
-    return
+    return state
 
 
 def spline():

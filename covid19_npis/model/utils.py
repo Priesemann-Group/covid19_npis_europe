@@ -25,7 +25,14 @@ def gamma(x, alpha, beta):
 
     log_unnormalized_prob = tf.math.xlogy(alpha - 1.0, x) - beta * x
     log_normalization = tf.math.lgamma(alpha) - alpha * tf.math.log(beta)
-    return tf.exp(log_unnormalized_prob - log_normalization)
+    pdf = tf.exp(log_unnormalized_prob - log_normalization)
+    if len(pdf.shape) > 1:
+        pdf = pdf / tf.expand_dims(
+            tf.reduce_sum(pdf, axis=-1) + 1e-5, axis=-1
+        )  # Adding 1e5 to prevent nans i.e. x/0
+    else:
+        pdf = pdf / tf.reduce_sum(pdf)
+    return pdf
 
 
 # Un-normalized distribution pdf for generation interval

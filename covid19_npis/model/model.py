@@ -19,7 +19,10 @@ from covid19_npis.model.distributions import (
     Normal,
     LogNormal,
 )
-from covid19_npis.model.utils import convolution_with_fixed_kernel
+from covid19_npis.model.utils import (
+    convolution_with_fixed_kernel,
+    convolution_with_varying_kernel,
+)
 
 log = logging.getLogger(__name__)
 
@@ -137,6 +140,7 @@ def main_model(modelParams):
         length_kernel=12,
         modelParams=modelParams,
     )
+    delay = tf.repeat(delay[..., tf.newaxis], repeats=modelParams.length, axis=-1)
     log.debug(f"delay kernel\n{delay}")
 
     # Convolution with new_I_t:
@@ -155,7 +159,7 @@ def main_model(modelParams):
         )
     else:
         filter_axes_data = (-2, -1)
-    new_cases = convolution_with_fixed_kernel(
+    new_cases = convolution_with_varying_kernel(
         data=new_I_t, kernel=delay, data_time_axis=-3, filter_axes_data=filter_axes_data
     )
     log.debug(f"new_cases\n{new_cases}")

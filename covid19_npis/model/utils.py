@@ -327,7 +327,7 @@ def einsum_indexed(
         "".join(ind_inputs1) + "," + "".join(ind_inputs2) + "->" + "".join(ind_output)
     )
 
-    log.debug("inferred einsum string: :", string_einsum)
+    log.debug(f"inferred einsum string: :, {string_einsum}")
 
     return tf.einsum(string_einsum, tensor1, tensor2)
 

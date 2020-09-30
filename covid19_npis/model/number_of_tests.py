@@ -1,5 +1,22 @@
-from .distributions import HalfCauchy, Normal, StudentT, HalfNormal, LKJCholesky
+import tensorflow as tf
+import tensorflow_probability as tfp
+import logging
+import pymc4 as pm
+import numpy as np
 from splipy import BSplineBasis
+
+log = logging.getLogger(__name__)
+
+from .distributions import (
+    HalfCauchy,
+    Normal,
+    StudentT,
+    HalfNormal,
+    LKJCholesky,
+    MvStudentT,
+    Deterministic,
+)
+from .. import transformations
 
 
 def calc_positive_tests(name, new_cases_delayed, phi_plus, phi_age, modelParams):
@@ -319,15 +336,18 @@ def _construct_reporting_delay(
 
     # We need to add the spline dimension at some point i.e. prop. expand delta_m
     m = yield Deterministic(
-        name=name, value=m_ast + delta_m, shape_label=("country", "spline")
+        name=name,
+        value=m_ast + tf.expand_dims(delta_m, -1),
+        shape_label=("country", "spline"),
     )
 
-    return m
+    return (m, theta)
 
 
-def _construct_testing_state(
+def construct_testing_state(
     name,
     modelParams,
+    num_knots,
     mu_cross_loc=0.0,
     mu_cross_scale=10.0,
     mu_m_loc=12.0,
@@ -374,7 +394,8 @@ def _construct_testing_state(
             \eta_{\text{traced},c,b} &= \ln \left(1 + e^{ \eta^\dagger_{\text{traced},c,b}} \right),\\
             \xi_{c,b} &= \ln \left(1 + e^{\xi_{c,b}^\dagger}\right)\frac{n_\text{inhabitants}}{10 000}\\
 
-
+        Finally :math:`m^\ast_{D_\text{test},c,b}` gets transformed by calling
+        the :py:func:`_construct_reporting_delay` function.
 
 
         Parameters
@@ -386,6 +407,9 @@ def _construct_testing_state(
         modelParams: :py:class:`covid19_npis.ModelParams`
             Instance of modelParams, mainly used for number of age groups and
             number of countries.
+
+        num_knots:
+            Number of knots for the Bspline dimension.
 
         mu_cross_loc: optional
             Location parameter for the three Normal distributions :math:`\mu_{\phi^\dagger_+},\: \mu_{\eta^\dagger_\text{traced}},\: \mu_{\xi^\dagger}.`
@@ -415,22 +439,34 @@ def _construct_testing_state(
         -------
         : 
             Testing state tuple :math:`(\phi_{+,c,b},
-            \: \eta_{\text{traced},c,b},\: \xi_{c,b},\: m^\ast_{D_\text{test},c,b}).`
-            |shape| 4 x (batch, country * spline)
+            \: \eta_{\text{traced},c,b},\: \xi_{c,b},\: m_{D_\text{test},c,b}),\: \theta_{D_\text{test}}.`
+            |shape| 4 x (batch, country, spline), (batch)
     """
 
     # sigma
     sigma_m = yield HalfNormal(
-        name=f"sigma_m", scale=sigma_m_scale, conditionally_independent=True
+        name=f"sigma_m",
+        scale=sigma_m_scale,
+        conditionally_independent=True,
+        transform=transformations.SoftPlus(scale=sigma_m_scale),
     )
     sigma_phi = yield HalfCauchy(
-        name=f"sigma_phi", scale=sigma_cross_scale, conditionally_independent=True
+        name=f"sigma_phi",
+        scale=sigma_cross_scale,
+        conditionally_independent=True,
+        transform=transformations.SoftPlus(scale=sigma_cross_scale),
     )
     sigma_eta = yield HalfCauchy(
-        name=f"sigma_eta", scale=sigma_cross_scale, conditionally_independent=True
+        name=f"sigma_eta",
+        scale=sigma_cross_scale,
+        conditionally_independent=True,
+        transform=transformations.SoftPlus(scale=sigma_cross_scale),
     )
     sigma_xi = yield HalfCauchy(
-        name=f"sigma_xi", scale=sigma_cross_scale, conditionally_independent=True
+        name=f"sigma_xi",
+        scale=10.0,
+        conditionally_independent=True,
+        transform=transformations.SoftPlus(scale=sigma_cross_scale),
     )
 
     Sigma = yield LKJCholesky(
@@ -445,7 +481,7 @@ def _construct_testing_state(
         Sigma,
         tf.stack([sigma_phi, sigma_eta, sigma_xi, sigma_m], axis=-1),
     )
-
+    log.debug(f"Sigma:\n{Sigma}")
     # mu
     mu_phi_cross = yield Normal(
         name="mu_phi_cross",
@@ -474,12 +510,38 @@ def _construct_testing_state(
 
     mu = tf.stack([mu_phi_cross, mu_eta_cross, mu_xi_cross, mu_m], axis=-1)
 
-    state = StudentT(name=name, loc=mu, scale=Sigma, conditionally_independent=True)
+    log.debug(f"mu:\n{mu}")
 
-    return state
+    state = yield MvStudentT(
+        name="state",
+        df=1.0,
+        loc=mu,
+        scale=tf.linalg.LinearOperatorLowerTriangular(Sigma, is_non_singular=True),
+        validate_args=True,
+        event_stack=(modelParams.num_countries, num_knots),
+    )
+    log.debug(f"state:\n{state}")
+
+    # Get variables from state to transform them
+    phi_cross = tf.gather(state, 0, axis=-1)
+    eta_cross = tf.gather(state, 1, axis=-1)
+    xi_cross = tf.gather(state, 2, axis=-1)
+    m_star = tf.gather(state, 3, axis=-1)
+    log.debug(f"xi_cross\n {xi_cross}")
+
+    # Transform variables
+    phi = tf.exp(phi_cross) * tf.math.sigmoid(-phi_cross)
+    eta = tf.math.softplus(eta_cross)
+    xi = tf.math.softplus(xi_cross)  # TODO factor inhabitans
+    m, theta = yield _construct_reporting_delay(
+        name="delay", modelParams=modelParams, m_ast=m_star
+    )
+    log.debug(f"xi\n {xi}")
+
+    return (phi, eta, xi, m, theta)
 
 
-def _construct_Bsplines_basis(modelParams, order=4, knots=None):
+def construct_Bsplines_basis(modelParams, order=4, knots=None):
     r"""
     Function to construct the basis functions for all BSplines, should only be called 
     once. Uses splipy python library.
@@ -515,9 +577,9 @@ def _construct_Bsplines_basis(modelParams, order=4, knots=None):
 
     # Get Basic spline functions from time array
     t = np.arange(0, modelParams.length, 1)
-    B = spl.evaluate(t, from_right=False)  # |shape| time, knots?
+    B = splines.evaluate(t, from_right=False)  # |shape| time, knots?
 
-    return tf.convert_to_tensor(B)
+    return tf.convert_to_tensor(B, dtype="float32")
 
 
 def calculate_Bsplines(coef, basis):
@@ -534,7 +596,7 @@ def calculate_Bsplines(coef, basis):
 
         coef: 
             Coefficients :math:`x`.
-            |shape| ..., knots?
+            |shape| ...,country, knots?
 
         basis:
             Basis functions tensor :math:`B.`
@@ -544,8 +606,8 @@ def calculate_Bsplines(coef, basis):
         -------
         :
             :math:`x(t)`
-            |shape| ...,time
+            |shape| ...,time, country
 
     """
 
-    return tf.einsum("...b,tb->...t", var, basis)
+    return tf.einsum("...cb,tb->...tc", coef, basis)

@@ -17,6 +17,7 @@ import pymc4 as pm
 from pymc4 import Distribution
 import types
 import tensorflow_probability as tfp
+from tensorflow_probability import distributions as tfd
 import tensorflow as tf
 
 dists_to_modify = [
@@ -94,3 +95,49 @@ LKJCholesky.__init__ = other_init
 HalfCauchy.__init__ = other_init
 StudentT.__init__ = other_init
 Gamma.__init__ = other_init
+
+
+# Own implementation of  Multivariate Student's t-distribution can be removed as soon as the pymc4
+# pull reqeust is merged
+class MvStudentT(pm.distributions.distribution.ContinuousDistribution):
+    r"""
+    Multivariate Student's t-distribution
+
+    .. math::
+
+        f(x) =
+            \frac{(1 + ||y||^{2} / \nu)^{-0.5 (\nu + k)}}
+            {Z}, \\
+        y = \Sigma^{-1} (x - \mu),\\
+        Z = \frac{|\det(\Sigma)| \sqrt(\nu \pi)^{k}} \Gamma(0.5 \nu)} {\Gamma(0.5 \nu)+k}
+
+
+    ========  ==========================
+    Support   :math:`x \in \mathbb{R}^k`
+    Mean      :math:`\mu` if :math:`\nu>1`
+    Variance  :math:`\frac{\nu}{\nu-2}\Sigma` if :math:`\nu > 2`
+    ========  ==========================
+
+
+    Parameters
+    ----------
+    df : positive scalar
+        The degrees of freedom :math:`\nu.`
+    loc : array_like
+        Vector of means :math:`\mu.`
+    scale : 
+        Lower triangular matrix, such that scale @ scale.T is positive
+        semi-definite :math:`\Sigma.`
+
+
+    """
+
+    def __init__(self, name, df, loc, scale, **kwargs):
+        super().__init__(name, df=df, loc=loc, scale=scale, **kwargs)
+
+    @staticmethod
+    def _init_distribution(conditions, **kwargs):
+        df, loc, scale = conditions["df"], conditions["loc"], conditions["scale"]
+        return tfd.MultivariateStudentTLinearOperator(
+            df=df, loc=loc, scale=scale, **kwargs
+        )

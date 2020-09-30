@@ -1,4 +1,5 @@
 from .distributions import HalfCauchy, Normal, StudentT, HalfNormal, LKJCholesky
+from splipy import BSplineBasis
 
 
 def calc_positive_tests(name, new_cases_delayed, phi_plus, phi_age, modelParams):
@@ -478,11 +479,73 @@ def _construct_testing_state(
     return state
 
 
-def spline():
+def _construct_Bsplines_basis(modelParams, order=4, knots=None):
+    r"""
+    Function to construct the basis functions for all BSplines, should only be called 
+    once. Uses splipy python library.
+
+    Parameters
+    ----------
+    modelParams: :py:class:`covid19_npis.ModelParams`
+        Instance of modelParams, mainly used for number of age groups and
+        number of countries.
+
+    order: optional
+        Order corresponds to exponent of the splines i.e. order of three corresponds
+        to x^2.
+        |default| 4
+
+    knots: list, optional
+        Knots array used for constructing the BSplines. 
+        |default| one knot every 7 days
+
+    Returns
+    -------
+    :
+        |shape| time, knots?
     """
-    TODO
-    ----
-    - Write docstring
-    - implement
-    - @Jonas :)
+
+    if knots is None:
+        knots = np.arange(0, modelParams.length, 7)
+        knots = np.insert(knots, 0, [0] * (order - 1), axis=0)
+        knots = np.insert(knots, -1, [knots[-1]] * (order - 1), axis=0)
+
+    # Construct basis spline object
+    splines = BSplineBasis(order=order, knots=knots, periodic=-1)
+
+    # Get Basic spline functions from time array
+    t = np.arange(0, modelParams.length, 1)
+    B = spl.evaluate(t, from_right=False)  # |shape| time, knots?
+
+    return tf.convert_to_tensor(B)
+
+
+def calculate_Bsplines(coef, basis):
+    r"""
+        Calculates the Bsplines given the basis functions B and the coefficients x.
+
+        .. math::
+
+            x(t) = \sum_{b} x_b B_b(t)
+
+
+        Parameters
+        ----------
+
+        coef: 
+            Coefficients :math:`x`.
+            |shape| ..., knots?
+
+        basis:
+            Basis functions tensor :math:`B.`
+            |shape| time, knots?
+
+        Returns
+        -------
+        :
+            :math:`x(t)`
+            |shape| ...,time
+
     """
+
+    return tf.einsum("...b,tb->...t", var, basis)

@@ -77,6 +77,7 @@ autodoc_mock_imports = [
     "theano",
     "pandas",
     "arviz",
+    "splipy",
 ]
 
 # Add any paths that contain templates here, relative to this directory.

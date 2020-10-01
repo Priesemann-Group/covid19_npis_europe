@@ -510,9 +510,6 @@ def convolution_with_varying_kernel(data, kernel, data_time_axis, filter_axes_da
         len_time == kernel.shape[-1]
     ), "kernel time axis is not equal to data time axis"
 
-    # Add batch shapes to filter axes
-    while len(filter_axes_data) < len(data.shape) - 1:
-        filter_axes_data = [0] + list(filter_axes_data)
     data_time_axis = positive_axes(data_time_axis, ndim=len(data.shape))
 
     kernel = tf.linalg.diag(
@@ -601,15 +598,13 @@ def get_filter_axis_data_from_dims(ndim):
         filter_axes_data = [
             -4,
             -2,
-            -1,
         ]
     elif ndim == 5:
         filter_axes_data = [
             -5,
             -4,
             -2,
-            -1,
         ]
     else:
-        filter_axes_data = (-2, -1)
+        filter_axes_data = (-2,)
     return filter_axes_data

@@ -381,7 +381,7 @@ def calc_reporting_kernel(m, theta, length_kernel=14):
     theta = theta[..., tf.newaxis, tf.newaxis]  # Add a empty time axis, and kernel axis
     log.debug(f"m\n{m.shape}")
     log.debug(f"theta\n{theta.shape}")
-    log.debug(f"m / theta\n{(m / theta[...,tf.newaxis]).shape}")
+    # log.debug(f"m / theta\n{(m / theta[...,tf.newaxis]).shape}")
 
     # Calculate pdf
     kernel = gamma(t, m / theta + 1.0, 1.0 / theta,)

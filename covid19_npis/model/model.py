@@ -157,8 +157,8 @@ def main_model(modelParams):
 
     # Reporting delay d:
     delay = covid19_npis.model.number_of_tests.calc_reporting_kernel(m_t, theta)
-    log.info(f"kernel\n{delay.shape}")  # batch, country, time, kernel
-    log.info(f"new_I_t\n{new_I_t.shape}")  # batch, time, country, age_group
+    log.info(f"kernel\n{delay}")  # batch, country, time, kernel
+    log.info(f"new_I_t\n{new_I_t}")  # batch, time, country, age_group
 
     filter_axes_data = covid19_npis.model.utils.get_filter_axis_data_from_dims(
         len(new_I_t.shape)
@@ -166,12 +166,13 @@ def main_model(modelParams):
     new_cases_delayed = convolution_with_varying_kernel(
         data=new_I_t, kernel=delay, data_time_axis=-3, filter_axes_data=filter_axes_data
     )
+    log.debug(f"new_cases_delayed\n{new_cases_delayed}")
 
     # Calc positive tests
-    phi_age = covid19_npis.model.number_of_tests._construct_phi_age(
+    phi_age = yield covid19_npis.model.number_of_tests._construct_phi_age(
         "phi_age", modelParams
     )
-    positive_tests = covid19_npis.model.number_of_tests.calc_positive_tests(
+    positive_tests = yield covid19_npis.model.number_of_tests.calc_positive_tests(
         name="pos_tests",
         new_cases_delayed=new_cases_delayed,
         phi_plus=phi_t,
@@ -181,10 +182,10 @@ def main_model(modelParams):
     log.debug(f"positive_tests\n{positive_tests}")
 
     # Calc total number of tests
-    phi_tests_reported = covid19_npis.model.number_of_tests._construct_phi_tests_reported(
+    phi_tests_reported = yield covid19_npis.model.number_of_tests._construct_phi_tests_reported(
         name="phi_tests_reported", modelParams=modelParams
     )
-    total_tests = covid19_npis.model.number_of_tests.calc_total_number_of_tests_performed(
+    total_tests = yield covid19_npis.model.number_of_tests.calc_total_number_of_tests_performed(
         name="total_tests",
         new_cases_delayed=new_cases_delayed,
         phi_tests_reported=phi_tests_reported,

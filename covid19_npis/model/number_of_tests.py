@@ -239,7 +239,7 @@ def _construct_phi_age(name, modelParams, sigma_scale=0.2):
         name=f"{name}_cross",
         loc=0,
         scale=sigma,
-        shape_label=age_group,
+        shape_label="age_group",
         conditionally_independent=True,
     )
 

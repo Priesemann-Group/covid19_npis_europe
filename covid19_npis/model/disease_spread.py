@@ -296,14 +296,6 @@ def construct_generation_interval(
     g = gamma(tf.range(0.1, l + 0.1, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
     # g = weibull(tf.range(1, l, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
 
-    # Get the pdf and normalize
-    # g_p, norm = tf.linalg.normalize(g, 1)
-    if len(g.shape) > 1:
-        g = g / tf.expand_dims(
-            tf.reduce_sum(g, axis=-1) + 1e-5, axis=-1
-        )  # Adding 1e5 to prevent nans i.e. x/0
-    else:
-        g = g / tf.reduce_sum(g)
     g = yield Deterministic("g", g)
     return (
         g,

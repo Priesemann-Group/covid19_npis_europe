@@ -584,3 +584,25 @@ def convolution_with_map(data, kernel, modelParams):
     log.info(convolution.shape)
     convolution = tf.einsum("t...ca->...tca", convolution)
     return convolution
+
+
+def get_filter_axis_data_from_dims(ndim):
+    """
+    Returns filter axis data from len(new_I_t.shape) 
+    """
+    if ndim == 4:
+        filter_axes_data = [
+            -4,
+            -2,
+            -1,
+        ]
+    elif ndim == 5:
+        filter_axes_data = [
+            -5,
+            -4,
+            -2,
+            -1,
+        ]
+    else:
+        filter_axes_data = (-2, -1)
+    return filter_axes_data

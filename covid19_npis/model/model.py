@@ -160,8 +160,11 @@ def main_model(modelParams):
     log.info(f"kernel\n{delay.shape}")  # batch, country, time, kernel
     log.info(f"new_I_t\n{new_I_t.shape}")  # batch, time, country, age_group
 
+    filter_axes_data = covid19_npis.model.utils.get_filter_axis_data_from_dims(
+        len(new_I_t.shape)
+    )
     new_cases_delayed = convolution_with_varying_kernel(
-        data=new_I_t, kernel=delay, data_time_axis=-3, filter_axes_data=(-2, -1,)
+        data=new_I_t, kernel=delay, data_time_axis=-3, filter_axes_data=filter_axes_data
     )
 
     # Calc positive tests

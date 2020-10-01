@@ -364,6 +364,11 @@ def calc_reporting_kernel(m, theta, length_kernel=14):
     length_kernel : optional
         Length of the kernel in days
         |default| 14 days
+
+    Returns
+    -------
+    :
+        |shape| batch,country, kernel, time
     """
 
     # Time tensor
@@ -380,7 +385,7 @@ def calc_reporting_kernel(m, theta, length_kernel=14):
 
     # Calculate pdf
     kernel = gamma(t, m / theta + 1.0, 1.0 / theta,)
-
+    kernel = tf.einsum("...ctk->...ckt", kernel)
     return kernel
 
 

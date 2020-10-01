@@ -68,7 +68,7 @@ def calc_positive_tests(name, new_cases_delayed, phi_plus, phi_age, modelParams)
 
 
 def calc_total_number_of_tests_performed(
-    name, new_cases_delayed, phi, eta, xi, modelParams
+    name, new_cases_delayed, phi_tests_reported, phi_plus, eta, xi, modelParams
 ):
     r"""
         .. math::
@@ -376,7 +376,7 @@ def calc_reporting_kernel(m, theta, length_kernel=14):
     theta = theta[..., tf.newaxis, tf.newaxis]  # Add a empty time axis, and kernel axis
     log.debug(f"m\n{m.shape}")
     log.debug(f"theta\n{theta.shape}")
-    log.debug(f"m_t / theta\n{(m / theta[...,tf.newaxis]).shape}")
+    log.debug(f"m / theta\n{(m / theta[...,tf.newaxis]).shape}")
 
     # Calculate pdf
     kernel = gamma(t, m / theta + 1.0, 1.0 / theta,)

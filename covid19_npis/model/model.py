@@ -19,7 +19,7 @@ from covid19_npis.model.distributions import (
     Normal,
     LogNormal,
 )
-from covid19_npis.model.utils import convolution_with_fixed_kernel, gamma
+from covid19_npis.model.utils import convolution_with_varying_kernel, gamma
 
 log = logging.getLogger(__name__)
 
@@ -127,40 +127,46 @@ def main_model(modelParams):
     new_I_t = yield Deterministic(
         name="new_I_t", value=new_I_t, shape_label=("time", "country", "age_group"),
     )
+    log.debug(f"new_I_t\n{new_I_t.shape}")
 
     """ # Number of tests
+    TODO - short description here/ maybe but all of that into a helper function
     """
-    # Bsplines
+    # Get basic functions for b-splines (used later)
     B = covid19_npis.model.number_of_tests.construct_Bsplines_basis(modelParams)
 
     (
         phi,
         eta,
         xi,
-        m,
-        theta_delay,
+        m_star,
     ) = yield covid19_npis.model.number_of_tests.construct_testing_state(
         "state", modelParams, num_knots=B.shape[-1]
     )
 
+    # Transform m_star and construct reporting delay
+    m, theta = yield covid19_npis.model.number_of_tests._construct_reporting_delay(
+        name="delay", modelParams=modelParams, m_ast=m_star
+    )
+
+    # Construct Bsplines
     phi_t = covid19_npis.model.number_of_tests.calculate_Bsplines(phi, B)
     eta_t = covid19_npis.model.number_of_tests.calculate_Bsplines(eta, B)
     xi_t = covid19_npis.model.number_of_tests.calculate_Bsplines(xi, B)
     m_t = covid19_npis.model.number_of_tests.calculate_Bsplines(m, B)
 
-    """ # Reporting delay d:
-    """
-    length_kernel = 14
-    log.info(f"m_t\n{m_t.shape}")
-    log.info(f"theta_delay\n{theta_delay.shape}")
-    log.info(f"m_t / theta_delay\n{(m_t / theta_delay).shape}")
-    # Time tensor
-    t = tf.range(0.01, length_kernel + 0.01, 1.0, dtype="float32")
-    delay = gamma(
-        t[..., tf.newaxis, tf.newaxis], m_t / theta_delay + 1.0, 1.0 / theta_delay
+    # Reporting delay d:
+    kernel = covid19_npis.model.number_of_tests.calc_reporting_kernel(m_t, theta)
+    log.info(f"kernel\n{kernel.shape}")  # batch, country, time, kernel
+    log.info(f"new_I_t\n{new_I_t.shape}")  # batch, time, country, age_group
+
+    new_cases_delayed = convolution_with_varying_kernel(
+        new_I_t, delay, data_time_axis=-3, filter_axes_data=(-2, -1,)
     )
-    log.info(f"delay\n{delay.shape}")
-    log.debug(f"new_cases\n{new_cases}")
-    likelihood = yield covid19_npis.model.studentT_likelihood(modelParams, new_cases)
+
+    log.debug(f"new_cases_delayed\n{new_cases_delayed.shape}")
+    likelihood = yield covid19_npis.model.studentT_likelihood(
+        modelParams, new_cases_delayed
+    )
 
     return likelihood

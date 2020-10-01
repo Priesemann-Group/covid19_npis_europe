@@ -17,6 +17,7 @@ from .distributions import (
     Deterministic,
 )
 from .. import transformations
+from .utils import gamma
 
 
 def calc_positive_tests(name, new_cases_delayed, phi_plus, phi_age, modelParams):
@@ -344,6 +345,45 @@ def _construct_reporting_delay(
     return (m, theta)
 
 
+def calc_reporting_kernel(m, theta, length_kernel=14):
+    r"""
+    Calculates the pdf for the gamma reporting kernel.
+
+    .. math::
+
+        f_{c,t}(\tau) =  Gamma(\tau ; \alpha = \frac{m_{D_{\text{test}},c}(t)}{\theta_{D_\text{test}},c}
+        + 1, \beta=\frac{1}{\theta_{D_\text{test},c}}),\nonumber\\
+        \text{with $f_{c,t}$ normalized such that} \:\: \sum_{\tau=0}^T f_{c,t}(\tau) = 1.
+
+    Parameters
+    ----------
+    m :
+        |shape| batch, time, country
+    theta : 
+        |shape| batch, country
+    length_kernel : optional
+        Length of the kernel in days
+        |default| 14 days
+    """
+
+    # Time tensor
+    t = tf.range(
+        0.01, length_kernel + 0.01, 1.0, dtype="float32"
+    )  # The gamma function does not like 0!
+
+    # Get shapes right we want c,t
+    m = tf.einsum("...tc->...ct", m)[..., tf.newaxis]  # Add empty kernel axis
+    theta = theta[..., tf.newaxis, tf.newaxis]  # Add a empty time axis, and kernel axis
+    log.debug(f"m\n{m.shape}")
+    log.debug(f"theta\n{theta.shape}")
+    log.debug(f"m_t / theta\n{(m / theta[...,tf.newaxis]).shape}")
+
+    # Calculate pdf
+    kernel = gamma(t, m / theta + 1.0, 1.0 / theta,)
+
+    return kernel
+
+
 def construct_testing_state(
     name,
     modelParams,
@@ -394,9 +434,6 @@ def construct_testing_state(
             \eta_{\text{traced},c,b} &= \ln \left(1 + e^{ \eta^\dagger_{\text{traced},c,b}} \right),\\
             \xi_{c,b} &= \ln \left(1 + e^{\xi_{c,b}^\dagger}\right)\frac{n_\text{inhabitants}}{10 000}\\
 
-        Finally :math:`m^\ast_{D_\text{test},c,b}` gets transformed by calling
-        the :py:func:`_construct_reporting_delay` function.
-
 
         Parameters
         ----------
@@ -440,7 +477,7 @@ def construct_testing_state(
         : 
             Testing state tuple :math:`(\phi_{+,c,b},
             \: \eta_{\text{traced},c,b},\: \xi_{c,b},\: m_{D_\text{test},c,b}),\: \theta_{D_\text{test}}.`
-            |shape| 4 x (batch, country, spline), (batch)
+            |shape| 4 x (batch, country, spline),
     """
 
     # sigma
@@ -482,6 +519,7 @@ def construct_testing_state(
         tf.stack([sigma_phi, sigma_eta, sigma_xi, sigma_m], axis=-1),
     )
     log.debug(f"Sigma:\n{Sigma}")
+
     # mu
     mu_phi_cross = yield Normal(
         name="mu_phi_cross",
@@ -519,6 +557,7 @@ def construct_testing_state(
         scale=tf.linalg.LinearOperatorLowerTriangular(Sigma, is_non_singular=True),
         validate_args=True,
         event_stack=(modelParams.num_countries, num_knots),
+        shape_label=("country", "knots"),
     )
     log.debug(f"state:\n{state}")
 
@@ -532,13 +571,10 @@ def construct_testing_state(
     # Transform variables
     phi = tf.exp(phi_cross) * tf.math.sigmoid(-phi_cross)
     eta = tf.math.softplus(eta_cross)
-    xi = tf.math.softplus(xi_cross)  # TODO factor inhabitans
-    m, theta = yield _construct_reporting_delay(
-        name="delay", modelParams=modelParams, m_ast=m_star
-    )
+    xi = tf.math.softplus(xi_cross)  # TODO factor inhibitants
     log.debug(f"xi\n {xi}")
 
-    return (phi, eta, xi, m, theta)
+    return (phi, eta, xi, m_star)
 
 
 def construct_Bsplines_basis(modelParams, order=4, knots=None):

@@ -139,5 +139,8 @@ class MvStudentT(pm.distributions.distribution.ContinuousDistribution):
     def _init_distribution(conditions, **kwargs):
         df, loc, scale = conditions["df"], conditions["loc"], conditions["scale"]
         return tfd.MultivariateStudentTLinearOperator(
-            df=df, loc=loc, scale=scale, **kwargs
+            df=df,
+            loc=loc,
+            scale=tf.linalg.LinearOperatorLowerTriangular(scale, is_non_singular=True),
+            **kwargs
         )

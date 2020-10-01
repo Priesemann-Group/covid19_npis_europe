@@ -120,7 +120,7 @@ def calc_total_number_of_tests_performed(
     inner = (
         tf.einsum("...tca,...tc->...tca", new_cases_delayed, phi_plus)
         + tf.einsum("...tca,...tc,...tc->...tca", new_cases_delayed, phi_plus, eta)
-        + xi
+        + xi[..., tf.newaxis]
     )
     n_Sigma = yield Deterministic(
         name=name,
@@ -186,13 +186,13 @@ def _construct_phi_tests_reported(
         name=f"{name}_dagger",
         loc=mu,
         scale=sigma,
-        event_stack=(modelParams.num_countries),
+        event_stack=modelParams.num_countries,
         shape_label="country",
         conditionally_independent=True,
     )
 
     phi = yield Deterministic(
-        name=name, value=phi_dagger * tf.math.sigmoid(phi_dagger), shape_label="country"
+        name=name, value=tf.math.sigmoid(phi_dagger), shape_label="country"
     )
 
     return phi
@@ -235,12 +235,19 @@ def _construct_phi_age(name, modelParams, sigma_scale=0.2):
         conditionally_independent=True,
         shape_label="age_group",
     )
-    phi_cross = yield Normal(
-        name=f"{name}_cross",
-        loc=0,
-        scale=sigma,
-        shape_label="age_group",
-        conditionally_independent=True,
+    phi_cross = tf.einsum(
+        "...a,...a->...a",
+        (
+            yield Normal(
+                name=f"{name}_cross",
+                loc=0,
+                scale=1.0,
+                shape_label="age_group",
+                event_stack=modelParams.num_age_groups,
+                conditionally_independent=True,
+            )
+        ),
+        sigma,
     )
 
     phi = yield Deterministic(
@@ -307,41 +314,60 @@ def _construct_reporting_delay(
             :math:`m_{D_\text{test},c,b}`
             |shape| batch, country, spline
     """
-    mu = yield Normal(
-        name=f"mu_{name}", loc=mu_loc, scale=mu_scale, conditionally_independent=True
-    )
+
+    # Theta
     sigma_theta = yield HalfNormal(
         name=f"sigma_theta_{name}",
         scale=sigma_theta_scale,
         conditionally_independent=True,
     )
-    theta = yield Normal(
-        name=f"theta_{name}",
-        loc=mu,
-        scale=sigma_theta,
-        event_stack=modelParams.num_countries,
-        shape_label="country",
-        conditionally_independent=True,
+    mu = yield Normal(
+        name=f"mu_{name}", loc=0.0, scale=mu_scale, conditionally_independent=True,
     )
+    mu = mu + mu_loc
+    log.debug(f"sigma_theta\n{sigma_theta}")
+    theta = (
+        tf.einsum(
+            "...c,...->...c",
+            (
+                yield Normal(
+                    name=f"theta_{name}",
+                    loc=0.0,
+                    scale=1.0,
+                    event_stack=modelParams.num_countries,
+                    shape_label="country",
+                    conditionally_independent=True,
+                )
+            ),
+            sigma_theta,
+        )
+        + mu[..., tf.newaxis]
+    )
+
+    # m
     sigma_m = yield HalfNormal(
         name=f"sigma_m_{name}", scale=sigma_m_scale, conditionally_independent=True
     )
-    delta_m = yield Normal(
-        name=f"delta_{name}",
-        loc=0.0,
-        scale=sigma_m,
-        event_stack=modelParams.num_countries,
-        shape_label="country",
-        conditionally_independent=True,
+    delta_m = tf.einsum(
+        "...c,...->...c",
+        (
+            yield Normal(
+                name=f"delta_{name}",
+                loc=0.0,
+                scale=1.0,
+                event_stack=modelParams.num_countries,
+                shape_label="country",
+                conditionally_independent=True,
+            )
+        ),
+        sigma_m,
     )
+
+    m = tf.math.softplus(m_ast + delta_m[..., tf.newaxis])
+    theta = 0.5 * tf.math.softplus(2 * theta)
 
     # We need to add the spline dimension at some point i.e. prop. expand delta_m
-    m = yield Deterministic(
-        name=name,
-        value=m_ast + tf.expand_dims(delta_m, -1),
-        shape_label=("country", "spline"),
-    )
-
+    m = yield Deterministic(name=name, value=m, shape_label=("country", "spline"),)
     return (m, theta)
 
 
@@ -377,11 +403,12 @@ def calc_reporting_kernel(m, theta, length_kernel=14):
     )  # The gamma function does not like 0!
 
     # Get shapes right we want c,t
-    m = tf.einsum("...tc->...ct", m)[..., tf.newaxis]  # Add empty kernel axis
+    m = tf.einsum("...tc->...ct", m)[
+        ..., tf.newaxis
+    ]  # Add empty kernel axis -> batch country time kernel
     theta = theta[..., tf.newaxis, tf.newaxis]  # Add a empty time axis, and kernel axis
-    log.debug(f"m\n{m.shape}")
-    log.debug(f"theta\n{theta.shape}")
-    # log.debug(f"m / theta\n{(m / theta[...,tf.newaxis]).shape}")
+    log.debug(f"m\n{m}")
+    log.debug(f"theta\n{theta}")
 
     # Calculate pdf
     kernel = gamma(t, m / theta + 1.0, 1.0 / theta,)
@@ -519,7 +546,7 @@ def construct_testing_state(
         transform=transformations.CorrelationCholesky(),
     )
     Sigma = tf.einsum(
-        "...ij,...j->...ij",
+        "...ij,...j->...ij",  # todo look at i,j
         Sigma,
         tf.stack([sigma_phi, sigma_eta, sigma_xi, sigma_m], axis=-1),
     )
@@ -545,11 +572,9 @@ def construct_testing_state(
         conditionally_independent=True,
     )
     mu_m = yield Normal(
-        name="mu_m_cross",
-        loc=mu_m_loc,
-        scale=mu_m_scale,
-        conditionally_independent=True,
+        name="mu_m_cross", loc=0.0, scale=mu_m_scale, conditionally_independent=True,
     )
+    mu_m = mu_m + mu_m_loc
 
     mu = tf.stack([mu_phi_cross, mu_eta_cross, mu_xi_cross, mu_m], axis=-1)
 
@@ -559,7 +584,7 @@ def construct_testing_state(
         name="state",
         df=1.0,
         loc=mu,
-        scale=tf.linalg.LinearOperatorLowerTriangular(Sigma, is_non_singular=True),
+        scale=Sigma,
         validate_args=True,
         event_stack=(modelParams.num_countries, num_knots),
         shape_label=("country", "knots"),
@@ -574,9 +599,9 @@ def construct_testing_state(
     log.debug(f"xi_cross\n {xi_cross}")
 
     # Transform variables
-    phi = tf.exp(phi_cross) * tf.math.sigmoid(-phi_cross)
+    phi = tf.math.sigmoid(phi_cross)
     eta = tf.math.softplus(eta_cross)
-    xi = tf.math.softplus(xi_cross)  # TODO factor inhibitants
+    xi = tf.math.softplus(xi_cross) * 1e8 / 10000
     log.debug(f"xi\n {xi}")
 
     return (phi, eta, xi, m_star)

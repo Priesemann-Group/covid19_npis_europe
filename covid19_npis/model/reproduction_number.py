@@ -40,7 +40,7 @@ def _fsigmoid(t, l, d):
     # Factors of the exponent
     log.debug(f"d in _fsigmoid\n{d}")
     log.debug(f"t in _fsigmoid\n{t}")
-    inside_exp_1 = -4.0 / l
+    inside_exp_1 = 4.0 / l
     inside_exp_2 = t - d
     log.debug(f"t-d\n{inside_exp_2}")
     inside_exp_1 = tf.expand_dims(inside_exp_1, axis=-1)
@@ -374,7 +374,7 @@ def construct_R_t(R_0, modelParams):
         # We need to expand the dims of d_icp because we need a additional time dimension
         # for "t - d_icp"
         d_i_c_p = tf.expand_dims(d_i_c_p, axis=-1)
-        inner_sigmoid = tf.einsum("...i,...icpt->...icpt", -4.0 / l_i_sign, t - d_i_c_p)
+        inner_sigmoid = tf.einsum("...i,...icpt->...icpt", 4.0 / l_i_sign, t - d_i_c_p)
         log.debug(f"inner_sigmoid\n{inner_sigmoid}")
         gamma_i_c_p = tf.einsum(
             "...icpt,icp->...icpt",

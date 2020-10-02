@@ -166,6 +166,11 @@ def main_model(modelParams):
     new_cases_delayed = convolution_with_varying_kernel(
         data=new_I_t, kernel=delay, data_time_axis=-3, filter_axes_data=filter_axes_data
     )
+    new_cases_delayed = yield Deterministic(
+        "new_cases_delayed",
+        new_cases_delayed,
+        shape_label=("time", "country", "age_group"),
+    )
     log.debug(f"new_cases_delayed\n{new_cases_delayed}")
 
     # Calc positive tests
@@ -178,6 +183,9 @@ def main_model(modelParams):
         phi_plus=phi_t,
         phi_age=phi_age,
         modelParams=modelParams,
+    )
+    positive_tests = yield Deterministic(
+        "positive_tests", positive_tests, shape_label=("time", "country", "age_group")
     )
     log.debug(f"positive_tests\n{positive_tests}")
 
@@ -194,10 +202,13 @@ def main_model(modelParams):
         xi=xi_t,
         modelParams=modelParams,
     )
+    total_tests = yield Deterministic(
+        "total_tests", positive_tests, shape_label=("time", "country", "age_group")
+    )
     log.debug(f"total_tests\n{total_tests}")
 
     likelihood = yield covid19_npis.model.studentT_likelihood(
-        modelParams, new_cases_delayed
+        modelParams, positive_tests
     )
 
     return likelihood

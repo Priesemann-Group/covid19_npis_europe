@@ -550,7 +550,9 @@ def construct_testing_state(
         Sigma,
         tf.stack([sigma_phi, sigma_eta, sigma_xi, sigma_m], axis=-1),
     )
-    Sigma = yield Deterministic(f"sigma_{name}", Sigma)
+    Sigma = yield Deterministic(
+        f"sigma_{name}", Sigma, shape_label=("testing_state_vars", "testing_state_vars")
+    )
     log.debug(f"Sigma:\n{Sigma}")
 
     # mu

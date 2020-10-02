@@ -67,6 +67,25 @@ params = {
     "g_theta": 1.0,
     "mean_delay": np.array([[12.0], [12.5]]),
     "sigma": 0.1,
+    "phi_tests_reported": np.ones((modelParams.num_countries,)),
+    "phi_age": np.ones((modelParams.num_age_groups,)),
+    "theta_delay": np.zeros((modelParams.num_countries,)),
+    "delay": 12 * np.ones((modelParams.num_countries, modelParams.num_knots)),
+    "mu_testing_state": np.array([0, 0, 0, 12]),
+    "sigma_testing_state": np.einsum(
+        "...ij,...j->...ij",
+        np.linalg.cholesky(
+            np.array(
+                [
+                    [1, 0.1, 0.1, 0.1],
+                    [0.1, 1, 0.1, 0.1],
+                    [0.1, 0.1, 1, 0.1],
+                    [0.1, 0.1, 0.1, 1],
+                ]
+            )
+        ),
+        np.array([0.1, 0.1, 0.1, 0.1]),
+    ),
 }
 
 (

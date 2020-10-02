@@ -24,12 +24,18 @@ class ModelParams:
     """
 
     def __init__(
-        self, countries, min_offset_sim_data=20, minimal_daily_cases=40, dtype="float32"
+        self,
+        countries,
+        min_offset_sim_data=20,
+        minimal_daily_cases=40,
+        spline_degree=3,
+        dtype="float32",
     ):
 
         self._dtype = dtype
         self._min_offset_sim_data = min_offset_sim_data
         self._minimal_daily_cases = minimal_daily_cases
+        self._spline_degree = spline_degree
 
         # Save data objects and calculate all other variables
         self.countries = countries
@@ -143,6 +149,13 @@ class ModelParams:
         return self._data_tensor
 
     @property
+    def knots(self):
+        knots = np.arange(0, self.length, 7)
+        knots = np.insert(knots, 0, [0] * self._spline_degree, axis=0)
+        knots = np.insert(knots, -1, [knots[-1]] * self._spline_degree, axis=0)
+        return knots
+
+    @property
     def date_data_tensor(self):
         """
         Creates a tensor with dimension intervention, country, change_points
@@ -209,6 +222,10 @@ class ModelParams:
     @property
     def num_interventions(self):
         return len(self.data_summary["interventions"])
+
+    @property
+    def num_knots(self):
+        return len(self.knots) - 2 * (self._spline_degree - 1)
 
     @property
     def indices_begin_sim(self):

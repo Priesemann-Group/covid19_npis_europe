@@ -550,6 +550,7 @@ def construct_testing_state(
         Sigma,
         tf.stack([sigma_phi, sigma_eta, sigma_xi, sigma_m], axis=-1),
     )
+    Sigma = yield Deterministic(f"sigma_{name}", Sigma)
     log.debug(f"Sigma:\n{Sigma}")
 
     # mu
@@ -577,6 +578,7 @@ def construct_testing_state(
     mu_m = mu_m + mu_m_loc
 
     mu = tf.stack([mu_phi_cross, mu_eta_cross, mu_xi_cross, mu_m], axis=-1)
+    mu = yield Deterministic(f"mu_{name}", mu)
 
     log.debug(f"mu:\n{mu}")
 
@@ -607,7 +609,7 @@ def construct_testing_state(
     return (phi, eta, xi, m_star)
 
 
-def construct_Bsplines_basis(modelParams, order=4, knots=None):
+def construct_Bsplines_basis(modelParams, degree=3, knots=None):
     r"""
     Function to construct the basis functions for all BSplines, should only be called 
     once. Uses splipy python library.
@@ -618,10 +620,10 @@ def construct_Bsplines_basis(modelParams, order=4, knots=None):
         Instance of modelParams, mainly used for number of age groups and
         number of countries.
 
-    order: optional
-        Order corresponds to exponent of the splines i.e. order of three corresponds
-        to x^2.
-        |default| 4
+    degree: optional
+        degree corresponds to exponent of the splines i.e. degree of three corresponds
+        to a cubic spline.
+        |default| 3
 
     knots: list, optional
         Knots array used for constructing the BSplines. 
@@ -634,12 +636,10 @@ def construct_Bsplines_basis(modelParams, order=4, knots=None):
     """
 
     if knots is None:
-        knots = np.arange(0, modelParams.length, 7)
-        knots = np.insert(knots, 0, [0] * (order - 1), axis=0)
-        knots = np.insert(knots, -1, [knots[-1]] * (order - 1), axis=0)
+        knots = modelParams.knots
 
     # Construct basis spline object
-    splines = BSplineBasis(order=order, knots=knots, periodic=-1)
+    splines = BSplineBasis(order=degree + 1, knots=knots, periodic=-1)
 
     # Get Basic spline functions from time array
     t = np.arange(0, modelParams.length, 1)

@@ -141,7 +141,7 @@ def main_model(modelParams):
         xi,
         m_star,
     ) = yield covid19_npis.model.number_of_tests.construct_testing_state(
-        "state", modelParams, num_knots=B.shape[-1]
+        "testing_state", modelParams, num_knots=B.shape[-1]
     )
 
     # Transform m_star and construct reporting delay

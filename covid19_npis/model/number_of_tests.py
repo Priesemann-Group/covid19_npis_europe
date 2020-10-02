@@ -585,13 +585,13 @@ def construct_testing_state(
     log.debug(f"mu:\n{mu}")
 
     state = yield MvStudentT(
-        name="state",
+        name=name,
         df=1.0,
         loc=mu,
         scale=Sigma,
         validate_args=True,
         event_stack=(modelParams.num_countries, num_knots),
-        shape_label=("country", "knots"),
+        shape_label=("country", "spline"),
     )
     log.debug(f"state:\n{state}")
 
@@ -600,13 +600,11 @@ def construct_testing_state(
     eta_cross = tf.gather(state, 1, axis=-1)
     xi_cross = tf.gather(state, 2, axis=-1)
     m_star = tf.gather(state, 3, axis=-1)
-    log.debug(f"xi_cross\n {xi_cross}")
 
     # Transform variables
     phi = tf.math.sigmoid(phi_cross)
     eta = tf.math.softplus(eta_cross)
     xi = tf.math.softplus(xi_cross) * 1e8 / 10000
-    log.debug(f"xi\n {xi}")
 
     return (phi, eta, xi, m_star)
 

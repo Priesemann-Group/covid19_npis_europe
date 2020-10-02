@@ -70,7 +70,8 @@ params = {
     "phi_tests_reported": np.ones((modelParams.num_countries,)),
     "phi_age": np.ones((modelParams.num_age_groups,)),
     "theta_delay": np.zeros((modelParams.num_countries,)),
-    "delay": 12 * np.ones((modelParams.num_countries, modelParams.num_knots)),
+    "delay": np.linspace(10, 14, modelParams.num_splines)
+    * np.ones((modelParams.num_countries, modelParams.num_splines)),
     "mu_testing_state": np.array([0, 0, 0, 12]),
     "sigma_testing_state": np.einsum(
         "...ij,...j->...ij",
@@ -92,9 +93,19 @@ params = {
     new_cases_inferred,
     R_t,
     interv,
-    extra,
+    (delay, positive_tests, new_cases_delayed, total_tests, new_I_t, delay_kernel),
 ) = covid19_npis.test_data.data_generators.test_data_from_model(
-    main_model, modelParams, params, ["delay"]
+    main_model,
+    modelParams,
+    params,
+    [
+        "delay",
+        "positive_tests",
+        "new_cases_delayed",
+        "total_tests",
+        "new_I_t",
+        "delay_kernel",
+    ],
 )
 
 covid19_npis.test_data.data_generators.save_data(

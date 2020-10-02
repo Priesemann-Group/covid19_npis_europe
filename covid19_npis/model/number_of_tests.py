@@ -3,7 +3,6 @@ import tensorflow_probability as tfp
 import logging
 import pymc4 as pm
 import numpy as np
-from splipy import BSplineBasis
 
 log = logging.getLogger(__name__)
 
@@ -20,7 +19,7 @@ from .. import transformations
 from .utils import gamma
 
 
-def calc_positive_tests(name, new_cases_delayed, phi_plus, phi_age, modelParams):
+def calc_positive_tests(new_cases_delayed, phi_plus, phi_age, modelParams):
     r"""
         .. math::
 
@@ -60,15 +59,11 @@ def calc_positive_tests(name, new_cases_delayed, phi_plus, phi_age, modelParams)
     n_plus = tf.einsum(
         "...tca,...tc,...a->...tca", new_cases_delayed, phi_plus, phi_age
     )
-
-    n_plus = yield Deterministic(
-        name=name, value=n_plus, shape_label=("time", "country", "age_group")
-    )
     return n_plus
 
 
 def calc_total_number_of_tests_performed(
-    name, new_cases_delayed, phi_tests_reported, phi_plus, eta, xi, modelParams
+    new_cases_delayed, phi_tests_reported, phi_plus, eta, xi, modelParams
 ):
     r"""
         .. math::
@@ -122,11 +117,7 @@ def calc_total_number_of_tests_performed(
         + tf.einsum("...tca,...tc,...tc->...tca", new_cases_delayed, phi_plus, eta)
         + xi[..., tf.newaxis]
     )
-    n_Sigma = yield Deterministic(
-        name=name,
-        value=tf.einsum("...c,...tca->...tca", phi_tests_reported, inner),
-        shape_label=("time", "country", "age_group"),
-    )
+    n_Sigma = tf.einsum("...c,...tca->...tca", phi_tests_reported, inner)
 
     return n_Sigma
 
@@ -609,7 +600,7 @@ def construct_testing_state(
     return (phi, eta, xi, m_star)
 
 
-def construct_Bsplines_basis(modelParams, degree=3, knots=None):
+def construct_Bsplines_basis(modelParams):
     r"""
     Function to construct the basis functions for all BSplines, should only be called 
     once. Uses splipy python library.
@@ -635,16 +626,7 @@ def construct_Bsplines_basis(modelParams, degree=3, knots=None):
         |shape| time, knots?
     """
 
-    if knots is None:
-        knots = modelParams.knots
-
-    # Construct basis spline object
-    splines = BSplineBasis(order=degree + 1, knots=knots, periodic=-1)
-
-    # Get Basic spline functions from time array
-    t = np.arange(0, modelParams.length, 1)
-    B = splines.evaluate(t, from_right=False)  # |shape| time, knots?
-
+    B = modelParams.spline_basis
     return tf.convert_to_tensor(B, dtype="float32")
 
 

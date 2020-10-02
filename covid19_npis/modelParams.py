@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import logging
+from scipy.interpolate import BSpline
 
 log = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ class ModelParams:
         min_offset_sim_data=20,
         minimal_daily_cases=40,
         spline_degree=3,
+        spline_stride=7,
         dtype="float32",
     ):
 
@@ -36,6 +38,7 @@ class ModelParams:
         self._min_offset_sim_data = min_offset_sim_data
         self._minimal_daily_cases = minimal_daily_cases
         self._spline_degree = spline_degree
+        self._spline_stride = spline_stride
 
         # Save data objects and calculate all other variables
         self.countries = countries
@@ -125,6 +128,17 @@ class ModelParams:
         self._data_tensor = data_tensor
 
     @property
+    def spline_basis(self):
+        stride = self._spline_stride
+        degree = self._spline_degree
+        knots = np.arange(self.length + degree * stride, 0 - degree * stride, -stride)
+        knots = knots[::-1]
+        num_splines = len(knots) - 2 * (degree - 1)
+        spl = BSpline(knots, np.eye(num_splines), degree, extrapolate=False)
+        spline_basis = spl(np.arange(0, self.length))
+        return spline_basis  # shape : modelParams.length x modelParams.num_splines
+
+    @property
     def dataframe(self):
         """
         New cases as multiColumn dataframe level 0 = country/region and
@@ -147,13 +161,6 @@ class ModelParams:
         |shape| time, country, agegroup 
         """
         return self._data_tensor
-
-    @property
-    def knots(self):
-        knots = np.arange(0, self.length, 7)
-        knots = np.insert(knots, 0, [0] * self._spline_degree, axis=0)
-        knots = np.insert(knots, -1, [knots[-1]] * self._spline_degree, axis=0)
-        return knots
 
     @property
     def date_data_tensor(self):
@@ -224,8 +231,8 @@ class ModelParams:
         return len(self.data_summary["interventions"])
 
     @property
-    def num_knots(self):
-        return len(self.knots) - 2 * (self._spline_degree - 1)
+    def num_splines(self):
+        return self.spline_basis.shape[1]
 
     @property
     def indices_begin_sim(self):

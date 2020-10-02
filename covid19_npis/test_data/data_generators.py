@@ -182,7 +182,7 @@ def test_data(**in_params):
     return df_new_cases.sort_index(), df_R_t, df_interv
 
 
-def test_data_from_model(model, modelParams, params_dict):
+def test_data_from_model(model, modelParams, params_dict, to_return=None):
     """
     Generates a test dataset from our model! Needs some pregenerated
     data file which is quite strange but only uses it to cast the right dimensions!
@@ -196,6 +196,8 @@ def test_data_from_model(model, modelParams, params_dict):
         number of countries.
     params_dict: dictionary
         Parameters for the test run.
+    to_return: list str
+        Return these variables
 
     Returns
     -------
@@ -207,6 +209,9 @@ def test_data_from_model(model, modelParams, params_dict):
     len_gen_interv_kernel = 12
     num_interventions = 2
 
+    if to_return is None:
+        to_return = []
+
     model_name = model(modelParams).name
 
     dict_with_model_name = {
@@ -215,43 +220,37 @@ def test_data_from_model(model, modelParams, params_dict):
     }
     trace = az.from_dict(posterior=dict_with_model_name,)
 
+    var_names = []
+    variables = list(
+        set(
+            ["R_0", "new_cases_inferred", "R_t", "g", "d_i_c_p", "new_I_t", "h_0_t",]
+            + to_return
+        )
+    )
+
+    for var in variables:
+        var_names.append(f"{model_name}/{var}")
+
     # Sample
     trace = pm.sample_posterior_predictive(
-        model(modelParams),
-        trace,
-        var_names=[
-            f"{model_name}/R_0",
-            f"{model_name}/new_cases_inferred",
-            f"{model_name}/R_t",
-            f"{model_name}/g",
-            f"{model_name}/d_i_c_p",
-            f"{model_name}/new_I_t",
-            f"{model_name}/h_0_t",
-        ],
-        use_auto_batching=False,
+        model(modelParams), trace, var_names=var_names, use_auto_batching=False,
     )
 
     # Convert to pandas
     _, sample_state = pm.evaluate_model(model(modelParams))
-    new_cases_inferred = data.convert_trace_to_dataframe(
-        trace,
-        sample_state=sample_state,
-        key="new_cases_inferred",
-        data_type="posterior_predictive",
-    )
-    new_cases_inferred.index = new_cases_inferred.index.droplevel(["chain", "draw"])
-    new_cases_inferred = new_cases_inferred.stack().unstack(level="time").T
-    new_cases_inferred.columns = new_cases_inferred.columns.droplevel(
-        -1
-    )  # stack adds an additional dimension
 
-    R_t = data.convert_trace_to_dataframe(
-        trace, sample_state=sample_state, key="R_t", data_type="posterior_predictive",
-    )
-    R_t.index = R_t.index.droplevel(["chain", "draw"])
-    R_t = R_t.stack().unstack(level="time").T
-    R_t.columns = R_t.columns.droplevel(-1)  # stack adds an additional dimension
+    def convert_to_pandas(key):
+        df = data.convert_trace_to_dataframe(
+            trace, sample_state=sample_state, key=key, data_type="posterior_predictive",
+        )
+        df.index = df.index.droplevel(["chain", "draw"])
+        if "time" in df.index.names:
+            df = df.stack().unstack(level="time").T
+            df.columns = df.columns.droplevel(-1)  # stack adds an additional dimension
+        return df
 
+    new_cases_inferred = convert_to_pandas("new_cases_inferred")
+    R_t = convert_to_pandas("R_t")
     d = data.convert_trace_to_dataframe(
         trace,
         sample_state=sample_state,
@@ -265,7 +264,12 @@ def test_data_from_model(model, modelParams, params_dict):
             interv = country.data_interventions
         else:
             interv = interv.join(country.data_interventions)
-    return new_cases_inferred, R_t, interv
+
+    extra = []
+    for var in to_return:
+        extra.append(convert_to_pandas(var))
+
+    return new_cases_inferred, R_t, interv, extra
 
 
 def save_data(path, new_cases, R_t, interv):

@@ -92,8 +92,9 @@ params = {
     new_cases_inferred,
     R_t,
     interv,
+    extra,
 ) = covid19_npis.test_data.data_generators.test_data_from_model(
-    main_model, modelParams, params
+    main_model, modelParams, params, ["delay"]
 )
 
 covid19_npis.test_data.data_generators.save_data(

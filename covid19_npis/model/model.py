@@ -203,7 +203,7 @@ def main_model(modelParams):
         modelParams=modelParams,
     )
     total_tests = yield Deterministic(
-        "total_tests", positive_tests, shape_label=("time", "country", "age_group")
+        "total_tests", total_tests, shape_label=("time", "country", "age_group")
     )
     log.debug(f"total_tests\n{total_tests}")
 

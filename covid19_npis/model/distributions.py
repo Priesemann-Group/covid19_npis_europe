@@ -40,13 +40,25 @@ class DistributionAdditions:
     """
 
     def __init__(self, *args, **kwargs):
-
         if "shape_label" in kwargs:
             self.shape_label = kwargs.get("shape_label")
             event_ndim = len(self.shape_label)
             del kwargs["shape_label"]
 
         super().__init__(*args, **kwargs)
+
+        if "loc" in kwargs and tf.is_tensor(kwargs.get("loc")):
+            tf.debugging.assert_all_finite(
+                kwargs.get("loc"), f"loc not finite in {self.name}"
+            )
+        if "scale" in kwargs and tf.is_tensor(kwargs.get("scale")):
+            tf.debugging.assert_all_finite(
+                kwargs.get("scale"), f"scale not finite in {self.name}"
+            )
+
+    def log_prob(self, value):
+        tf.debugging.assert_all_finite(value, f"not finite value in {self.name}")
+        return super().log_prob(value)
 
 
 # ------------------------------------------------------------------------------ #
@@ -142,5 +154,5 @@ class MvStudentT(pm.distributions.distribution.ContinuousDistribution):
             df=df,
             loc=loc,
             scale=tf.linalg.LinearOperatorLowerTriangular(scale, is_non_singular=True),
-            **kwargs
+            **kwargs,
         )

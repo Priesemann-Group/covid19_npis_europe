@@ -131,7 +131,9 @@ class ModelParams:
     def spline_basis(self):
         stride = self._spline_stride
         degree = self._spline_degree
-        knots = np.arange(self.length + degree * stride, 0 - degree * stride, -stride)
+        knots = np.arange(
+            self.length + degree * stride, 0 - (degree + 1) * stride, -stride
+        )
         knots = knots[::-1]
         num_splines = len(knots) - 2 * (degree - 1)
         spl = BSpline(knots, np.eye(num_splines), degree, extrapolate=False)

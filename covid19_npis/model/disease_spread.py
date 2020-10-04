@@ -52,6 +52,7 @@ def construct_h_0_t(
         R_t - tf.ones(R_t.shape, dtype=R_t.dtype)
     ) / mean_gen_interv + tf.ones(R_t.shape, dtype=R_t.dtype)
     R_inv = 1 / R_t_rescaled
+    R_inv = tf.clip_by_value(R_inv, clip_value_min=0.7, clip_value_max=1.2)
     """
     R = R_t_rescaled[0]
     R_sqrt = tf.math.sqrt(R)

@@ -316,6 +316,7 @@ def _construct_reporting_delay(
         name=f"mu_{name}", loc=0.0, scale=mu_scale, conditionally_independent=True,
     )
     mu = mu + mu_loc
+    log.debug(f"mu delta m:\n{mu}")
     log.debug(f"sigma_theta\n{sigma_theta}")
     theta = (
         tf.einsum(
@@ -356,9 +357,11 @@ def _construct_reporting_delay(
 
     m = tf.math.softplus(m_ast + delta_m[..., tf.newaxis])
     theta = 0.5 * tf.math.softplus(2 * theta)
+    theta = tf.clip_by_value(theta, clip_value_min=0.1, clip_value_max=10)
 
     # We need to add the spline dimension at some point i.e. prop. expand delta_m
     m = yield Deterministic(name=name, value=m, shape_label=("country", "spline"),)
+    log.debug(f"m_spline:\n{m}")
     return (m, theta)
 
 
@@ -537,14 +540,14 @@ def construct_testing_state(
         transform=transformations.CorrelationCholesky(),
     )
     Sigma = tf.einsum(
-        "...ij,...j->...ij",  # todo look at i,j
+        "...ij,...i->...ij",  # todo look at i,j
         Sigma,
         tf.stack([sigma_phi, sigma_eta, sigma_xi, sigma_m], axis=-1),
     )
     Sigma = yield Deterministic(
         f"sigma_{name}", Sigma, shape_label=("testing_state_vars", "testing_state_vars")
     )
-    log.debug(f"Sigma:\n{Sigma}")
+    log.debug(f"Sigma state:\n{Sigma}")
 
     # mu
     mu_phi_cross = yield Normal(
@@ -568,12 +571,12 @@ def construct_testing_state(
     mu_m = yield Normal(
         name="mu_m_cross", loc=0.0, scale=mu_m_scale, conditionally_independent=True,
     )
-    mu_m = mu_m + mu_m_loc
+    mu_m = mu_m
 
     mu = tf.stack([mu_phi_cross, mu_eta_cross, mu_xi_cross, mu_m], axis=-1)
     mu = yield Deterministic(f"mu_{name}", mu)
 
-    log.debug(f"mu:\n{mu}")
+    log.debug(f"mu state:\n{mu}")
 
     state = yield MvStudentT(
         name=name,
@@ -590,7 +593,7 @@ def construct_testing_state(
     phi_cross = tf.gather(state, 0, axis=-1)
     eta_cross = tf.gather(state, 1, axis=-1)
     xi_cross = tf.gather(state, 2, axis=-1)
-    m_star = tf.gather(state, 3, axis=-1)
+    m_star = tf.gather(state, 3, axis=-1) + mu_m_loc
 
     # Transform variables
     phi = tf.math.sigmoid(phi_cross)
@@ -627,6 +630,7 @@ def construct_Bsplines_basis(modelParams):
     """
 
     B = modelParams.spline_basis
+    log.debug(f"spline basis:\n{B}")
     return tf.convert_to_tensor(B, dtype="float32")
 
 

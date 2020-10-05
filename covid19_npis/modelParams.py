@@ -181,7 +181,8 @@ class ModelParams:
                 for p, cp in enumerate(country.change_points[intervention.name]):
                     d_cp.append(self.date_to_index(cp.date_data))
                 if len(d_cp) < max_num_cp:
-                    d_cp.append([0.0] * (max_num_cp - len(d_cp)))
+                    for x in range(max_num_cp - len(d_cp)):
+                        d_cp.append(0.0)
                 d_c.append(d_cp)
             data.append(d_c)
         return tf.constant(data, dtype="float32")
@@ -203,7 +204,8 @@ class ModelParams:
                 for p, cp in enumerate(country.change_points[intervention.name]):
                     d_cp.append(cp.gamma_max)
                 if len(d_cp) < max_num_cp:
-                    d_cp.append([0.0] * (max_num_cp - len(d_cp)))
+                    for x in range(max_num_cp - len(d_cp)):
+                        d_cp.append(0.0)
                 d_c.append(d_cp)
             data.append(d_c)
         return tf.constant(data, dtype="float32")

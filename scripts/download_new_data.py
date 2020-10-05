@@ -53,6 +53,7 @@ for country in countries:
         interventions[policy] = ox.get_time_data(
             policy=policy, country=country, data_begin=begin, data_end=end,
         )
+    interventions.index = interventions.index.rename("date")
     interventions.to_csv(path + f"/{country}/interventions.csv", date_format="%d.%m.%y")
 
 
@@ -110,7 +111,7 @@ new_cases = new_cases.drop(columns=["69", "79"])
 
 new_cases["80+"] = new_cases["89"] + new_cases["90"]
 new_cases = new_cases.drop(columns=["89", "90"])
-
+new_cases.index = new_cases.index.rename("date")
 new_cases.to_csv(path + f"/France/new_cases.csv", date_format="%d.%m.%y")
 
 
@@ -124,6 +125,7 @@ age_groups = [
     "A60-A79",
     "A80+",
 ]  # available age_groups
+new_cases = pd.DataFrame()
 for age_group in age_groups:
     new_cases[age_group] = Germany.get_new(
         "confirmed", data_begin=begin, data_end=end, age_group=age_group
@@ -140,5 +142,5 @@ new_cases = new_cases.drop(columns="A60-A79")
 
 new_cases["80+"] = new_cases["A80+"]
 new_cases = new_cases.drop(columns="A80+")
-
+new_cases.index = new_cases.index.rename("date")
 new_cases.to_csv(path + f"/Germany/new_cases.csv", date_format="%d.%m.%y")

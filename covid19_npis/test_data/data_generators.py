@@ -248,6 +248,7 @@ def test_data_from_model(model, modelParams, params_dict, to_return=None):
         if "time" in df.index.names:
             df = df.stack().unstack(level="time").T
             df.columns = df.columns.droplevel(-1)  # stack adds an additional dimension
+            df.index = df.index.rename("date")
         return df
 
     new_cases_inferred = convert_to_pandas("new_cases_inferred")

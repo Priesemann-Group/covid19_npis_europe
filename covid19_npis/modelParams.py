@@ -210,6 +210,19 @@ class ModelParams:
             data.append(d_c)
         return tf.constant(data, dtype="float32")
 
+    @property
+    def N_data_tensor(self):
+        """
+        Creates the population tensor with dimension country, agegroups
+        """
+        data = []
+        for c, country in enumerate(self.countries):
+            d_c = []
+            for age_group in self.age_groups:
+                d_c.append(country.data_population.loc[age_group].values[0])
+            data.append(d_c)
+        return tf.constant(data, dtype="float32")
+
     # ------------------------------------------------------------------------------ #
     # Additional properties
     # ------------------------------------------------------------------------------ #

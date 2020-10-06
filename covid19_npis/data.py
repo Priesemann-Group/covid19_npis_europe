@@ -1,5 +1,6 @@
 import logging
 import pandas as pd
+import os
 
 log = logging.getLogger(__name__)
 from . import modelParams
@@ -211,12 +212,11 @@ class Country(object):
         name: string
             Name of the country
             
-        fp_new_cases : string
-            Filepath to the daily new cases as csv, should have age group columns. The age group
-            names get parsed from the column names!
+        path_to_folder : string
+            Filepath to the folder, which holds all the data for the country!
+            Should be something like "../data/Germany".
+            That is new_cases.csv, interventions.csv, population.csv
 
-        fp_interventions : string
-            Filepath to the interventions csv file. The column names get parsed as intervention names!
     """
 
     """
@@ -226,15 +226,28 @@ class Country(object):
     """
     interventions = []
 
-    def __init__(self, name, fp_new_cases, fp_interventions):
+    def __init__(self, name, path_to_folder):
         self.name = name
-        # Retrieve files and parse them!
+
+        # Check if files exist
+        assert os.path.isfile(path_to_folder + "/new_cases.csv")
+        assert os.path.isfile(path_to_folder + "/interventions.csv")
+        assert os.path.isfile(path_to_folder + "/population.csv")
+        # assert os.path.isfile(path_to_folder+"/tests.csv")
+
+        # Load files
         self.data_new_cases = self._to_iso(
-            self._load_csv_with_date_index(fp_new_cases), "age_group"
+            self._load_csv_with_date_index(path_to_folder + "/new_cases.csv"),
+            "age_group",
         )
         self.data_interventions = self._to_iso(
-            self._load_csv_with_date_index(fp_interventions), "intervention"
+            self._load_csv_with_date_index(path_to_folder + "/interventions.csv"),
+            "intervention",
         )
+        self.data_population = pd.read_csv(
+            path_to_folder + "/population.csv", index_col="age_group"
+        )
+
         # Create change_points from interventions time series
         self.change_points = {}
         for column in self.data_interventions.columns:
@@ -249,6 +262,9 @@ class Country(object):
         data = pd.read_csv(filepath)
         if "date" in data.columns:
             data["date"] = pd.to_datetime(data["date"], format="%d.%m.%y")
+            data = data.set_index("date")
+        elif "time" in data.columns:
+            data["date"] = pd.to_datetime(data["time"], format="%d.%m.%y")
             data = data.set_index("date")
 
         return data

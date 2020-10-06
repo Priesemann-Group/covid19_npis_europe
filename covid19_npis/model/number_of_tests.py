@@ -598,7 +598,11 @@ def construct_testing_state(
     # Transform variables
     phi = tf.math.sigmoid(phi_cross)
     eta = tf.math.softplus(eta_cross)
-    xi = tf.math.softplus(xi_cross) * 1e8 / 10000
+    xi = tf.einsum(
+        "...cb,c->...cb",
+        tf.math.softplus(xi_cross),
+        tf.reduce_sum(modelParams.N_data_tensor, axis=-1) / 10000,
+    )
 
     return (phi, eta, xi, m_star)
 

@@ -103,12 +103,11 @@ def main_model(modelParams):
     )
     log.debug(f"h_0(t):\n{h_0_t}")
 
-    """ # Create population size tensor (vector) N:
+    """ # Get population size tensor from modelParams:
     Should be done earlier in the real model i.e. in the modelParams
     The N tensor has the |shape| country, age_group.
     """
-    N = tf.convert_to_tensor([1e12, 1e12, 1e12, 1e12] * modelParams.num_countries)
-    N = tf.reshape(N, (modelParams.num_countries, modelParams.num_age_groups))
+    N = modelParams.N_data_tensor
     log.debug(f"N:\n{N}")
 
     """ # Create new cases new_I(t):

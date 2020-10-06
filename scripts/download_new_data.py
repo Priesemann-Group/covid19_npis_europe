@@ -16,10 +16,7 @@ countries = ["France", "Germany"]
 path = "../data"
 begin = datetime.datetime(2020, 5, 17)
 end = datetime.datetime.today()
-age_groups = {
-    "France": [9, 19, 29, 39, 49, 59, 69, 79, 89, 90],
-    "Germany": ["A00-A04", "A05-A14", "A15-A34", "A35-A59", "A60-A79", "A80+"],
-}
+_age_groups = ["young", "mid", "old", "old+"]
 policies = [
     "C1_School closing",
     "C2_Workplace closing",
@@ -100,16 +97,16 @@ for age_group in age_groups:
     )
 
 # We want to sum over 0-9,10-19 and 19-29 for the first age group:
-new_cases["0-29"] = new_cases["09"] + new_cases["19"] + new_cases["29"]
+new_cases["young"] = new_cases["09"] + new_cases["19"] + new_cases["29"]
 new_cases = new_cases.drop(columns=["09", "19", "29"])
 # Do the same for agegroups 30-39,40-49,50-59
-new_cases["30-59"] = new_cases["39"] + new_cases["49"] + new_cases["59"]
+new_cases["mid"] = new_cases["39"] + new_cases["49"] + new_cases["59"]
 new_cases = new_cases.drop(columns=["39", "49", "59"])
 
-new_cases["60-79"] = new_cases["69"] + new_cases["79"]
+new_cases["old"] = new_cases["69"] + new_cases["79"]
 new_cases = new_cases.drop(columns=["69", "79"])
 
-new_cases["80+"] = new_cases["89"] + new_cases["90"]
+new_cases["old+"] = new_cases["89"] + new_cases["90"]
 new_cases = new_cases.drop(columns=["89", "90"])
 new_cases.index = new_cases.index.rename("date")
 new_cases.to_csv(path + f"/France/new_cases.csv", date_format="%d.%m.%y")
@@ -131,16 +128,48 @@ for age_group in age_groups:
         "confirmed", data_begin=begin, data_end=end, age_group=age_group
     )
 
-new_cases["0-34"] = new_cases["A00-A04"] + new_cases["A05-A14"] + new_cases["A15-A34"]
+new_cases["young"] = new_cases["A00-A04"] + new_cases["A05-A14"] + new_cases["A15-A34"]
 new_cases = new_cases.drop(columns=["A00-A04", "A05-A14", "A15-A34"])
 
-new_cases["35-59"] = new_cases["A35-A59"]
+new_cases["mid"] = new_cases["A35-A59"]
 new_cases = new_cases.drop(columns="A35-A59")
 
-new_cases["60-79"] = new_cases["A60-A79"]
+new_cases["old"] = new_cases["A60-A79"]
 new_cases = new_cases.drop(columns="A60-A79")
 
-new_cases["80+"] = new_cases["A80+"]
+new_cases["old+"] = new_cases["A80+"]
 new_cases = new_cases.drop(columns="A80+")
 new_cases.index = new_cases.index.rename("date")
 new_cases.to_csv(path + f"/Germany/new_cases.csv", date_format="%d.%m.%y")
+
+
+""" Population age structure
+This one should also be quite easy but will take a while to download!
+-> Use local copy in data folder
+"""
+if not os.path.isfile(path + f"/WPP2019_PopulationBySingleAgeSex_1950-2019.csv"):
+    # Download file if it does not exist yet
+    import requests
+
+    url = "https://population.un.org/wpp/Download/Files/1_Indicators%20(Standard)/CSV_FILES/WPP2019_PopulationBySingleAgeSex_1950-2019.csv"
+    log.info("Beginning file download for population file, this will take a while!")
+    myfile = requests.get(url)
+    open(path + f"/WPP2019_PopulationBySingleAgeSex_1950-2019.csv", "wb").write(
+        myfile.content
+    )
+
+pop = pd.read_csv(path + f"/WPP2019_PopulationBySingleAgeSex_1950-2019.csv")
+for country in countries:
+    data = pop.loc[pop["Location"] == country]
+    data = data.loc[data["Time"] == 2019]
+    data = data.set_index("AgeGrp")
+    data = data["PopTotal"]
+    groups = pd.DataFrame(columns=["PopTotal"])
+    groups.loc["young"] = data[0:29].sum()
+    groups.loc["mid"] = data[30:59].sum()
+    groups.loc["old"] = data[60:79].sum()
+    groups.loc["old+"] = data[80:].sum()
+    # Multiply by 1k to get real population numbers
+    groups = groups * 1000
+    groups.index.name = "age_group"
+    groups.astype("int64").to_csv(path + f"/{country}/population.csv",)

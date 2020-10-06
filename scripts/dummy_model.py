@@ -36,7 +36,7 @@ print(tf.config.optimizer.get_experimental_options())
 sys.path.append("../")
 
 # Needed to set logging level before importing other modules
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
 import covid19_npis
@@ -46,7 +46,7 @@ from covid19_npis.model import main_model
 """ # Debugging and other snippets
 """
 # For eventual debugging:
-tf.config.run_functions_eagerly(True)
+# tf.config.run_functions_eagerly(True)
 # tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
 
 # Force CPU
@@ -61,29 +61,13 @@ covid19_npis.utils.force_cpu_for_tensorflow()
 """
 
 # Load our data from csv files into our own custom data classes
-"""
-c1 = covid19_npis.data.Country(
-    "test-country-1",  # name
-    "../data/test_country_1/new_cases.csv",  # new_Cases per age groups in country
-    "../data/test_country_1/interventions.csv",  # interventions timeline with stringency index
-)
-c2 = covid19_npis.data.Country(
-    "test-country-2",
-    "../data/test_country_2/new_cases.csv",
-    "../data/test_country_2/interventions.csv",
-)
-"""
 
-c1 = covid19_npis.data.Country(
-    "test-country-1",  # name
-    "../data/test_data_from_model/test-country-1/new_cases.csv",  # new_Cases per age groups in country
-    "../data/test_data_from_model/test-country-1/interventions.csv",  # interventions timeline with stringency index
-)
-c2 = covid19_npis.data.Country(
-    "test-country-2",
-    "../data/test_data_from_model/test-country-2/new_cases.csv",
-    "../data/test_data_from_model/test-country-2/interventions.csv",
-)
+c1 = covid19_npis.data.Country("test-country-1", "../data/test_country_1",)  # name
+c2 = covid19_npis.data.Country("test-country-2", "../data/test_country_2",)
+
+
+# c1 = covid19_npis.data.Country("Germany", "../data/Germany",)  # Data folder for germany
+# c2 = covid19_npis.data.Country("France", "../data/France",)
 
 # Construct our modelParams from the data.
 modelParams = covid19_npis.ModelParams(countries=[c1, c2])

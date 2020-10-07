@@ -1,6 +1,7 @@
 import logging
 import pandas as pd
 import os
+import json
 
 log = logging.getLogger(__name__)
 from . import modelParams
@@ -261,6 +262,8 @@ class Country(object):
         # Load file if it exists
         self.__load_files(exist)
 
+        self.__check_for_age_group_names()
+
         # Create change_points from interventions time series
         self.change_points = {}
         for column in self.data_interventions.columns:
@@ -290,13 +293,22 @@ class Country(object):
             ret[file] = helper(file)
         return ret
 
-    def __load_files(self,exist):
+    def __load_files(self, exist):
         """
         Loads files if they exist
         """
+        if exist["/config.json"]:
+            with open(self.path_to_folder + "/config.json") as json_file:
+                data = json.load(json_file)
+                self.name = data["name"]
+                self.age_groups = data["age_groups"]
+        else:
+            self.name = "Fix config"
+            self.age_groups = {}
+
         if exist["/new_cases.csv"]:
             self.data_new_cases = self._to_iso(
-                self._load_csv_with_date_index(path_to_folder + "/new_cases.csv"),
+                self._load_csv_with_date_index(self.path_to_folder + "/new_cases.csv"),
                 "age_group",
             )
         else:
@@ -304,27 +316,30 @@ class Country(object):
 
         if exist["/interventions.csv"]:
             self.data_interventions = self._to_iso(
-                self._load_csv_with_date_index(path_to_folder + "/interventions.csv"),
+                self._load_csv_with_date_index(
+                    self.path_to_folder + "/interventions.csv"
+                ),
                 "intervention",
             )
         else:
             self.data_interventions = None
 
-        if exist["/population.csv"]
+        if exist["/population.csv"]:
             self.data_population = pd.read_csv(
-                path_to_folder + "/population.csv", index_col="age"
+                self.path_to_folder + "/population.csv", index_col="age"
             )
         else:
             self.data_population = None
 
-        if exist["/config.json"]:
-            with open(path_to_folder + "/config.json") as json_file:
-                data = json.load(json_file)
-                self.name = data["name"]
-                self.age_groups = data["age_groups"]
-        else:
-            self.name = "Fix config"
-            self.age_groups = {}
+    def __check_for_age_group_names(self):
+        for age_group in self.age_groups:
+            if age_group not in self.data_new_cases.columns.get_level_values(
+                level="age_group"
+            ):
+                message = "Age group missmatch in config.json and new_cases.csv!"
+                raise NameError(
+                    f"{self.name}: {message} {self.path_to_folder} {age_group}"
+                )
 
     def _load_csv_with_date_index(self, filepath):
         """

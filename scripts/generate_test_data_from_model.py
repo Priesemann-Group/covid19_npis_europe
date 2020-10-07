@@ -8,16 +8,8 @@ import numpy as np
 
 
 # Load our data from csv files into our own custom data classes
-c1 = covid19_npis.data.Country(
-    "test-country-1",  # name
-    "../data/test_country_1/new_cases.csv",  # new_Cases per age groups in country
-    "../data/test_country_1/interventions.csv",  # interventions timeline with stringency index
-)
-c2 = covid19_npis.data.Country(
-    "test-country-2",
-    "../data/test_country_2/new_cases.csv",
-    "../data/test_country_2/interventions.csv",
-)
+c1 = covid19_npis.data.Country("test-country-1", "../data/test_country_1")  # name
+c2 = covid19_npis.data.Country("test-country-2", "../data/test_country_2",)
 
 # Construct our modelParams from the data.
 modelParams = covid19_npis.ModelParams(countries=[c1, c2])

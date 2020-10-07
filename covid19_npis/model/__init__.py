@@ -17,6 +17,8 @@ from .utils import (
 )
 
 from . import number_of_tests
+from . import deaths
+
 
 from .model import main_model
 

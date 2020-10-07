@@ -213,14 +213,31 @@ class ModelParams:
     @property
     def N_data_tensor(self):
         """
-        Creates the population tensor with dimension country, agegroups
+        Creates the population tensor with dimension country, agegroups.
+        Automatically calculates the age strata.
         """
         data = []
         for c, country in enumerate(self.countries):
             d_c = []
+
+            # Get real age groups from country config
+            age_dict = country.age_groups
+
             for age_group in self.age_groups:
-                d_c.append(country.data_population.loc[age_group].values[0])
+                # Select age range from config and sum over it
+                lower, upper = age_dict[age_group]
+                d_c.append(country.data_population[lower:upper].sum().values[0])
             data.append(d_c)
+        return tf.constant(data, dtype="float32")
+
+    @property
+    def N_data_tensor_total(self):
+        """
+        Creates the population tensor with dimension country, agegroups.
+        """
+        data = []
+        for c, country in enumerate(self.countries):
+            data.append(country.data_population.to_numpy()[:, 0])
         return tf.constant(data, dtype="float32")
 
     # ------------------------------------------------------------------------------ #

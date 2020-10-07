@@ -206,7 +206,9 @@ def main_model(modelParams):
         "total_tests", total_tests, shape_label=("time", "country", "age_group")
     )
     log.debug(f"total_tests\n{total_tests}")
-
+    Phi = yield covid19_npis.model.deaths._calc_Phi_IFR(
+        name="IFR", modelParams=modelParams
+    )
     likelihood = yield covid19_npis.model.studentT_likelihood(
         modelParams, positive_tests
     )

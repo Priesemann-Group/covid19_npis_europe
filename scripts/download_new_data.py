@@ -1,9 +1,43 @@
+"""
+For each country we need to create a config folder with multiple Files:
+
+- new_cases.csv
+    - Time/Date column has to be named "date" or "time"
+    - Age group columns have to be named consistent between different data and
+    countries 
+
+- interventions.csv
+    - Time/Date column has to be named "date" or "time"
+    - Different intervention as additional columns with intervention name as
+    column name
+
+- tests.csv
+    - Time/Date column has to be named "date" or "time"
+    - Daily performed tests column with name "tests"
+
+- deaths.csv
+    - Time/Date column has to be named "date" or "time"
+    - Daily deaths column has to be named "deaths"
+    - Optional: Daily deaths per age group same column names as in new_cases
+
+- population.csv
+    - Age column named "age"
+    - Column Number of people per age named "PopTotal"
+
+- config.json, dict:
+    - name : "country_name"
+    - age_groups : dict 
+        - "column_name" : [age_lower, age_upper]
+"""
+
+
 import sys
 import logging
 import time
 import os
 import datetime
 import pandas as pd
+import json
 
 sys.path.append("../covid19_inference/")
 
@@ -11,7 +45,9 @@ from covid19_inference import data_retrieval
 
 log = logging.getLogger(__name__)
 
-# Config ---------------
+# ------------------------------------------------------------------------------ #
+# Config/Globals
+# ------------------------------------------------------------------------------ #
 countries = ["France", "Germany"]
 path = "../data"
 begin = datetime.datetime(2020, 5, 17)
@@ -27,149 +63,187 @@ policies = [
     "C7_Restrictions on internal movement",
     "C8_International travel controls",
 ]
-
-# -----------------------
-
-# Check if folders for countries exist if not, create them!
-for country in countries:
-    # Check if folder exists and create
-    if not os.path.exists(path + "/" + country):
-        os.makedirs(path + "/" + country)
-        print(f"Created folder {path}/{country}")
+# ------------------------------------------------------------------------------ #
+# Look into __main__ for the execution order
 
 
-""" Interventions:
-We want to start with the easy part ;)
-"""
-ox = data_retrieval.OxCGRT(True)  # interv
+def interventions():
+    """
+    Gets interventions from oxford interventions tracker and saves to 
+    interventions.csv
+    """
+    ox = data_retrieval.OxCGRT(True)  # interv
 
-
-for country in countries:
-    interventions = pd.DataFrame()
-    for policy in policies:
-        interventions[policy] = ox.get_time_data(
-            policy=policy, country=country, data_begin=begin, data_end=end,
+    for country in countries:
+        interventions = pd.DataFrame()
+        for policy in policies:
+            interventions[policy] = ox.get_time_data(
+                policy=policy, country=country, data_begin=begin, data_end=end,
+            )
+        interventions.index = interventions.index.rename("date")
+        interventions.to_csv(
+            path + f"/{country}/interventions.csv", date_format="%d.%m.%y"
         )
-    interventions.index = interventions.index.rename("date")
-    interventions.to_csv(path + f"/{country}/interventions.csv", date_format="%d.%m.%y")
+    log.info("Successfully created interventions files!")
 
 
-""" Tests:
-This should also be quite easy, but there are some problems
-if the cases do not occure daily! That is for example in germany the case.
-"""
-owd = data_retrieval.OWD(True)  # tests
+def tests():
+    """
+    Gets number of tests from our world in data and saves
+    them to tests.csv
+    """
+    owd = data_retrieval.OWD(True)  # tests
 
-for country in countries:
-    tests = owd.get_new("tests", country=country, data_begin=begin, data_end=end)
-    if country == "Germany":
-        # We map the weekly tests to the median each day
-        tests = owd.get_total("tests", country=country).diff()
-        dates = pd.date_range(begin - datetime.timedelta(days=14), end)
-        tests = tests.reindex(dates)[begin:end].ffill() / 7
+    for country in countries:
+        tests = owd.get_new("tests", country=country, data_begin=begin, data_end=end)
+        if country == "Germany":
+            # We map the weekly tests to the median each day
+            tests = owd.get_total("tests", country=country).diff()
+            dates = pd.date_range(begin - datetime.timedelta(days=14), end)
+            tests = tests.reindex(dates)[begin:end].ffill() / 7
 
-    tests.to_csv(path + f"/{country}/tests.csv", date_format="%d.%m.%y")
+        tests.to_csv(path + f"/{country}/tests.csv", date_format="%d.%m.%y")
+    log.info("Successfully created tests files!")
 
 
-""" New Cases/positive tests:
-This is kinda the hardest part, since we want to have simmilar age groups!
-Agegroups: 0-29,30-59,60-79,80+
-"""
-# cases France
-France = data_retrieval.countries.France(True)
-age_groups = [
-    "09",
-    "19",
-    "29",
-    "39",
-    "49",
-    "59",
-    "69",
-    "79",
-    "89",
-    "90",
-]  # available age_groups
+def new_cases():
+    """
+    Gets new cases/positive tests by age group for each country.
+    This is kinda the hardest part, since we want to have similar age groups!
+    Age groups: 0-29,30-59,60-79,80+
+    """
+    # cases France
+    France = data_retrieval.countries.France(True)
+    age_groups = [
+        "09",
+        "19",
+        "29",
+        "39",
+        "49",
+        "59",
+        "69",
+        "79",
+        "89",
+        "90",
+    ]  # available age_groups
 
-new_cases = pd.DataFrame()
-for age_group in age_groups:
-    new_cases[age_group] = France.get_new(
-        "confirmed", data_begin=begin, data_end=end, age_group=age_group
+    new_cases = pd.DataFrame()
+    for age_group in age_groups:
+        new_cases[age_group] = France.get_new(
+            "confirmed", data_begin=begin, data_end=end, age_group=age_group
+        )
+
+    # We want to sum over 0-9,10-19 and 19-29 for the first age group:
+    new_cases["young"] = new_cases["09"] + new_cases["19"] + new_cases["29"]
+    new_cases = new_cases.drop(columns=["09", "19", "29"])
+    # Do the same for agegroups 30-39,40-49,50-59
+    new_cases["mid"] = new_cases["39"] + new_cases["49"] + new_cases["59"]
+    new_cases = new_cases.drop(columns=["39", "49", "59"])
+
+    new_cases["old"] = new_cases["69"] + new_cases["79"]
+    new_cases = new_cases.drop(columns=["69", "79"])
+
+    new_cases["old+"] = new_cases["89"] + new_cases["90"]
+    new_cases = new_cases.drop(columns=["89", "90"])
+    new_cases.index = new_cases.index.rename("date")
+    new_cases.to_csv(path + f"/France/new_cases.csv", date_format="%d.%m.%y")
+
+    # cases germany
+    Germany = data_retrieval.RKI(True)
+    age_groups = [
+        "A00-A04",
+        "A05-A14",
+        "A15-A34",
+        "A35-A59",
+        "A60-A79",
+        "A80+",
+    ]  # available age_groups
+    new_cases = pd.DataFrame()
+    for age_group in age_groups:
+        new_cases[age_group] = Germany.get_new(
+            "confirmed", data_begin=begin, data_end=end, age_group=age_group
+        )
+
+    new_cases["young"] = (
+        new_cases["A00-A04"] + new_cases["A05-A14"] + new_cases["A15-A34"]
     )
+    new_cases = new_cases.drop(columns=["A00-A04", "A05-A14", "A15-A34"])
 
-# We want to sum over 0-9,10-19 and 19-29 for the first age group:
-new_cases["young"] = new_cases["09"] + new_cases["19"] + new_cases["29"]
-new_cases = new_cases.drop(columns=["09", "19", "29"])
-# Do the same for agegroups 30-39,40-49,50-59
-new_cases["mid"] = new_cases["39"] + new_cases["49"] + new_cases["59"]
-new_cases = new_cases.drop(columns=["39", "49", "59"])
+    new_cases["mid"] = new_cases["A35-A59"]
+    new_cases = new_cases.drop(columns="A35-A59")
 
-new_cases["old"] = new_cases["69"] + new_cases["79"]
-new_cases = new_cases.drop(columns=["69", "79"])
+    new_cases["old"] = new_cases["A60-A79"]
+    new_cases = new_cases.drop(columns="A60-A79")
 
-new_cases["old+"] = new_cases["89"] + new_cases["90"]
-new_cases = new_cases.drop(columns=["89", "90"])
-new_cases.index = new_cases.index.rename("date")
-new_cases.to_csv(path + f"/France/new_cases.csv", date_format="%d.%m.%y")
+    new_cases["old+"] = new_cases["A80+"]
+    new_cases = new_cases.drop(columns="A80+")
+    new_cases.index = new_cases.index.rename("date")
+    new_cases.to_csv(path + f"/Germany/new_cases.csv", date_format="%d.%m.%y")
+    log.info("Successfully created new_cases files!")
 
 
-# cases germany
-Germany = data_retrieval.RKI(True)
-age_groups = [
-    "A00-A04",
-    "A05-A14",
-    "A15-A34",
-    "A35-A59",
-    "A60-A79",
-    "A80+",
-]  # available age_groups
-new_cases = pd.DataFrame()
-for age_group in age_groups:
-    new_cases[age_group] = Germany.get_new(
-        "confirmed", data_begin=begin, data_end=end, age_group=age_group
-    )
+def population():
+    """
+    Downloads population data to path and create population.csv for every country.
+    Use local copy in data folder if it exists
+    """
+    if not os.path.isfile(path + f"/WPP2019_PopulationBySingleAgeSex_1950-2019.csv"):
+        # Download file if it does not exist yet
+        import requests
 
-new_cases["young"] = new_cases["A00-A04"] + new_cases["A05-A14"] + new_cases["A15-A34"]
-new_cases = new_cases.drop(columns=["A00-A04", "A05-A14", "A15-A34"])
+        url = "https://population.un.org/wpp/Download/Files/1_Indicators%20(Standard)/CSV_FILES/WPP2019_PopulationBySingleAgeSex_1950-2019.csv"
+        log.info("Beginning file download for population file, this will take a while!")
+        myfile = requests.get(url)
+        open(path + f"/WPP2019_PopulationBySingleAgeSex_1950-2019.csv", "wb").write(
+            myfile.content
+        )
 
-new_cases["mid"] = new_cases["A35-A59"]
-new_cases = new_cases.drop(columns="A35-A59")
-
-new_cases["old"] = new_cases["A60-A79"]
-new_cases = new_cases.drop(columns="A60-A79")
-
-new_cases["old+"] = new_cases["A80+"]
-new_cases = new_cases.drop(columns="A80+")
-new_cases.index = new_cases.index.rename("date")
-new_cases.to_csv(path + f"/Germany/new_cases.csv", date_format="%d.%m.%y")
+    pop = pd.read_csv(path + f"/WPP2019_PopulationBySingleAgeSex_1950-2019.csv")
+    for country in countries:
+        data = pop.loc[pop["Location"] == country]
+        data = data.loc[data["Time"] == 2019]
+        data = data.set_index("AgeGrp")
+        data = data["PopTotal"]
+        data = data * 1000
+        data.index.name = "age"
+        data.astype("int64").to_csv(path + f"/{country}/population.csv",)
+    log.info("Successfully created population files!")
 
 
-""" Population age structure
-This one should also be quite easy but will take a while to download!
--> Use local copy in data folder
-"""
-if not os.path.isfile(path + f"/WPP2019_PopulationBySingleAgeSex_1950-2019.csv"):
-    # Download file if it does not exist yet
-    import requests
+def config():
+    """
+    Save config dict as json file
+    """
+    for country in countries:
+        conf = {}
+        conf["name"] = country
+        conf["age_groups"] = {}
+        if country == "Germany":
+            conf["age_groups"]["young"] = [0, 34]
+            conf["age_groups"]["mid"] = [35, 59]
+            conf["age_groups"]["old"] = [60, 79]
+            conf["age_groups"]["old+"] = [80, 100]
+        if country == "France":
+            conf["age_groups"]["young"] = [0, 29]
+            conf["age_groups"]["mid"] = [30, 59]
+            conf["age_groups"]["old"] = [60, 79]
+            conf["age_groups"]["old+"] = [80, 100]
+        with open(path + f"/{country}/config.json", "w") as outfile:
+            json.dump(conf, outfile, indent=2)
+    log.info("Successfully created config files!")
 
-    url = "https://population.un.org/wpp/Download/Files/1_Indicators%20(Standard)/CSV_FILES/WPP2019_PopulationBySingleAgeSex_1950-2019.csv"
-    log.info("Beginning file download for population file, this will take a while!")
-    myfile = requests.get(url)
-    open(path + f"/WPP2019_PopulationBySingleAgeSex_1950-2019.csv", "wb").write(
-        myfile.content
-    )
 
-pop = pd.read_csv(path + f"/WPP2019_PopulationBySingleAgeSex_1950-2019.csv")
-for country in countries:
-    data = pop.loc[pop["Location"] == country]
-    data = data.loc[data["Time"] == 2019]
-    data = data.set_index("AgeGrp")
-    data = data["PopTotal"]
-    groups = pd.DataFrame(columns=["PopTotal"])
-    groups.loc["young"] = data[0:29].sum()
-    groups.loc["mid"] = data[30:59].sum()
-    groups.loc["old"] = data[60:79].sum()
-    groups.loc["old+"] = data[80:].sum()
-    # Multiply by 1k to get real population numbers
-    groups = groups * 1000
-    groups.index.name = "age_group"
-    groups.astype("int64").to_csv(path + f"/{country}/population.csv",)
+if __name__ == "__main__":
+
+    # Check if folders for countries exist if not, create them!
+    for country in countries:
+        # Check if folder exists and create
+        if not os.path.exists(path + "/" + country):
+            os.makedirs(path + "/" + country)
+            print(f"Created folder {path}/{country}")
+
+    interventions()
+    tests()
+    new_cases()
+    population()
+    config()

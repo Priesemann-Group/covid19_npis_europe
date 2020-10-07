@@ -202,16 +202,42 @@ def select_from_dataframe(df, axis=0, **kwargs):
 
 
 class Country(object):
-    """ Country data class, that contains new_cases and intervention data for a speciffic country.
-        Also calculates change points and interventions automatically on init.
+    """ Country data class!
+        Contains death, new_cases/positive tests, daily tests, interventions and config data for a specific country.
+        Retrieves this data from a gives folder. There are the following specifications for the data:
 
-        There is a global class attribute which holds the interventions.
+        - new_cases.csv
+            - Time/Date column has to be named "date" or "time"
+            - Age group columns have to be named consistent between different data and
+            countries 
+
+        - interventions.csv
+            - Time/Date column has to be named "date" or "time"
+            - Different intervention as additional columns with intervention name as
+            column name
+
+        - tests.csv
+            - Time/Date column has to be named "date" or "time"
+            - Daily performed tests column with name "tests"
+
+        - deaths.csv
+            - Time/Date column has to be named "date" or "time"
+            - Daily deaths column has to be named "deaths"
+            - Optional: Daily deaths per age group same column names as in new_cases
+
+        - population.csv
+            - Age column named "age"
+            - Column Number of people per age named "PopTotal"
+
+        - config.json, dict:
+            - name : "country_name"
+            - age_groups : dict 
+                - "column_name" : [age_lower, age_upper]
+
+        Also calculates change points and interventions automatically on init.
 
         Parameters
         ----------
-        name: string
-            Name of the country
-            
         path_to_folder : string
             Filepath to the folder, which holds all the data for the country!
             Should be something like "../data/Germany".
@@ -226,27 +252,14 @@ class Country(object):
     """
     interventions = []
 
-    def __init__(self, name, path_to_folder):
-        self.name = name
+    def __init__(self, path_to_folder):
+        self.path_to_folder = path_to_folder
 
         # Check if files exist
-        assert os.path.isfile(path_to_folder + "/new_cases.csv")
-        assert os.path.isfile(path_to_folder + "/interventions.csv")
-        assert os.path.isfile(path_to_folder + "/population.csv")
-        # assert os.path.isfile(path_to_folder+"/tests.csv")
+        exist = self.__check_files_exist()
 
-        # Load files
-        self.data_new_cases = self._to_iso(
-            self._load_csv_with_date_index(path_to_folder + "/new_cases.csv"),
-            "age_group",
-        )
-        self.data_interventions = self._to_iso(
-            self._load_csv_with_date_index(path_to_folder + "/interventions.csv"),
-            "intervention",
-        )
-        self.data_population = pd.read_csv(
-            path_to_folder + "/population.csv", index_col="age_group"
-        )
+        # Load file if it exists
+        self.__load_files(exist)
 
         # Create change_points from interventions time series
         self.change_points = {}
@@ -254,6 +267,64 @@ class Country(object):
             self.change_points.update(
                 self.create_change_points(self.data_interventions[column])
             )
+
+    def __check_files_exist(self):
+        def helper(file):
+            if os.path.isfile(self.path_to_folder + file):
+                return True
+            else:
+                log.warning(
+                    f"Could not find {self.path_to_folder + file} file. Trying to continue without it!"
+                )
+                return False
+
+        files = [
+            "/new_cases.csv",
+            "/tests.csv",
+            "/interventions.csv",
+            "/population.csv",
+            "/config.json",
+        ]
+        ret = {}
+        for file in files:
+            ret[file] = helper(file)
+        return ret
+
+    def __load_files(self,exist):
+        """
+        Loads files if they exist
+        """
+        if exist["/new_cases.csv"]:
+            self.data_new_cases = self._to_iso(
+                self._load_csv_with_date_index(path_to_folder + "/new_cases.csv"),
+                "age_group",
+            )
+        else:
+            self.data_new_cases = None
+
+        if exist["/interventions.csv"]:
+            self.data_interventions = self._to_iso(
+                self._load_csv_with_date_index(path_to_folder + "/interventions.csv"),
+                "intervention",
+            )
+        else:
+            self.data_interventions = None
+
+        if exist["/population.csv"]
+            self.data_population = pd.read_csv(
+                path_to_folder + "/population.csv", index_col="age"
+            )
+        else:
+            self.data_population = None
+
+        if exist["/config.json"]:
+            with open(path_to_folder + "/config.json") as json_file:
+                data = json.load(json_file)
+                self.name = data["name"]
+                self.age_groups = data["age_groups"]
+        else:
+            self.name = "Fix config"
+            self.age_groups = {}
 
     def _load_csv_with_date_index(self, filepath):
         """

@@ -36,7 +36,7 @@ def studentT_likelihood(modelParams, new_cases):
     log.debug(
         f"new_cases w. mask:\n{tf.boolean_mask(new_cases, mask, axis=len_batch_shape)}"
     )
-
+    """
     new_cases_inferred = yield StudentT(
         name="new_cases_inferred",
         loc=new_cases,
@@ -45,6 +45,7 @@ def studentT_likelihood(modelParams, new_cases):
         df=4,
         shape_label=("time", "country", "age_group"),
     )
+    """
 
     likelihood = yield StudentT(
         name="like",

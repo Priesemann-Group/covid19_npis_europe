@@ -1,6 +1,7 @@
 import sys
 import logging
 import time
+import itertools
 import os
 
 """
@@ -73,6 +74,22 @@ c2 = covid19_npis.data.Country("../data/France",)
 # Construct our modelParams from the data.
 modelParams = covid19_npis.ModelParams(countries=[c1, c2])
 
+# Test shapes, should be all 3:
+
+
+def print_dist_shapes(st):
+    for name, dist in itertools.chain(
+        st.discrete_distributions.items(), st.continuous_distributions.items(),
+    ):
+        print(dist.log_prob(st.all_values[name]).shape, name)
+    for p in st.potentials:
+        print(p.value.shape, p.name)
+
+
+_, sample_state = pm.evaluate_model_transformed(
+    main_model(modelParams), sample_shape=(3,)
+)
+print_dist_shapes(sample_state)
 
 """ # 2. MCMC Sampling
 """

@@ -48,16 +48,16 @@ class DistributionAdditions:
         super().__init__(*args, **kwargs)
 
         if "loc" in kwargs and tf.is_tensor(kwargs.get("loc")):
-            tf.debugging.assert_all_finite(
+            tf.debugging.check_numerics(
                 kwargs.get("loc"), f"loc not finite in {self.name}"
             )
         if "scale" in kwargs and tf.is_tensor(kwargs.get("scale")):
-            tf.debugging.assert_all_finite(
+            tf.debugging.check_numerics(
                 kwargs.get("scale"), f"scale not finite in {self.name}"
             )
 
     def log_prob(self, value):
-        tf.debugging.assert_all_finite(value, f"not finite value in {self.name}")
+        tf.debugging.check_numerics(value, f"not finite value in {self.name}")
         return super().log_prob(value)
 
 

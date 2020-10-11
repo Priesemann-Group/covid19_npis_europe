@@ -155,18 +155,27 @@ def main_model(modelParams):
     m_t = covid19_npis.model.number_of_tests.calculate_Bsplines(m, B)
 
     # Reporting delay d:
-    delay = covid19_npis.model.number_of_tests.calc_reporting_kernel(m_t, theta)
-    delay = yield Deterministic(
-        "delay_kernel", delay, shape_label=("country", "kernel", "time")
+    delay_kernel = covid19_npis.model.number_of_tests.calc_reporting_kernel(m_t, theta)
+    delay_kernel = yield Deterministic(
+        "delay_kernel", delay_kernel, shape_label=("country", "kernel", "time")
     )
-    log.info(f"kernel\n{delay}")  # batch, country, kernel, time
-    log.info(f"new_I_t\n{new_I_t}")  # batch, time, country, age_group
+    delay_kernel = tf.debugging.check_numerics(
+        delay_kernel, f"delay_kernel\n{delay_kernel}"
+    )
+    log.debug(f"kernel\n{delay_kernel}")  # batch, country, kernel, time
+    log.debug(f"new_I_t\n{new_I_t}")  # batch, time, country, age_group
 
     filter_axes_data = covid19_npis.model.utils.get_filter_axis_data_from_dims(
         len(new_I_t.shape)
     )
     new_cases_delayed = convolution_with_varying_kernel(
-        data=new_I_t, kernel=delay, data_time_axis=-3, filter_axes_data=filter_axes_data
+        data=new_I_t,
+        kernel=delay_kernel,
+        data_time_axis=-3,
+        filter_axes_data=filter_axes_data,
+    )
+    new_cases_delayed = tf.debugging.check_numerics(
+        new_cases_delayed, f"new_cases_delayed:\n{new_cases_delayed}"
     )
     new_cases_delayed = yield Deterministic(
         "new_cases_delayed",
@@ -179,12 +188,19 @@ def main_model(modelParams):
     phi_age = yield covid19_npis.model.number_of_tests._construct_phi_age(
         "phi_age", modelParams
     )
+    phi_age = tf.debugging.check_numerics(phi_age, f"phi_age:\n{phi_age}")
     positive_tests = covid19_npis.model.number_of_tests.calc_positive_tests(
         new_cases_delayed=new_cases_delayed,
         phi_plus=phi_t,
         phi_age=phi_age,
         modelParams=modelParams,
     )
+    positive_tests = tf.clip_by_value(positive_tests, 1e-9, 1e9)
+
+    positive_tests = tf.debugging.check_numerics(
+        positive_tests, f"positive_tests:\n{positive_tests}"
+    )
+
     positive_tests = yield Deterministic(
         "positive_tests", positive_tests, shape_label=("time", "country", "age_group")
     )

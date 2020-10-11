@@ -179,7 +179,6 @@ def _construct_phi_tests_reported(
         scale=sigma,
         event_stack=modelParams.num_countries,
         shape_label="country",
-        conditionally_independent=True,
     )
 
     phi = yield Deterministic(
@@ -225,6 +224,7 @@ def _construct_phi_age(name, modelParams, sigma_scale=0.2):
         event_stack=modelParams.num_age_groups,
         conditionally_independent=True,
         shape_label="age_group",
+        transform=transformations.SoftPlus(scale=sigma_scale),
     )
     phi_cross = tf.einsum(
         "...a,...a->...a",
@@ -538,6 +538,7 @@ def construct_testing_state(
         concentration=2,  # eta
         validate_args=True,
         transform=transformations.CorrelationCholesky(),
+        conditionally_independent=True,
     )
     Sigma = tf.einsum(
         "...ij,...i->...ij",  # todo look at i,j

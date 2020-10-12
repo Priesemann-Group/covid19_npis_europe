@@ -235,3 +235,73 @@ def _calc_Phi_IFR(
     log.info(f"Phi_IFR\n{Phi_IFR.shape}")
 
     return Phi_IFR
+
+
+def calc_delayed_deaths(name, new_cases, Phi_IFR, m, theta, length_kernel=14):
+    r"""
+    Calculates delayed deahs from IFR and delay kernel.
+
+    .. math::
+
+        \Tilde{E}_{\text{delayDeath}, c, a}(t) = \phi_{\text{IFR}, c,a} \sum_{\tau=0}^T \Tilde{E}_{c,a}(t-\tau) \cdot f_{c,t}(\tau) \\
+        f_{c,t}(\tau) = Gamma(\tau ; \alpha = \frac{m_{D_{\text{death}, c}}}{\theta_{D_\text{death}}}+ 1, \beta=\frac{1}{\theta_{D_\text{death}}})
+
+    Parameters
+    ----------
+    name: str
+        Name of the delayed deaths variable :math:`\Tilde{E}_{\text{delayDeath}, c, a}(t).`
+
+    new_cases: tf.Tensor
+        New cases without reporting delay :math:`\Tilde{E}_{c,a}(t).`
+        |shape| batch, time, country, age_group
+
+    Phi_IFR: tf.Tensor
+        Infection fatality ratio of the age brackets :math:`\phi_{\text{IFR}, c,a}.`
+        |shape| batch, country, age_group
+
+    m: tf.Tensor
+        Median fatality delay for the delay kernel :math:`m_{D_{\text{death}, c}.`
+        |shape| batch, country
+
+    theta: tf.Tensor
+        Scale fatality delay for the delay kernel :math:`\theta_{D_\text{death}}.`
+        |shape| batch
+
+    length_kernel : optional
+        Length of the kernel in days
+        |default| 14 days
+
+    Returns
+    -------
+    :
+        :math;`\Tilde{E}_{\text{delayDeath}, c, a}(t)`
+        |shape| batch, time, country, age_group
+    """
+
+    """ # Construct delay kernel f
+    """
+    # Time tensor
+    tau = tf.range(
+        0.01, length_kernel + 0.01, 1.0, dtype="float32"
+    )  # The gamma function does not like 0!
+    # Get shapes right we want c,t
+    m = m[..., tf.newaxis]  # |shape| batch, country, time
+    theta = theta[..., tf.newaxis, tf.newaxis]  # |shape| batch, country, time
+    # Calculate pdf
+    kernel = gamma(tau, m / theta + 1.0, 1.0 / theta,)
+
+    """ # Calc delayed deaths
+    """
+    # Add convolution
+    """dd=convolution_with_fixed_kernel(
+    data=new_cases,
+    kernel=kernel,
+    data_time_axis=-3,
+    filter_axes_data=?)
+    """
+
+    delayed_deaths = yield Deterministic(
+        name=name, value=dd, shape_label=("country", "age_group")
+    )
+
+    return delayed_deaths

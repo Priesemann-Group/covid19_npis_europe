@@ -130,6 +130,7 @@ def main_model(modelParams):
 
     """ # Number of tests
     TODO - short description here/ maybe but all of that into a helper function
+         - cleanup and maybe move some of this into a high level function
     """
     # Get basic functions for b-splines (used later)
     B = covid19_npis.model.number_of_tests.construct_Bsplines_basis(modelParams)
@@ -222,9 +223,29 @@ def main_model(modelParams):
         "total_tests", total_tests, shape_label=("time", "country", "age_group")
     )
     log.debug(f"total_tests\n{total_tests}")
-    Phi = yield covid19_npis.model.deaths._calc_Phi_IFR(
+
+    """ # Deaths
+    TODO: - description
+
+    """
+    """
+    # Infection fatality ratio
+    death_Phi = yield covid19_npis.model.deaths._calc_Phi_IFR(
         name="IFR", modelParams=modelParams
     )
+    # Death reporting delay
+    death_m, death_theta = yield covid19_npis.model.deaths._construct_reporting_delay(
+        name="delay_deaths", modelParams=modelParams
+    )
+    # Calculate new deaths delayed
+    deaths_delayed = yield covid19_npis.model.deaths.calc_delayed_deaths(
+        name="cases_delayed_deaths",
+        new_cases=new_I_t,
+        Phi_IFR=death_Phi,
+        m=death_m,
+        theta=death_theta,
+    )
+    """
     likelihood = yield covid19_npis.model.studentT_likelihood(
         modelParams, positive_tests
     )

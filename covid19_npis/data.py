@@ -235,6 +235,7 @@ class Country(object):
             - age_groups : dict 
                 - "column_name" : [age_lower, age_upper]
 
+
         Also calculates change points and interventions automatically on init.
 
         Parameters

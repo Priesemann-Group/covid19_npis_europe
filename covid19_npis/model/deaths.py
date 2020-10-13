@@ -260,7 +260,7 @@ def calc_delayed_deaths(name, new_cases, Phi_IFR, m, theta, length_kernel=14):
         |shape| batch, country, age_group
 
     m: tf.Tensor
-        Median fatality delay for the delay kernel :math:`m_{D_{\text{death}, c}.`
+        Median fatality delay for the delay kernel :math:`m_{D_{\text{death}, c}}.`
         |shape| batch, country
 
     theta: tf.Tensor

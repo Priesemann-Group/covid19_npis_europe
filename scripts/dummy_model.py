@@ -108,6 +108,9 @@ trace = pm.sample(
 end_time = time.time()
 log.info("running time: {:.1f}s".format(end_time - begin_time))
 
+# Save trace
+today = datetime.datetime.now()
+arviz.to_netcdf(trace, f"./traces/{today.strftime("%y_%m_%d_%H")}.netcdf")
 
 """ # 3. Plotting
 """
@@ -122,10 +125,12 @@ trace_prior = pm.sample_prior_predictive(
 _, sample_state = pm.evaluate_model(main_model(modelParams))
 
 
+
+
+
 """ ## Plot distributions
     Function returns a list of figures which can be shown by fig[i].show() each figure being one country.
 """
-
 
 # Plot by name.
 dist_names = [

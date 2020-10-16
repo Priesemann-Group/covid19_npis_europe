@@ -465,11 +465,11 @@ def construct_R_0(name, loc, scale, hn_scale, modelParams):
     """
 
     R_0_star = yield Normal(
-        name="R_0^*",
-        loc=loc,
+        name="R_0_star",
+        loc=0.0,
         scale=scale,
         conditionally_independent=True,
-        transform=transformations.Normal(shift=loc),
+        # transform=transformations.Normal(shift=loc),
     )
 
     sigma_R_0_c = yield HalfNormal(
@@ -479,19 +479,19 @@ def construct_R_0(name, loc, scale, hn_scale, modelParams):
         transform=transformations.SoftPlus(scale=hn_scale),
     )
 
-    ΔR_0_c = (
+    delta_R_0_c = (
         yield Normal(
-            name="ΔR_0_c",
+            name="delta_R_0_c",
             loc=0.0,
             scale=1.0,
             event_stack=(modelParams.num_countries),
             shape_label=("country"),
             conditionally_independent=True,
         )
-    ) * tf.expand_dims(sigma_R_0_c, axis=-1)
+    ) * sigma_R_0_c[..., tf.newaxis]
 
     # Add to trace via deterministic
-    R_0 = tf.expand_dims(R_0_star, axis=-1) + ΔR_0_c
+    R_0 = R_0_star[..., tf.newaxis] + delta_R_0_c
     # Softplus because we want to make sure that R_0 > 0.
     R_0 = 0.1 * tf.math.softplus(10 * R_0)
     R_0 = yield Deterministic(name=name, value=R_0, shape_label=("country"),)

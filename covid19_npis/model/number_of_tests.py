@@ -536,7 +536,7 @@ def construct_testing_state(
         name="Sigma_cholesky",
         dimension=4,
         concentration=2,  # eta
-        validate_args=True,
+        # validate_args=True,
         transform=transformations.CorrelationCholesky(),
         conditionally_independent=True,
     )
@@ -570,9 +570,11 @@ def construct_testing_state(
         conditionally_independent=True,
     )
     mu_m = yield Normal(
-        name="mu_m_cross", loc=0.0, scale=mu_m_scale, conditionally_independent=True,
+        name="mu_m_cross",
+        loc=mu_m_loc,
+        scale=mu_m_scale,
+        conditionally_independent=True,
     )
-    mu_m = mu_m
 
     mu = tf.stack([mu_phi_cross, mu_eta_cross, mu_xi_cross, mu_m], axis=-1)
     mu = yield Deterministic(f"mu_{name}", mu)
@@ -594,7 +596,7 @@ def construct_testing_state(
     phi_cross = tf.gather(state, 0, axis=-1)
     eta_cross = tf.gather(state, 1, axis=-1)
     xi_cross = tf.gather(state, 2, axis=-1)
-    m_star = tf.gather(state, 3, axis=-1) + mu_m_loc
+    m_star = tf.gather(state, 3, axis=-1)
 
     # Transform variables
     phi = tf.math.sigmoid(phi_cross)
@@ -636,7 +638,7 @@ def construct_Bsplines_basis(modelParams):
 
     B = modelParams.spline_basis
     log.debug(f"spline basis:\n{B}")
-    return tf.convert_to_tensor(B, dtype="float32")
+    return tf.constant(B, dtype="float32")
 
 
 def calculate_Bsplines(coef, basis):

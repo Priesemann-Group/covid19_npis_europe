@@ -129,7 +129,10 @@ def main_model(modelParams):
     log.debug(f"new_I_t\n{new_I_t.shape}")
 
     """ # Number of tests
-    TODO - short description here/ maybe but all of that into a helper function
+    Our real world data consists of reported cases i.e positiv test, number of tests total
+    and deaths. 
+
+    TODO:
          - cleanup and maybe move some of this into a high level function
     """
     # Get basic functions for b-splines (used later)
@@ -149,23 +152,25 @@ def main_model(modelParams):
         name="delay", modelParams=modelParams, m_ast=m_star
     )
 
-    # Construct Bsplines
+    # Construct Bsplines we can maybe do it right after the studenT in the constructing
+    # State... on the full tensor
     phi_t = covid19_npis.model.number_of_tests.calculate_Bsplines(phi, B)
     eta_t = covid19_npis.model.number_of_tests.calculate_Bsplines(eta, B)
     xi_t = covid19_npis.model.number_of_tests.calculate_Bsplines(xi, B)
     m_t = covid19_npis.model.number_of_tests.calculate_Bsplines(m, B)
 
-    # Reporting delay d:
+    # We construct the gamma kernel for the reporting delay
     delay_kernel = covid19_npis.model.number_of_tests.calc_reporting_kernel(m_t, theta)
     delay_kernel = yield Deterministic(
         "delay_kernel", delay_kernel, shape_label=("country", "kernel", "time")
     )
+    log.debug(f"kernel\n{delay_kernel}")  # batch, country, kernel, time
+
     delay_kernel = tf.debugging.check_numerics(
         delay_kernel, f"delay_kernel\n{delay_kernel}"
     )
-    log.debug(f"kernel\n{delay_kernel}")  # batch, country, kernel, time
-    log.debug(f"new_I_t\n{new_I_t}")  # batch, time, country, age_group
 
+    log.debug(f"new_I_t\n{new_I_t}")  # batch, time, country, age_group
     filter_axes_data = covid19_npis.model.utils.get_filter_axis_data_from_dims(
         len(new_I_t.shape)
     )
@@ -249,5 +254,4 @@ def main_model(modelParams):
     likelihood = yield covid19_npis.model.studentT_likelihood(
         modelParams, positive_tests
     )
-
     return likelihood

@@ -12,6 +12,10 @@ os.environ["KMP_AFFINITY"] = "granularity=fine,verbose,compact,1,0"
 
 import pymc4 as pm
 import tensorflow as tf
+
+# Mute Tensorflow warnings ...
+logging.getLogger("tensorflow").setLevel(logging.ERROR)
+
 import numpy as np
 import time
 import os
@@ -32,12 +36,10 @@ tf.config.optimizer.set_experimental_options(
 )
 print(tf.config.optimizer.get_experimental_options())
 """
-
-
 sys.path.append("../")
 
 # Needed to set logging level before importing other modules
-# logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
 import covid19_npis
@@ -52,7 +54,7 @@ tf.config.run_functions_eagerly(True)
 
 # Force CPU
 covid19_npis.utils.force_cpu_for_tensorflow()
-
+covid19_npis.utils.split_cpu_in_logical_devices(4)
 
 """ # 1. Data Retrieval
     Load data for different countries/regions, for now we have to define every
@@ -99,18 +101,24 @@ begin_time = time.time()
 trace = pm.sample(
     main_model(modelParams),
     num_samples=100,
-    burn_in=200,
+    burn_in=100,
     use_auto_batching=False,
-    num_chains=3,
-    xla=True,
+    num_chains=2,
+    xla=False,
+    sampler_type="nuts",
 )
 
 end_time = time.time()
 log.info("running time: {:.1f}s".format(end_time - begin_time))
 
 # Save trace
+import datetime
+import arviz
+
 today = datetime.datetime.now()
-arviz.to_netcdf(trace, f"./traces/{today.strftime("%y_%m_%d_%H")}.netcdf")
+trace.posterior.to_netcdf(
+    f"./traces/{today.strftime('%y_%m_%d_%H')}.h5", engine="scipy"
+)
 
 """ # 3. Plotting
 """
@@ -123,9 +131,6 @@ trace_prior = pm.sample_prior_predictive(
     main_model(modelParams), sample_shape=(1000,), use_auto_batching=False
 )
 _, sample_state = pm.evaluate_model(main_model(modelParams))
-
-
-
 
 
 """ ## Plot distributions
@@ -142,6 +147,7 @@ dist_names = [
     "alpha_i_c_a",
     "l_i_sign",
     "d_i_c_p",
+    "C",
 ]
 
 dist_fig = {}

@@ -265,6 +265,7 @@ def construct_generation_interval(
         concentration=g["mu"]["k"],
         rate=1.0 / g["mu"]["θ"],
         conditionally_independent=True,
+        validate_args=True,
     )
 
     # g_mu = tf.constant(5.0)
@@ -282,13 +283,17 @@ def construct_generation_interval(
         concentration=g["θ"]["k"],
         rate=1.0 / g["θ"]["θ"],
         conditionally_independent=True,
+        validate_args=True,
     )
 
     log.debug(f"g_mu:\n{g_mu}")
     log.debug(f"g_theta:\n{g_theta}")
 
-    g_theta = tf.expand_dims(g_theta, axis=-1)
-    g_mu = tf.expand_dims(g_mu, axis=-1)
+    # Add a small number here to prevent zeros. Could happen in the sampling
+    # at some point and we divide at a later point by these tensors,
+    # which could yield nans otherwise.
+    g_theta = tf.expand_dims(g_theta, axis=-1) + 1e-8
+    g_mu = tf.expand_dims(g_mu, axis=-1) + 1e-8
 
     """ Construct generation interval gamma distribution from underlying
         generation distribution
@@ -302,12 +307,6 @@ def construct_generation_interval(
         g,
         tf.expand_dims(g_mu, axis=-1),
     )  # shape g: batch_shape x len_gen_interv, shape g_mu: batch_shape x 1 x 1
-
-
-def infection_model_sim(N, h_0_t, R_t, C, gen_kernel):
-    N = 1e8
-    len
-    h_0_t = np.ones()
 
 
 def InfectionModel(N, h_0_t, R_t, C, gen_kernel):

@@ -49,7 +49,7 @@ from covid19_npis.model import main_model
 """ # Debugging and other snippets
 """
 # For eventual debugging:
-tf.config.run_functions_eagerly(True)
+# tf.config.run_functions_eagerly(True)
 # tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
 
 # Force CPU
@@ -65,8 +65,8 @@ covid19_npis.utils.split_cpu_in_logical_devices(4)
 
 # Load our data from csv files into our own custom data classes
 
-c1 = covid19_npis.data.Country("../data/test_data_from_model/test-country-1",)  # name
-c2 = covid19_npis.data.Country("../data/test_data_from_model/test-country-2",)
+c1 = covid19_npis.data.Country("../data/test_country_1",)  # name
+c2 = covid19_npis.data.Country("../data/test_country_2",)
 
 
 """
@@ -104,7 +104,7 @@ trace = pm.sample(
     burn_in=100,
     use_auto_batching=False,
     num_chains=2,
-    xla=False,
+    xla=True,
     sampler_type="nuts",
 )
 

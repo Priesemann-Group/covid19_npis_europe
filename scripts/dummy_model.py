@@ -169,7 +169,7 @@ for name in dist_names:
 
 """ ## Plot time series
 """
-ts_names = ["new_I_t", "R_t", "h_0_t"]
+ts_names = ["positive_tests", "R_t", "h_0_t"]
 ts_fig = {}
 ts_axes = {}
 for name in ts_names:
@@ -177,13 +177,13 @@ for name in ts_names:
         trace, sample_state=sample_state, key=name, plot_chain_separated=True,
     )
     # plot data into new_cases
-    if name == "new_I_t":
+    if name == "new_I_t" or name == "positive_tests":
         for i, c in enumerate(modelParams.data_summary["countries"]):
             for j, a in enumerate(modelParams.data_summary["age_groups"]):
-                ts_axes["new_I_t"][j][i] = covid19_npis.plot.time_series._timeseries(
+                ts_axes[name][j][i] = covid19_npis.plot.time_series._timeseries(
                     modelParams.dataframe.index[:],
                     modelParams.dataframe[(c, a)].to_numpy()[:],
-                    ax=ts_axes["new_I_t"][j][i],
+                    ax=ts_axes[name][j][i],
                     alpha=0.5,
                 )
 

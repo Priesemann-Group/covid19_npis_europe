@@ -30,6 +30,7 @@ dists_to_modify = [
     "Gamma",
     "HalfNormal",
     "Deterministic",
+    "MvNormalCholesky",
 ]
 
 

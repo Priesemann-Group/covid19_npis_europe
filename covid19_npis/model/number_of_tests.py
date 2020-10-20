@@ -13,6 +13,7 @@ from .distributions import (
     HalfNormal,
     LKJCholesky,
     MvStudentT,
+    MvNormalCholesky,
     Deterministic,
 )
 from .. import transformations
@@ -226,23 +227,23 @@ def _construct_phi_age(name, modelParams, sigma_scale=0.2):
         shape_label="age_group",
         transform=transformations.SoftPlus(scale=sigma_scale),
     )
-    phi_cross = tf.einsum(
-        "...a,...a->...a",
-        (
-            yield Normal(
-                name=f"{name}_cross",
-                loc=0,
-                scale=1.0,
-                shape_label="age_group",
-                event_stack=modelParams.num_age_groups,
-                conditionally_independent=True,
-            )
-        ),
-        sigma,
+    log.debug(f"phi_age sigma {sigma}")
+
+    phi_cross = yield Normal(
+        name=f"{name}_cross",
+        loc=0.0,
+        scale=1.0,
+        shape_label="age_group",
+        event_stack=modelParams.num_age_groups,
+        conditionally_independent=True,
     )
+    log.debug(f"phi_age sigma {phi_cross}")
+
+    phi_cross = tf.einsum("...a,...a->...a", phi_cross, sigma)
+    log.debug(f"phi_age sigma {phi_cross}")
 
     phi = yield Deterministic(
-        name=name, value=tf.math.exp(phi_cross), shape_label="age_group"
+        name=name, value=tf.math.softplus(phi_cross), shape_label="age_group"
     )
 
     return phi
@@ -529,24 +530,30 @@ def construct_testing_state(
         name=f"sigma_xi",
         scale=10.0,
         conditionally_independent=True,
-        transform=transformations.SoftPlus(scale=sigma_cross_scale),
+        transform=transformations.SoftPlus(scale=10.0),
     )
+
+    log.debug(f"sigma_xi{sigma_xi}")
+    log.debug(f"sigma_eta{sigma_eta}")
+    log.debug(f"sigma_phi{sigma_phi}")
+    log.debug(f"sigma_m{sigma_m}")
 
     Sigma = yield LKJCholesky(
         name="Sigma_cholesky",
         dimension=4,
-        concentration=2,  # eta
+        concentration=2.0,  # eta
         # validate_args=True,
         transform=transformations.CorrelationCholesky(),
         conditionally_independent=True,
     )
+
     Sigma = tf.einsum(
         "...ij,...i->...ij",  # todo look at i,j
         Sigma,
         tf.stack([sigma_phi, sigma_eta, sigma_xi, sigma_m], axis=-1),
     )
     Sigma = yield Deterministic(
-        f"sigma_{name}", Sigma, shape_label=("testing_state_vars", "testing_state_vars")
+        f"Sigma_{name}", Sigma, shape_label=("testing_state_vars", "testing_state_vars")
     )
     log.debug(f"Sigma state:\n{Sigma}")
 
@@ -581,15 +588,15 @@ def construct_testing_state(
 
     log.debug(f"mu state:\n{mu}")
 
-    state = yield MvStudentT(
+    state = yield MvNormalCholesky(
         name=name,
-        df=1.0,
         loc=mu,
-        scale=Sigma,
+        scale_tril=Sigma,
         validate_args=True,
         event_stack=(modelParams.num_countries, num_knots),
         shape_label=("country", "spline"),
     )
+
     log.debug(f"state:\n{state}")
 
     # Get variables from state to transform them
@@ -655,11 +662,11 @@ def calculate_Bsplines(coef, basis):
 
         coef: 
             Coefficients :math:`x`.
-            |shape| ...,country, knots?
+            |shape| ...,country, spline
 
         basis:
             Basis functions tensor :math:`B.`
-            |shape| time, knots?
+            |shape| time, spline
 
         Returns
         -------

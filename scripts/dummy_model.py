@@ -101,11 +101,11 @@ begin_time = time.time()
 trace = pm.sample(
     main_model(modelParams),
     num_samples=100,
-    burn_in=100,
+    burn_in=200,
     use_auto_batching=False,
     num_chains=2,
     xla=True,
-    sampler_type="nuts",
+    # sampler_type="nuts",
 )
 
 end_time = time.time()

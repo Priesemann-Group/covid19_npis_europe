@@ -136,6 +136,7 @@ def main_model(modelParams):
          - cleanup and maybe move some of this into a high level function
     """
     # Get basic functions for b-splines (used later)
+
     B = covid19_npis.model.number_of_tests.construct_Bsplines_basis(modelParams)
 
     (
@@ -146,11 +147,15 @@ def main_model(modelParams):
     ) = yield covid19_npis.model.number_of_tests.construct_testing_state(
         "testing_state", modelParams, num_knots=B.shape[-1]
     )
-
+    phi = yield Deterministic(name="phi_deter", value=phi)
+    log.debug(f"new_I_t\n{new_I_t.shape}")
     # Transform m_star and construct reporting delay
+
     m, theta = yield covid19_npis.model.number_of_tests._construct_reporting_delay(
         name="delay", modelParams=modelParams, m_ast=m_star
     )
+    m_t = covid19_npis.model.number_of_tests.calculate_Bsplines(m, B)
+    log.debug(f"m_t {m_t}")
 
     # Construct Bsplines we can maybe do it right after the studenT in the constructing
     # State... on the full tensor
@@ -159,6 +164,10 @@ def main_model(modelParams):
     xi_t = covid19_npis.model.number_of_tests.calculate_Bsplines(xi, B)
     m_t = covid19_npis.model.number_of_tests.calculate_Bsplines(m, B)
 
+    log.debug(f"phi_t {phi_t}")
+    log.debug(f"eta_t {eta_t}")
+    log.debug(f"xi_t {xi_t}")
+    log.debug(f"m_t {m_t}")
     # We construct the gamma kernel for the reporting delay
     delay_kernel = covid19_npis.model.number_of_tests.calc_reporting_kernel(m_t, theta)
     delay_kernel = yield Deterministic(
@@ -174,6 +183,7 @@ def main_model(modelParams):
     filter_axes_data = covid19_npis.model.utils.get_filter_axis_data_from_dims(
         len(new_I_t.shape)
     )
+
     new_cases_delayed = convolution_with_varying_kernel(
         data=new_I_t,
         kernel=delay_kernel,
@@ -189,14 +199,17 @@ def main_model(modelParams):
         shape_label=("time", "country", "age_group"),
     )
     log.debug(f"new_cases_delayed\n{new_cases_delayed}")
-
+    """
     # Calc positive tests
+    """
     phi_age = yield covid19_npis.model.number_of_tests._construct_phi_age(
         "phi_age", modelParams
     )
+
     phi_age = tf.debugging.check_numerics(phi_age, f"phi_age:\n{phi_age}")
+
     positive_tests = covid19_npis.model.number_of_tests.calc_positive_tests(
-        new_cases_delayed=new_cases_delayed,
+        new_cases_delayed=new_I_t,
         phi_plus=phi_t,
         phi_age=phi_age,
         modelParams=modelParams,
@@ -216,24 +229,28 @@ def main_model(modelParams):
     phi_tests_reported = yield covid19_npis.model.number_of_tests._construct_phi_tests_reported(
         name="phi_tests_reported", modelParams=modelParams
     )
+
+    """
+    Disable total tests
     total_tests = covid19_npis.model.number_of_tests.calc_total_number_of_tests_performed(
-        new_cases_delayed=new_cases_delayed,
+        new_cases_delayed=new_I_t,
         phi_tests_reported=phi_tests_reported,
         phi_plus=phi_t,
         eta=eta_t,
         xi=xi_t,
         modelParams=modelParams,
     )
+    
     total_tests = yield Deterministic(
         "total_tests", total_tests, shape_label=("time", "country", "age_group")
     )
+    
     log.debug(f"total_tests\n{total_tests}")
-
+    """
     """ # Deaths
     TODO: - description
+    
 
-    """
-    """
     # Infection fatality ratio
     death_Phi = yield covid19_npis.model.deaths._calc_Phi_IFR(
         name="IFR", modelParams=modelParams

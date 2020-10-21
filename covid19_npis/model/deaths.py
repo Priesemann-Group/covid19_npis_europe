@@ -16,11 +16,18 @@ from .distributions import (
     Deterministic,
 )
 from .. import transformations
-from .utils import gamma
+from .utils import gamma, get_filter_axis_data_from_dims, convolution_with_fixed_kernel
 
 
 def _construct_reporting_delay(
-    name, modelParams,
+    name,
+    modelParams,
+    sigma_theta_scale=0.3,
+    mu_theta_loc=1.5,
+    mu_theta_scale=0.3,
+    sigma_m_scale=4.0,
+    mu_m_loc=21.0,
+    mu_m_scale=2.0,
 ):
     r"""
         .. math::
@@ -178,8 +185,30 @@ def _calc_Phi_IFR(
 
     Parameters
     ----------
+    name: str
+        Name of the infection fatatlity ratio variable :math:`\phi_{\text{IFR}, c,a}.` 
 
+    modelParams: :py:class:`covid19_npis.ModelParams`
+        Instance of modelParams, mainly used for number of age groups and
+        number of countries.
 
+    alpha_loc: optional
+        |default| 0.119
+
+    alpha_scale: optional
+        |default| 0.003
+
+    beta_loc: optional
+        |default| -7.53
+
+    beta_scale: optional
+        |default| 0.4
+
+    Returns
+    -------
+    :
+        Phi_IFR
+        |shape| batch, country, age brackets
     """
 
     alpha = yield Normal(
@@ -199,39 +228,40 @@ def _calc_Phi_IFR(
     )
 
     ages = tf.range(0.0, 101.0, delta=1.0, dtype="float32")  # [0...100]
-    log.info(f"ages\n{ages.shape}")
-    log.info(f"beta\n{beta.shape}")
-    log.info(f"alpha\n{alpha[..., tf.newaxis].shape}")
+    log.debug(f"ages\n{ages.shape}")
+    log.debug(f"beta\n{beta.shape}")
+    log.debug(f"alpha\n{alpha[..., tf.newaxis].shape}")
 
     IFR = 0.01 * tf.exp(
         beta[..., tf.newaxis] + tf.einsum("...,a->...a", alpha[..., tf.newaxis], ages)
-    )
-    log.info(f"IFR\n{IFR.shape}")
+    )  # |shape| batch,coutry,ages
+    log.debug(f"IFR\n{IFR.shape}")
 
-    N_total = modelParams.N_data_tensor_total
+    N_total = modelParams.N_data_tensor_total  # |shape| coutry,ages
     N_agegroups = modelParams.N_data_tensor
+    log.debug(f"N_total\n{N_total}")
+    log.debug(f"N_agegroups\n{N_agegroups}")
 
-    # for each age group: N_pop(a) * IFR(a)
-    sum_ = []
+    # Multiply N_pop(a) * IFR(a) for every age group and country
+    product = tf.einsum("...ca,ca->...ca", IFR, N_total)
+    log.debug(f"product\n{product}")
+    # for each  country and age group:
+    phi = []
     for c, country in enumerate(modelParams.countries):
-        sum_c = []
+        phi_c = []
         for age_group in modelParams.age_groups:
-            lower, upper = country.age_groups[
-                age_group
-            ]  # Get lower/upper bound for age groups
-            sum_a = tf.einsum(
-                "...a,a->...",
-                IFR[..., c, lower : upper + 1],
-                N_total[c, lower : upper + 1],
-            )
-            sum_c.append(sum_a)
-        sum_.append(sum_c)
+            # Get lower/upper bound for age groups in selected country
+            lower, upper = country.age_groups[age_group]  # inclusive
 
-    sum_ = tf.einsum("ca...->...ca", tf.convert_to_tensor(sum_))  # Transpose
+            phi_a = tf.math.reduce_sum(product[..., c, lower : upper + 1], axis=-1)
+            log.debug(f"phi_a\n{phi_a.shape}")
+            phi_c.append(phi_a)
+        phi.append(phi_c)
+    log.debug(f"phi\n{tf.convert_to_tensor(phi).shape}")
 
-    log.info(f"SUM\n{sum_.shape}")
+    phi = tf.einsum("ca...->...ca", tf.convert_to_tensor(phi))  # Transpose
 
-    Phi_IFR = tf.einsum("ca,...ca->...ca", 1.0 / N_agegroups, sum_)
+    Phi_IFR = tf.einsum("ca,...ca->...ca", 1.0 / N_agegroups, phi)
     log.info(f"Phi_IFR\n{Phi_IFR.shape}")
 
     return Phi_IFR
@@ -284,24 +314,32 @@ def calc_delayed_deaths(name, new_cases, Phi_IFR, m, theta, length_kernel=14):
     tau = tf.range(
         0.01, length_kernel + 0.01, 1.0, dtype="float32"
     )  # The gamma function does not like 0!
+
     # Get shapes right we want c,t
-    m = m[..., tf.newaxis]  # |shape| batch, country, time
-    theta = theta[..., tf.newaxis, tf.newaxis]  # |shape| batch, country, time
+    m = m[..., tf.newaxis, tf.newaxis]  # |shape| batch, country, age, time
+    theta = theta[..., tf.newaxis, tf.newaxis]  # |shape| batch, country, age, time
     # Calculate pdf
-    kernel = gamma(tau, m / theta + 1.0, 1.0 / theta,)
+    kernel = gamma(tau, m / theta + 1.0, 1.0 / theta,)  # add age group dimension
+    log.info(f"kernel deaths {kernel.shape}")
+    log.info(f"new_cases deaths {new_cases.shape}")
 
     """ # Calc delayed deaths
     """
-    # Add convolution
-    """dd=convolution_with_fixed_kernel(
-    data=new_cases,
-    kernel=kernel,
-    data_time_axis=-3,
-    filter_axes_data=?)
-    """
-
+    if len(new_cases.shape) == 4:
+        filter_axes_data = [-4, -2, -1]
+    else:
+        filter_axes_data = [-2, -1]
+    dd = convolution_with_fixed_kernel(
+        data=new_cases,
+        kernel=kernel,
+        data_time_axis=-3,
+        filter_axes_data=filter_axes_data,
+    )
+    log.info(f"dd {dd.shape}")
     delayed_deaths = yield Deterministic(
-        name=name, value=dd, shape_label=("country", "age_group")
+        name=name,
+        value=tf.einsum("...ca,...tca->...tca", Phi_IFR, dd),
+        shape_label=("time", "country", "age_group"),
     )
 
     return delayed_deaths

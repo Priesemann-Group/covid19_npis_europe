@@ -199,9 +199,8 @@ def main_model(modelParams):
         shape_label=("time", "country", "age_group"),
     )
     log.debug(f"new_cases_delayed\n{new_cases_delayed}")
-    """
+
     # Calc positive tests
-    """
     phi_age = yield covid19_npis.model.number_of_tests._construct_phi_age(
         "phi_age", modelParams
     )
@@ -214,10 +213,10 @@ def main_model(modelParams):
         phi_age=phi_age,
         modelParams=modelParams,
     )
-    positive_tests = tf.clip_by_value(positive_tests, 1e-9, 1e9)
+    positive_tests = tf.clip_by_value(positive_tests, 1e-9, 1e9)  # remove?
 
     positive_tests = tf.debugging.check_numerics(
-        positive_tests, f"positive_tests:\n{positive_tests}"
+        positive_tests, f"positive_tests:\n{positive_tests}"  # remove?
     )
 
     positive_tests = yield Deterministic(
@@ -230,8 +229,6 @@ def main_model(modelParams):
         name="phi_tests_reported", modelParams=modelParams
     )
 
-    """
-    Disable total tests
     total_tests = covid19_npis.model.number_of_tests.calc_total_number_of_tests_performed(
         new_cases_delayed=new_I_t,
         phi_tests_reported=phi_tests_reported,
@@ -240,16 +237,14 @@ def main_model(modelParams):
         xi=xi_t,
         modelParams=modelParams,
     )
-    
+
     total_tests = yield Deterministic(
         "total_tests", total_tests, shape_label=("time", "country", "age_group")
     )
-    
+
     log.debug(f"total_tests\n{total_tests}")
     """
-    """ # Deaths
-    TODO: - description
-    
+    """  # Deaths
 
     # Infection fatality ratio
     death_Phi = yield covid19_npis.model.deaths._calc_Phi_IFR(
@@ -267,7 +262,12 @@ def main_model(modelParams):
         m=death_m,
         theta=death_theta,
     )
+
+    """ Likelihood
+    TODO    - description on fitting data
+            - add deaths and total tests
     """
+
     likelihood = yield covid19_npis.model.studentT_likelihood(
         modelParams, positive_tests
     )

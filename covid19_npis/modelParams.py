@@ -237,8 +237,8 @@ class ModelParams:
         """
         data = []
         for c, country in enumerate(self.countries):
-            data.append(country.data_population.to_numpy()[:, 0])
-        return tf.constant(data, dtype="float32")
+            data.append(country.data_population.values[:, 0].tolist())
+        return tf.constant(data, dtype="float32", shape=[self.num_countries, 101])
 
     # ------------------------------------------------------------------------------ #
     # Additional properties

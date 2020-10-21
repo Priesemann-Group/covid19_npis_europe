@@ -30,3 +30,12 @@ def split_cpu_in_logical_devices(n):
     logical_devices = tf.config.list_logical_devices("CPU")
 
     log.info(f"Created {len(logical_devices)} virtual CPUs")
+
+
+def setup_colored_logs():
+    import coloredlogs
+
+    logger = logging.getLogger()
+    coloredlogs.install(level=logger.level)
+
+    coloredlogs.install(logger=tf.get_logger(), level=tf.get_logger().level)

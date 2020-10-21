@@ -43,8 +43,6 @@ class ModelParams:
         # Save data objects and calculate all other variables
         self.countries = countries
 
-        # Configs for distribution
-
         # Make global accessible since only one instance should be active at any time
         globals()["modelParams"] = self
 

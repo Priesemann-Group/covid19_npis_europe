@@ -290,6 +290,7 @@ class Country(object):
         files = [
             "/new_cases.csv",
             "/tests.csv",
+            "/deaths.csv",
             "/interventions.csv",
             "/population.csv",
             "/config.json",
@@ -319,6 +320,20 @@ class Country(object):
             )
         else:
             self.data_new_cases = None
+
+        if exist["/tests.csv"]:
+            self.data_total_tests = self._to_iso(
+                self._load_csv_with_date_index(self.path_to_folder + "/tests.csv"),
+            )
+        else:
+            self.data_total_tests = None
+
+        if exist["/deaths.csv"]:
+            self.data_deaths = self._to_iso(
+                self._load_csv_with_date_index(self.path_to_folder + "/deaths.csv"),
+            )
+        else:
+            self.data_deaths = None
 
         if exist["/interventions.csv"]:
             self.data_interventions = self._to_iso(
@@ -361,17 +376,26 @@ class Country(object):
 
         return data
 
-    def _to_iso(self, df, name):
+    def _to_iso(self, df, name=None):
         """
             Create multicolumn from normal columns with country at level 0
-            and name for level 1
+            and name for level 1. Or only constructs one level if no name is supplied.
 
             Parameters
             ----------
             df : pandas.DataFrame
 
-            name: str
+            name: str, optional
         """
+
+        if name is None:
+            if len(df.columns) != 1:
+                log.warning(f"Multiple columns found in {df.name}! Using first one!")
+            df.columns = pd.MultiIndex(
+                levels=[[self.name,],], codes=[[0,],], names=["country"]
+            )
+            return df
+
         cols = []
         for column in df.columns:
             cols.append((self.name, column))

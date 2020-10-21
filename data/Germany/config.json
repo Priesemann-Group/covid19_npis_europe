@@ -1,19 +1,19 @@
 {
   "name": "Germany",
   "age_groups": {
-    "young": [
+    "age_group_0": [
       0,
       34
     ],
-    "mid": [
+    "age_group_1": [
       35,
       59
     ],
-    "old": [
+    "age_group_2": [
       60,
       79
     ],
-    "old+": [
+    "age_group_3": [
       80,
       100
     ]

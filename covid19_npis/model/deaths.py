@@ -262,7 +262,7 @@ def _calc_Phi_IFR(
     phi = tf.einsum("ca...->...ca", tf.convert_to_tensor(phi))  # Transpose
 
     Phi_IFR = tf.einsum("ca,...ca->...ca", 1.0 / N_agegroups, phi)
-    log.info(f"Phi_IFR\n{Phi_IFR.shape}")
+    log.debug(f"Phi_IFR\n{Phi_IFR.shape}")
 
     return Phi_IFR
 
@@ -320,8 +320,8 @@ def calc_delayed_deaths(name, new_cases, Phi_IFR, m, theta, length_kernel=14):
     theta = theta[..., tf.newaxis, tf.newaxis]  # |shape| batch, country, age, time
     # Calculate pdf
     kernel = gamma(tau, m / theta + 1.0, 1.0 / theta,)  # add age group dimension
-    log.info(f"kernel deaths {kernel.shape}")
-    log.info(f"new_cases deaths {new_cases.shape}")
+    log.debug(f"kernel deaths\n{kernel.shape}")
+    log.debug(f"new_cases deaths\n{new_cases.shape}")
 
     """ # Calc delayed deaths
     """
@@ -338,7 +338,7 @@ def calc_delayed_deaths(name, new_cases, Phi_IFR, m, theta, length_kernel=14):
         data_time_axis=-3,
         filter_axes_data=filter_axes_data,
     )
-    log.info(f"dd {dd.shape}")
+    log.debug(f"dd\n{dd.shape}")
     delayed_deaths = yield Deterministic(
         name=name,
         value=tf.einsum("...ca,...tca->...tca", Phi_IFR, dd),

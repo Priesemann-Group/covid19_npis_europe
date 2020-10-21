@@ -1,5 +1,7 @@
 import sys
 import logging
+
+
 import time
 import itertools
 import os
@@ -38,9 +40,6 @@ print(tf.config.optimizer.get_experimental_options())
 """
 sys.path.append("../")
 
-# Needed to set logging level before importing other modules
-logging.basicConfig(level=logging.DEBUG)
-log = logging.getLogger(__name__)
 
 import covid19_npis
 from covid19_npis.model import main_model
@@ -48,13 +47,23 @@ from covid19_npis.model import main_model
 
 """ # Debugging and other snippets
 """
+
+# Logs setup
+logger = logging.getLogger()
+logger.setLevel(
+    logging.DEBUG
+)  # Needed to set logging level before importing other modules
+covid19_npis.utils.setup_colored_logs()
+
+
 # For eventual debugging:
-# tf.config.run_functions_eagerly(True)
+tf.config.run_functions_eagerly(True)
 # tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
 
 # Force CPU
 covid19_npis.utils.force_cpu_for_tensorflow()
 covid19_npis.utils.split_cpu_in_logical_devices(4)
+
 
 """ # 1. Data Retrieval
     Load data for different countries/regions, for now we have to define every

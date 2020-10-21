@@ -52,7 +52,7 @@ countries = ["France", "Germany"]
 path = "../data"
 begin = datetime.datetime(2020, 5, 17)
 end = datetime.datetime.today()
-_age_groups = ["young", "mid", "old", "old+"]
+_age_groups = ["age_group_0", "age_group_1", "age_group_2", "age_group_3"]
 policies = [
     "C1_School closing",
     "C2_Workplace closing",
@@ -101,7 +101,7 @@ def tests():
             tests = owd.get_total("tests", country=country).diff()
             dates = pd.date_range(begin - datetime.timedelta(days=14), end)
             tests = tests.reindex(dates)[begin:end].ffill() / 7
-
+            tests.index.name = "date"
         tests.to_csv(path + f"/{country}/tests.csv", date_format="%d.%m.%y")
     log.info("Successfully created tests files!")
 
@@ -134,16 +134,16 @@ def new_cases():
         )
 
     # We want to sum over 0-9,10-19 and 19-29 for the first age group:
-    new_cases["young"] = new_cases["09"] + new_cases["19"] + new_cases["29"]
+    new_cases["age_group_0"] = new_cases["09"] + new_cases["19"] + new_cases["29"]
     new_cases = new_cases.drop(columns=["09", "19", "29"])
     # Do the same for agegroups 30-39,40-49,50-59
-    new_cases["mid"] = new_cases["39"] + new_cases["49"] + new_cases["59"]
+    new_cases["age_group_1"] = new_cases["39"] + new_cases["49"] + new_cases["59"]
     new_cases = new_cases.drop(columns=["39", "49", "59"])
 
-    new_cases["old"] = new_cases["69"] + new_cases["79"]
+    new_cases["age_group_2"] = new_cases["69"] + new_cases["79"]
     new_cases = new_cases.drop(columns=["69", "79"])
 
-    new_cases["old+"] = new_cases["89"] + new_cases["90"]
+    new_cases["age_group_3"] = new_cases["89"] + new_cases["90"]
     new_cases = new_cases.drop(columns=["89", "90"])
     new_cases.index = new_cases.index.rename("date")
     new_cases.to_csv(path + f"/France/new_cases.csv", date_format="%d.%m.%y")
@@ -164,18 +164,18 @@ def new_cases():
             "confirmed", data_begin=begin, data_end=end, age_group=age_group
         )
 
-    new_cases["young"] = (
+    new_cases["age_group_0"] = (
         new_cases["A00-A04"] + new_cases["A05-A14"] + new_cases["A15-A34"]
     )
     new_cases = new_cases.drop(columns=["A00-A04", "A05-A14", "A15-A34"])
 
-    new_cases["mid"] = new_cases["A35-A59"]
+    new_cases["age_group_1"] = new_cases["A35-A59"]
     new_cases = new_cases.drop(columns="A35-A59")
 
-    new_cases["old"] = new_cases["A60-A79"]
+    new_cases["age_group_2"] = new_cases["A60-A79"]
     new_cases = new_cases.drop(columns="A60-A79")
 
-    new_cases["old+"] = new_cases["A80+"]
+    new_cases["age_group_3"] = new_cases["A80+"]
     new_cases = new_cases.drop(columns="A80+")
     new_cases.index = new_cases.index.rename("date")
     new_cases.to_csv(path + f"/Germany/new_cases.csv", date_format="%d.%m.%y")
@@ -219,15 +219,15 @@ def config():
         conf["name"] = country
         conf["age_groups"] = {}
         if country == "Germany":
-            conf["age_groups"]["young"] = [0, 34]
-            conf["age_groups"]["mid"] = [35, 59]
-            conf["age_groups"]["old"] = [60, 79]
-            conf["age_groups"]["old+"] = [80, 100]
+            conf["age_groups"]["age_group_0"] = [0, 34]
+            conf["age_groups"]["age_group_1"] = [35, 59]
+            conf["age_groups"]["age_group_2"] = [60, 79]
+            conf["age_groups"]["age_group_3"] = [80, 100]
         if country == "France":
-            conf["age_groups"]["young"] = [0, 29]
-            conf["age_groups"]["mid"] = [30, 59]
-            conf["age_groups"]["old"] = [60, 79]
-            conf["age_groups"]["old+"] = [80, 100]
+            conf["age_groups"]["age_group_0"] = [0, 29]
+            conf["age_groups"]["age_group_1"] = [30, 59]
+            conf["age_groups"]["age_group_2"] = [60, 79]
+            conf["age_groups"]["age_group_3"] = [80, 100]
         with open(path + f"/{country}/config.json", "w") as outfile:
             json.dump(conf, outfile, indent=2)
     log.info("Successfully created config files!")

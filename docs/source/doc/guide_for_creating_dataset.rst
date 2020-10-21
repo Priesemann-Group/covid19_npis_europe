@@ -29,6 +29,11 @@ Next we create a config.json file inside this folder. The json has to contain a 
     }
 
 
+- config.json, dict:
+    - name : "country_name"
+    - age_groups : dict 
+        - "column_name" : [age_lower, age_upper]
+
 
 Population data
 ^^^^^^^^^^^^^^^
@@ -47,6 +52,8 @@ Each dataset for a country/region needs to contain population data for every age
 | ...   | ...        |
 +-------+------------+
 
+- Age column named "age"
+- Column Number of people per age named "PopTotal"
 
 New cases/ Positive tests data
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -65,16 +72,19 @@ Date Format should be "%d.%m.%y".
 | ...      |     ...     |     ...     |     ...     |     ...     |
 +----------+-------------+-------------+-------------+-------------+
 
+- Time/Date column has to be named "date" or "time"
+- Age group columns have to be named consistent between different data and countries! 
+
+
 Total tests data
 ^^^^^^^^^^^^^^^^
 
 The number of total tests performed per day in the country/region is also supplied as
-a csv file called "tests.csv". The format should be as follows, the names of the columns 
-have to be the same for your dataset!
+a csv file called "tests.csv". The format should be as follows: 
 
 
 +----------+-------------+
-| date     | TotalTests  |
+| date     |      tests  |
 +==========+=============+
 | 01.01.20 |   10323     |
 +----------+-------------+
@@ -83,14 +93,29 @@ have to be the same for your dataset!
 | ...      |     ...     |
 +----------+-------------+
 
+- Time/Date column has to be named "date" or "time"
+- Daily performed tests column with name "tests"
 
 
 Number of deaths data
 ^^^^^^^^^^^^^^^^^^^^^
 
-TODO
+The number of deaths per day in the country/region also supplied as csv file nameed "deaths.csv".
 
 
++----------+-------------+
+| date     |     deaths  |
++==========+=============+
+| 01.01.20 |   10        |
++----------+-------------+
+| 02.01.20 |   35        |
++----------+-------------+
+| ...      |     ...     |
++----------+-------------+
+
+- Time/Date column has to be named "date" or "time"
+- Daily deaths column has to be named "deaths"
+- Optional(not working yet): Daily deaths per age group same column names as in new_cases
 
 Interventions data
 ^^^^^^^^^^^^^^^^^^
@@ -117,3 +142,6 @@ You can call/name the interventions whatever you like. The index should be an in
 +----------+----------------+---------------+-------------+-------------+
 | ...      |     ...        |     ...       |     ...     |     ...     |
 +----------+----------------+---------------+-------------+-------------+
+
+- Time/Date column has to be named "date" or "time"
+- Different intervention as additional columns with intervention name as column name

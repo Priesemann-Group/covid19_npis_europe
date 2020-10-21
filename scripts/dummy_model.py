@@ -54,7 +54,7 @@ logger.setLevel(
     logging.DEBUG
 )  # Needed to set logging level before importing other modules
 covid19_npis.utils.setup_colored_logs()
-
+logging.getLogger("parso.python.diff").disabled = True
 
 # For eventual debugging:
 tf.config.run_functions_eagerly(True)

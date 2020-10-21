@@ -69,20 +69,56 @@ class ModelParams:
         """ # Update dataframe
         Join all dataframes from the country objects
         """
+        # Get if csv exits:
+        check = self.countries[0].exist
         for i, country in enumerate(self.countries):
-            if i > 0:
-                _df = _df.join(country.data_new_cases)
-            else:
-                _df = country.data_new_cases
-        self._dataframe = _df
+            for key in country.exist:
+                check[key] &= country.exist[key]
+
+        # Join positive tests
+        if check["/new_cases.csv"]:
+            for i, country in enumerate(self.countries):
+                if i > 0:
+                    _df = _df.join(country.data_new_cases)
+                else:
+                    _df = country.data_new_cases
+            self._dataframe = _df
+
+        # Join total tests
+        if check["/tests.csv"]:
+            for i, country in enumerate(self.countries):
+                if i > 0:
+                    _df_t = _df_t.join(country.data_total_tests)
+                else:
+                    _df_t = country.data_total_tests
+            self._dataframe_total_tests = _df_t
+
+        # Join deaths
+        if check["/deaths.csv"]:
+            for i, country in enumerate(self.countries):
+                if i > 0:
+                    _df_d = _df_d.join(country.data_deaths)
+                else:
+                    _df_d = country.data_deaths
+            self._dataframe_deaths = _df_d
+
+        # Join population
+        if check["/population.csv"]:
+            for i, country in enumerate(self.countries):
+                if i > 0:
+                    _df_p = _df_p.join(country.data_population)
+                else:
+                    _df_p = country.data_population
+            self._dataframe_population = _df_p
 
         # Join all interventions dataframes
-        for i, country in enumerate(self.countries):
-            if i > 0:
-                _int = _int.join(country.data_interventions)
-            else:
-                _int = country.data_interventions
-        self._interventions = _int
+        if check["/interventions.csv"]:
+            for i, country in enumerate(self.countries):
+                if i > 0:
+                    _int = _int.join(country.data_interventions)
+                else:
+                    _int = country.data_interventions
+            self._interventions = _int
 
         """ # Update Data summary
         """
@@ -105,11 +141,11 @@ class ModelParams:
 
         self._data_summary = data
 
-        """ # Update Data Tensor
+        """ # Update positive test data tensor/df 
         set data tensor, replaces values smaller than 40 by nans.
         """
         data_tensor = (
-            self.dataframe.to_numpy()
+            self._dataframe.to_numpy()
             .astype(self.dtype)
             .reshape((-1, len(self.countries), len(self.age_groups)))
         )
@@ -125,6 +161,9 @@ class ModelParams:
             data_tensor[:i] = np.nan
         self._pos_tests_data_tensor = data_tensor
 
+        """ # Update total tests data tensor/df
+        """
+
     @property
     def spline_basis(self):
         stride = self._spline_stride
@@ -139,20 +178,15 @@ class ModelParams:
         return spline_basis  # shape : modelParams.length x modelParams.num_splines
 
     @property
-    def dataframe(self):
-        """
-        New cases as multiColumn dataframe level 0 = country/region and
-        level 1 = age group.
-        """
-        return self._dataframe
-
-    @property
     def data_summary(self):
         """
         Data summary for all countries
         """
         return self._data_summary
 
+    # ------------------------------------------------------------------------------ #
+    # Interventions
+    # ------------------------------------------------------------------------------ #
     @property
     def date_data_tensor(self):
         """
@@ -200,8 +234,15 @@ class ModelParams:
         return tf.constant(data, dtype="float32")
 
     # ------------------------------------------------------------------------------ #
-    # Data from folder
+    # Positive tests
     # ------------------------------------------------------------------------------ #
+    @property
+    def pos_tests_dataframe(self):
+        """
+        New cases as multiColumn dataframe level 0 = country/region and
+        level 1 = age group.
+        """
+        return self._dataframe
 
     @property
     def pos_tests_data_tensor(self):
@@ -211,6 +252,40 @@ class ModelParams:
         |shape| time, country, agegroup 
         """
         return self._pos_tests_data_tensor
+
+    # ------------------------------------------------------------------------------ #
+    # Total tests
+    # ------------------------------------------------------------------------------ #
+    @property
+    def total_tests_dataframe(self):
+        """
+        Dataframe of total tests in all countries. Datetime index and country columns
+        as Multiindex.
+        """
+        return self._dataframe_total_tests
+
+    # ------------------------------------------------------------------------------ #
+    # Number of deaths
+    # ------------------------------------------------------------------------------ #
+    @property
+    def deaths_dataframe(self):
+        """
+        Dataframe of deaths in all countries. Datetime index and country columns
+        as Multiindex.
+        """
+        return self._dataframe_deaths
+
+    # ------------------------------------------------------------------------------ #
+    # Population
+    # ------------------------------------------------------------------------------ #
+
+    @property
+    def N_dataframe(self):
+        """
+        Dataframe of population in all countries. Datetime index and country columns
+        as Multiindex.
+        """
+        return self._dataframe_population
 
     @property
     def N_data_tensor(self):

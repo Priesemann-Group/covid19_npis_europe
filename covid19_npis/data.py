@@ -263,10 +263,10 @@ class Country(object):
         self.path_to_folder = path_to_folder
 
         # Check if files exist
-        exist = self.__check_files_exist()
+        self.exist = self.__check_files_exist()
 
         # Load file if it exists
-        self.__load_files(exist)
+        self.__load_files(self.exist)
 
         self.__check_for_age_group_names()
 
@@ -346,8 +346,8 @@ class Country(object):
             self.data_interventions = None
 
         if exist["/population.csv"]:
-            self.data_population = pd.read_csv(
-                self.path_to_folder + "/population.csv", index_col="age"
+            self.data_population = self._to_iso(
+                pd.read_csv(self.path_to_folder + "/population.csv", index_col="age")
             )
         else:
             self.data_population = None

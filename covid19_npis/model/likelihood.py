@@ -80,10 +80,8 @@ def _studentT_positive_tests(modelParams, pos_tests):
     sigma = sigma[..., tf.newaxis, :, tf.newaxis]  # add time and age group dimension
     log.debug(f"sigma:\n{sigma}")
 
-    # Retrieve data from the modelParameters
+    # Retrieve data from the modelParameters and create a boolean mask
     data = modelParams.pos_tests_data_tensor
-
-    # Create boolean mask of data (nan=>False else True)
     mask = ~np.isnan(data)
 
     len_batch_shape = len(pos_tests.shape) - 3
@@ -97,8 +95,10 @@ def _studentT_positive_tests(modelParams, pos_tests):
         observed=tf.boolean_mask(data, mask),
         reinterpreted_batch_ndims=1,
     )
-    log.debug(f"likelihood:\n{likelihood}")
-    tf.debugging.check_numerics(likelihood, "Nan in likelihood", name="likelihood_pos")
+    log.debug(f"likelihood_pos_tests:\n{likelihood}")
+    tf.debugging.check_numerics(
+        likelihood, "Nan in likelihood", name="likelihood_pos_tests"
+    )
     return likelihood
 
 
@@ -121,7 +121,12 @@ def _studentT_total_tests(modelParams, total_tests):
             |shape| batch, time, country, age_group
     """
 
-    # Scale of the likelihood sigma
+    # Sadly we do not have age strata for the total performed test. We sum over the
+    # age groups to get a value for all ages. We can add an exception later if we find
+    # data for that.
+    total_tests_without_age = tf.reduce_sum(total_tests, axis=-1)
+
+    # Scale of the likelihood sigma for each country
     sigma = yield HalfCauchy(
         name="sigma_likelihood_total_tests",
         scale=50.0,
@@ -130,27 +135,25 @@ def _studentT_total_tests(modelParams, total_tests):
         transform=transformations.SoftPlus(),
         shape_label="country",
     )
-    sigma = sigma[..., tf.newaxis, :, tf.newaxis]  # add time and age group dimension
-    log.debug(f"sigma:\n{sigma}")
+    log.debug(f"likelihood_total_tests sigma:\n{sigma}")
 
-    # Retrieve data from the modelParameters
-    data = modelParams.pos_tests_data_tensor
-
-    # Create boolean mask of data (nan=>False else True)
+    # Retrieve data from the modelParameters and create a boolean mask
+    data = modelParams.total_tests_data_tensor
     mask = ~np.isnan(data)
 
-    len_batch_shape = len(pos_tests.shape) - 3
+    # Create studentT likelihood
+    len_batch_shape = len(total_tests_without_age.shape) - 3
     likelihood = yield StudentT(
         name="likelihood_total_tests",
-        loc=tf.boolean_mask(pos_tests, mask, axis=len_batch_shape),
+        loc=tf.boolean_mask(total_tests_without_age, mask, axis=len_batch_shape),
         scale=tf.boolean_mask(
-            sigma * tf.sqrt(pos_tests) + 1, mask, axis=len_batch_shape
+            sigma * tf.sqrt(total_tests_without_age) + 1, mask, axis=len_batch_shape
         ),
         df=4,
         observed=tf.boolean_mask(data, mask),
         reinterpreted_batch_ndims=1,
     )
-    log.debug(f"likelihood:\n{likelihood}")
+    log.debug(f"likelihood_total_tests:\n{likelihood}")
     tf.debugging.check_numerics(
         likelihood, "Nan in likelihood", name="likelihood_total"
     )

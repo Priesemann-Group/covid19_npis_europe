@@ -83,6 +83,8 @@ class ModelParams:
                 else:
                     _df = country.data_new_cases
             self._dataframe = _df
+        else:
+            log.error("Supply /new_cases.csv!")
 
         # Join total tests
         if check["/tests.csv"]:
@@ -92,6 +94,8 @@ class ModelParams:
                 else:
                     _df_t = country.data_total_tests
             self._dataframe_total_tests = _df_t
+        else:
+            self._dataframe_total_tests = None
 
         # Join deaths
         if check["/deaths.csv"]:
@@ -101,6 +105,8 @@ class ModelParams:
                 else:
                     _df_d = country.data_deaths
             self._dataframe_deaths = _df_d
+        else:
+            self._dataframe_deaths = None
 
         # Join population
         if check["/population.csv"]:
@@ -110,6 +116,8 @@ class ModelParams:
                 else:
                     _df_p = country.data_population
             self._dataframe_population = _df_p
+        else:
+            self._dataframe_population = None
 
         # Join all interventions dataframes
         if check["/interventions.csv"]:
@@ -119,6 +127,8 @@ class ModelParams:
                 else:
                     _int = country.data_interventions
             self._interventions = _int
+        else:
+            log.error("Supply /interventions.csv!")
 
         """ # Update Data summary
         """
@@ -264,6 +274,14 @@ class ModelParams:
         """
         return self._dataframe_total_tests
 
+    @property
+    def total_tests_data_tensor(self):
+        """
+        Dataframe of total tests in all countries. Datetime index and country columns
+        as Multiindex.
+        """
+        return tf.constant(self._dataframe_total_tests.to_numpy(), dtype="float32")
+
     # ------------------------------------------------------------------------------ #
     # Number of deaths
     # ------------------------------------------------------------------------------ #
@@ -290,8 +308,9 @@ class ModelParams:
     @property
     def N_data_tensor(self):
         """
-        Creates the population tensor with dimension country, agegroups.
-        Automatically calculates the age strata.
+        Creates the population tensor with
+        automatically calculated age strata/brackets.
+        |shape| country, age_groups
         """
         data = []
         for c, country in enumerate(self.countries):
@@ -310,7 +329,8 @@ class ModelParams:
     @property
     def N_data_tensor_total(self):
         """
-        Creates the population tensor with dimension country, agegroups.
+        Creates the population tensor for every age.
+        |shape| country, age
         """
         data = []
         for c, country in enumerate(self.countries):

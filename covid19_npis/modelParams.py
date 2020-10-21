@@ -125,7 +125,7 @@ class ModelParams:
         self._indices_begin_data = i_data_begin_list
         for i in i_data_begin_list:
             data_tensor[:i] = np.nan
-        self._data_tensor = data_tensor
+        self._pos_tests_data_tensor = data_tensor
 
     @property
     def spline_basis(self):
@@ -154,15 +154,6 @@ class ModelParams:
         Data summary for all countries
         """
         return self._data_summary
-
-    @property
-    def data_tensor(self):
-        """
-        Tensor of input dataframe i.e. daily new cases for countries/regions
-        and age groups.
-        |shape| time, country, agegroup 
-        """
-        return self._data_tensor
 
     @property
     def date_data_tensor(self):
@@ -209,6 +200,19 @@ class ModelParams:
                 d_c.append(d_cp)
             data.append(d_c)
         return tf.constant(data, dtype="float32")
+
+    # ------------------------------------------------------------------------------ #
+    # Data from folder
+    # ------------------------------------------------------------------------------ #
+
+    @property
+    def pos_tests_data_tensor(self):
+        """
+        Tensor of daily new cases / positive tests for countries/regions
+        and age groups.
+        |shape| time, country, agegroup 
+        """
+        return self._pos_tests_data_tensor
 
     @property
     def N_data_tensor(self):

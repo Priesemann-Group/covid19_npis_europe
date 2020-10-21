@@ -38,7 +38,7 @@ def construct_h_0_t(
         I_t
     """
     batch_dims = tuple(R_t.shape)[:-3]
-    data = modelParams.data_tensor
+    data = modelParams.pos_tests_data_tensor
     diff_sim_data = modelParams.min_offset_sim_data
     assert data.ndim == 3
     assert (

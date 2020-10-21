@@ -325,10 +325,13 @@ def calc_delayed_deaths(name, new_cases, Phi_IFR, m, theta, length_kernel=14):
 
     """ # Calc delayed deaths
     """
-    if len(new_cases.shape) == 4:
+    if len(new_cases.shape) == 5:
+        filter_axes_data = [-5, -4, -2, -1]
+    elif len(new_cases.shape) == 4:
         filter_axes_data = [-4, -2, -1]
     else:
         filter_axes_data = [-2, -1]
+
     dd = convolution_with_fixed_kernel(
         data=new_cases,
         kernel=kernel,

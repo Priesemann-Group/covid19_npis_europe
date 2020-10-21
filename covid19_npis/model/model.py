@@ -269,6 +269,6 @@ def main_model(modelParams):
     """
 
     likelihood = yield covid19_npis.model.studentT_likelihood(
-        modelParams, positive_tests
+        modelParams, positive_tests, total_tests, deaths_delayed
     )
     return likelihood

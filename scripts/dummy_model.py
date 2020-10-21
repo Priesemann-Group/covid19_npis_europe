@@ -49,15 +49,14 @@ from covid19_npis.model import main_model
 """
 
 # Logs setup
-logger = logging.getLogger()
-logger.setLevel(
-    logging.DEBUG
-)  # Needed to set logging level before importing other modules
+log = logging.getLogger()
+# Needed to set logging level before importing other modules
+# logger.setLevel(logging.DEBUG)
 covid19_npis.utils.setup_colored_logs()
 logging.getLogger("parso.python.diff").disabled = True
 
 # For eventual debugging:
-tf.config.run_functions_eagerly(True)
+# tf.config.run_functions_eagerly(True)
 # tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
 
 # Force CPU
@@ -86,8 +85,6 @@ c2 = covid19_npis.data.Country("../data/France",)
 modelParams = covid19_npis.ModelParams(countries=[c1, c2])
 
 # Test shapes, should be all 3:
-
-
 def print_dist_shapes(st):
     for name, dist in itertools.chain(
         st.discrete_distributions.items(), st.continuous_distributions.items(),
@@ -152,7 +149,7 @@ dist_names = [
     "I_0_diff_base",
     "g_mu",
     "g_theta",
-    "sigma",
+    "sigma_likelihood_pos_tests",
     "alpha_i_c_a",
     "l_i_sign",
     "d_i_c_p",

@@ -277,8 +277,7 @@ class ModelParams:
     @property
     def total_tests_data_tensor(self):
         """
-        Dataframe of total tests in all countries. Datetime index and country columns
-        as Multiindex.
+        |shape| time, country
         """
         return tf.constant(self._dataframe_total_tests.to_numpy(), dtype="float32")
 
@@ -293,10 +292,17 @@ class ModelParams:
         """
         return self._dataframe_deaths
 
+    @property
+    def deaths_data_tensor(self):
+        """
+        
+        |shape| time, country
+        """
+        return tf.constant(self._dataframe_deaths.to_numpy(), dtype="float32")
+
     # ------------------------------------------------------------------------------ #
     # Population
     # ------------------------------------------------------------------------------ #
-
     @property
     def N_dataframe(self):
         """
@@ -340,7 +346,6 @@ class ModelParams:
     # ------------------------------------------------------------------------------ #
     # Additional properties
     # ------------------------------------------------------------------------------ #
-
     @property
     def dtype(self):
         return self._dtype

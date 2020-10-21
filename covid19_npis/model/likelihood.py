@@ -142,7 +142,7 @@ def _studentT_total_tests(modelParams, total_tests):
     mask = ~np.isnan(data)
 
     # Create studentT likelihood
-    len_batch_shape = len(total_tests_without_age.shape) - 3
+    len_batch_shape = len(total_tests_without_age.shape) - 2
     likelihood = yield StudentT(
         name="likelihood_total_tests",
         loc=tf.boolean_mask(total_tests_without_age, mask, axis=len_batch_shape),
@@ -156,5 +156,63 @@ def _studentT_total_tests(modelParams, total_tests):
     log.debug(f"likelihood_total_tests:\n{likelihood}")
     tf.debugging.check_numerics(
         likelihood, "Nan in likelihood", name="likelihood_total"
+    )
+    return likelihood
+
+
+def _studentT_deaths(modelParams, deaths):
+    """
+        Creates studentT likelihood for the recorded deaths.
+
+        .. math::
+
+            \text{Add math}
+
+        Parameters
+        ----------
+        modelParams: :py:class:`covid19_npis.ModelParams`
+            Instance of modelParams, mainly used for number of age groups and
+            number of countries.
+
+        total_tests: tf.Tensor
+            Inferred tensor for the number of total tests recorded. 
+            |shape| batch, time, country, age_group
+    """
+
+    # Sadly we do not have age strata for the number of deaths in most countries.
+    # We sum over the age groups to get a value for all ages.
+    # We can add an exception later.
+    deaths_without_age = tf.reduce_sum(total_tests, axis=-1)
+
+    # Scale of the likelihood sigma for each country
+    sigma = yield HalfCauchy(
+        name="sigma_likelihood_deaths",
+        scale=50.0,
+        event_stack=modelParams.num_countries,
+        conditionally_independent=True,
+        transform=transformations.SoftPlus(),
+        shape_label="country",
+    )
+    log.debug(f"likelihood_deaths sigma:\n{sigma}")
+
+    # Retrieve data from the modelParameters and create a boolean mask
+    data = modelParams.deaths_data_tensor
+    mask = ~np.isnan(data)
+
+    # Create studentT likelihood
+    len_batch_shape = len(deaths_without_age.shape) - 2
+    likelihood = yield StudentT(
+        name="likelihood_total_tests",
+        loc=tf.boolean_mask(deaths_without_age, mask, axis=len_batch_shape),
+        scale=tf.boolean_mask(
+            sigma * tf.sqrt(deaths_without_age) + 1, mask, axis=len_batch_shape
+        ),
+        df=4,
+        observed=tf.boolean_mask(data, mask),
+        reinterpreted_batch_ndims=1,
+    )
+    log.debug(f"likelihood_deaths:\n{likelihood}")
+    tf.debugging.check_numerics(
+        likelihood, "Nan in likelihood", name="likelihood_deaths"
     )
     return likelihood

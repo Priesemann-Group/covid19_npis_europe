@@ -33,6 +33,7 @@ Welcome to COVID-19 NPIS's documentation!
 
     doc/contributing
     doc/debugging
+    doc/guide_for_creating_dataset
 
 Indices and tables
 ==================

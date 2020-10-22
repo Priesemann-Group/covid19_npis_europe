@@ -184,8 +184,7 @@ def convert_trace_to_dataframe(trace, sample_state, key, data_type=None):
     if r"time" in df.index.names:
         df.index = df.index.set_levels(
             pd.date_range(
-                modelParams.modelParams.dataframe.index.min(),
-                modelParams.modelParams.dataframe.index.max(),
+                modelParams.modelParams.data_begin, modelParams.modelParams.data_end,
             ),
             level="time",
         )

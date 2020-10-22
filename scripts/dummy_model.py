@@ -51,7 +51,7 @@ from covid19_npis.model import main_model
 # Logs setup
 log = logging.getLogger()
 # Needed to set logging level before importing other modules
-# logger.setLevel(logging.DEBUG)
+# log.setLevel(logging.DEBUG)
 covid19_npis.utils.setup_colored_logs()
 logging.getLogger("parso.python.diff").disabled = True
 
@@ -187,8 +187,8 @@ for name in ts_names:
         for i, c in enumerate(modelParams.data_summary["countries"]):
             for j, a in enumerate(modelParams.data_summary["age_groups"]):
                 ts_axes[name][j][i] = covid19_npis.plot.time_series._timeseries(
-                    modelParams.dataframe.index[:],
-                    modelParams.dataframe[(c, a)].to_numpy()[:],
+                    modelParams.pos_tests_dataframe.index[:],
+                    modelParams.pos_tests_dataframe[(c, a)].to_numpy()[:],
                     ax=ts_axes[name][j][i],
                     alpha=0.5,
                 )

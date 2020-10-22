@@ -40,20 +40,17 @@ def studentT_likelihood(modelParams, pos_tests, total_tests, deaths):
 
     """
 
-    lh_return = []
+    likelihood = yield _studentT_positive_tests(modelParams, pos_tests)
 
-    likelihood_positive_tests = yield _studentT_positive_tests(modelParams, pos_tests)
-    lh_return.append(likelihood_positive_tests)
-
-    if modelParams.data_summary.files["/tests.csv"]:
+    if modelParams.data_summary["files"]["/tests.csv"]:
         likelihood_total_tests = yield _studentT_total_tests(modelParams, total_tests)
-        lh_return.append(likelihood_total_tests)
+        likelihood = tf.stack([likelihood, likelihood_total_tests], axis=-1)
 
-    if modelParams.data_summary.files["/deaths.csv"]:
+    if modelParams.data_summary["files"]["/deaths.csv"]:
         likelihood_deaths = yield _studentT_deaths(modelParams, deaths)
-        lh_return.append(likelihood_deaths)
-
-    return lh_return
+        likelihood = tf.stack([likelihood, likelihood_deaths], axis=-1)
+    log.debug(f"likelihood:\n{likelihood}")
+    return likelihood
 
 
 def _studentT_positive_tests(modelParams, pos_tests):
@@ -166,7 +163,7 @@ def _studentT_total_tests(modelParams, total_tests):
     tf.debugging.check_numerics(
         likelihood, "Nan in likelihood", name="likelihood_total"
     )
-    return likelihood
+    return likelihood[..., tf.newaxis]
 
 
 def _studentT_deaths(modelParams, deaths):
@@ -224,4 +221,4 @@ def _studentT_deaths(modelParams, deaths):
     tf.debugging.check_numerics(
         likelihood, "Nan in likelihood", name="likelihood_deaths"
     )
-    return likelihood
+    return likelihood[..., tf.newaxis]

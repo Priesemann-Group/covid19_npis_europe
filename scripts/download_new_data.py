@@ -182,6 +182,16 @@ def new_cases():
     log.info("Successfully created new_cases files!")
 
 
+def deaths():
+    """
+    Get and save number of covid deaths. 
+    """
+    owd = data_retrieval.OWD(True)
+    for country in countries:
+        deaths = owd.get_new("deaths", country=country, data_begin=begin, data_end=end)
+        deaths.to_csv(path + f"/{country}/deaths.csv", date_format="%d.%m.%y")
+
+
 def population():
     """
     Downloads population data to path and create population.csv for every country.

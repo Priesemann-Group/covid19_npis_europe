@@ -397,6 +397,14 @@ class ModelParams:
 
         return max(data)
 
+    @property
+    def data_begin(self):
+        return self.pos_tests_dataframe.index.min()
+
+    @property
+    def data_end(self):
+        return self.pos_tests_dataframe.index.max()
+
     # ------------------------------------------------------------------------------ #
     # Methods
     # ------------------------------------------------------------------------------ #

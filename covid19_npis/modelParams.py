@@ -138,6 +138,7 @@ class ModelParams:
             "age_groups": [],
             "countries": [],
             "interventions": [],
+            "files": check,
         }
         # Create countries lookup list dynamic from data dataframe
         for i in range(len(_df.columns.levels[0])):

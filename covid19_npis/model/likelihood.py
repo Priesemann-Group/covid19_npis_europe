@@ -40,13 +40,20 @@ def studentT_likelihood(modelParams, pos_tests, total_tests, deaths):
 
     """
 
+    lh_return = []
+
     likelihood_positive_tests = yield _studentT_positive_tests(modelParams, pos_tests)
+    lh_return.append(likelihood_positive_tests)
 
-    # likelihood_total_tests = yield _studentT_total_tests(modelParams, total_tests)
+    if modelParams.data_summary.files["/tests.csv"]:
+        likelihood_total_tests = yield _studentT_total_tests(modelParams, total_tests)
+        lh_return.append(likelihood_total_tests)
 
-    # likelihood_deaths = yield _studentT_deaths(modelParams, deaths)
+    if modelParams.data_summary.files["/deaths.csv"]:
+        likelihood_deaths = yield _studentT_deaths(modelParams, deaths)
+        lh_return.append(likelihood_deaths)
 
-    return likelihood_positive_tests  # , likelihood_total_tests, likelihood_deaths
+    return lh_return
 
 
 def _studentT_positive_tests(modelParams, pos_tests):
@@ -135,6 +142,8 @@ def _studentT_total_tests(modelParams, total_tests):
         transform=transformations.SoftPlus(),
         shape_label="country",
     )
+    sigma = sigma[..., tf.newaxis, :]  # Add time dimension
+
     log.debug(f"likelihood_total_tests sigma:\n{sigma}")
 
     # Retrieve data from the modelParameters and create a boolean mask
@@ -194,7 +203,7 @@ def _studentT_deaths(modelParams, deaths):
         shape_label="country",
     )
     log.debug(f"likelihood_deaths sigma:\n{sigma}")
-
+    sigma = sigma[..., tf.newaxis, :]  # Add time dimension
     # Retrieve data from the modelParameters and create a boolean mask
     data = modelParams.deaths_data_tensor
     mask = ~np.isnan(data)

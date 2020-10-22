@@ -44,11 +44,11 @@ def studentT_likelihood(modelParams, pos_tests, total_tests, deaths):
 
     if modelParams.data_summary["files"]["/tests.csv"]:
         likelihood_total_tests = yield _studentT_total_tests(modelParams, total_tests)
-        likelihood = tf.stack([likelihood, likelihood_total_tests], axis=-1)
+        # likelihood = tf.stack([likelihood, likelihood_total_tests], axis=-1)
 
     if modelParams.data_summary["files"]["/deaths.csv"]:
         likelihood_deaths = yield _studentT_deaths(modelParams, deaths)
-        likelihood = tf.stack([likelihood, likelihood_deaths], axis=-1)
+        # likelihood = tf.stack([likelihood, likelihood_deaths], axis=-1)
     log.debug(f"likelihood:\n{likelihood}")
     return likelihood
 
@@ -188,7 +188,7 @@ def _studentT_deaths(modelParams, deaths):
     # Sadly we do not have age strata for the number of deaths in most countries.
     # We sum over the age groups to get a value for all ages.
     # We can add an exception later.
-    deaths_without_age = tf.reduce_sum(total_tests, axis=-1)
+    deaths_without_age = tf.reduce_sum(deaths, axis=-1)
 
     # Scale of the likelihood sigma for each country
     sigma = yield HalfCauchy(
@@ -208,7 +208,7 @@ def _studentT_deaths(modelParams, deaths):
     # Create studentT likelihood
     len_batch_shape = len(deaths_without_age.shape) - 2
     likelihood = yield StudentT(
-        name="likelihood_total_tests",
+        name="likelihood_deaths",
         loc=tf.boolean_mask(deaths_without_age, mask, axis=len_batch_shape),
         scale=tf.boolean_mask(
             sigma * tf.sqrt(deaths_without_age) + 1, mask, axis=len_batch_shape

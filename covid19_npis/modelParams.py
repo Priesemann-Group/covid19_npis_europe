@@ -262,7 +262,7 @@ class ModelParams:
         and age groups.
         |shape| time, country, agegroup 
         """
-        return self._pos_tests_data_tensor
+        return tf.constant(self._pos_tests_data_tensor, dtype="float32")
 
     # ------------------------------------------------------------------------------ #
     # Total tests

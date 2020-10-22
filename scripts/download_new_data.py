@@ -51,7 +51,7 @@ log = logging.getLogger(__name__)
 countries = ["France", "Germany"]
 path = "../data"
 begin = datetime.datetime(2020, 5, 17)
-end = datetime.datetime.today()
+end = datetime.datetime(2020, 10, 18)
 _age_groups = ["age_group_0", "age_group_1", "age_group_2", "age_group_3"]
 policies = [
     "C1_School closing",
@@ -255,5 +255,6 @@ if __name__ == "__main__":
     interventions()
     tests()
     new_cases()
+    deaths()
     population()
     config()

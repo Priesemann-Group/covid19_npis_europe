@@ -320,8 +320,8 @@ def calc_delayed_deaths(name, new_cases, Phi_IFR, m, theta, length_kernel=14):
     theta = theta[..., tf.newaxis, tf.newaxis]  # |shape| batch, country, age, time
     # Calculate pdf
     kernel = gamma(tau, m / theta + 1.0, 1.0 / theta,)  # add age group dimension
-    log.debug(f"kernel deaths\n{kernel.shape}")
-    log.debug(f"new_cases deaths\n{new_cases.shape}")
+    log.debug(f"kernel deaths\n{kernel}")
+    log.debug(f"new_cases deaths\n{new_cases}")
 
     """ # Calc delayed deaths
     """

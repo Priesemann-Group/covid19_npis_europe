@@ -51,12 +51,12 @@ from covid19_npis.model import main_model
 # Logs setup
 log = logging.getLogger()
 # Needed to set logging level before importing other modules
-# log.setLevel(logging.DEBUG)
+log.setLevel(logging.DEBUG)
 covid19_npis.utils.setup_colored_logs()
 logging.getLogger("parso.python.diff").disabled = True
 
 # For eventual debugging:
-# tf.config.run_functions_eagerly(True)
+tf.config.run_functions_eagerly(True)
 # tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
 
 # Force CPU
@@ -73,8 +73,8 @@ covid19_npis.utils.split_cpu_in_logical_devices(4)
 
 # Load our data from csv files into our own custom data classes
 
-c1 = covid19_npis.data.Country("../data/test_country_1",)  # name
-c2 = covid19_npis.data.Country("../data/test_country_2",)
+c1 = covid19_npis.data.Country("../data/Germany",)  # name
+c2 = covid19_npis.data.Country("../data/France",)
 
 
 """
@@ -106,8 +106,8 @@ begin_time = time.time()
 
 trace = pm.sample(
     main_model(modelParams),
-    num_samples=100,
-    burn_in=200,
+    num_samples=200,
+    burn_in=400,
     use_auto_batching=False,
     num_chains=2,
     xla=True,

@@ -48,10 +48,10 @@ log = logging.getLogger(__name__)
 # ------------------------------------------------------------------------------ #
 # Config/Globals
 # ------------------------------------------------------------------------------ #
-countries = ["France", "Germany", "Belgium"]
+countries = ["France", "Germany", "Belgium", "Portugal"]
 path = "../data"
 begin = datetime.datetime(2020, 5, 17)
-end = datetime.datetime.now() - datetime.timedelta(days=4)
+end = datetime.datetime.now() - datetime.timedelta(days=1)
 _age_groups = ["age_group_0", "age_group_1", "age_group_2", "age_group_3"]
 policies = [
     "C1_School closing",
@@ -107,6 +107,11 @@ def tests():
             tests = data_retrieval.Belgium(True).get_new(
                 "tests", data_begin=begin, data_end=end
             )
+
+        # Fill na if they do not fill
+        tests = tests.reindex(pd.date_range(begin, end))
+        tests.index.name = "date"
+
         tests.to_csv(path + f"/{country}/tests.csv", date_format="%d.%m.%y")
     log.info("Successfully created tests files!")
 
@@ -151,7 +156,9 @@ def new_cases():
 
         new_cases["age_group_3"] = new_cases["89"] + new_cases["90"]
         new_cases = new_cases.drop(columns=["89", "90"])
-        new_cases.index = new_cases.index.rename("date")
+        # Fill na if they do not fill
+        new_cases = new_cases.reindex(pd.date_range(begin, end))
+        new_cases.index.name = "date"
         new_cases.to_csv(path + f"/France/new_cases.csv", date_format="%d.%m.%y")
 
     # cases germany
@@ -226,9 +233,48 @@ def new_cases():
         new_cases.index = new_cases.index.rename("date")
         new_cases.to_csv(path + f"/Belgium/new_cases.csv", date_format="%d.%m.%y")
 
+    def portugal():
+        Portugal = data_retrieval.Portugal(True)
+        age_groups = [
+            "0-9",
+            "10-19",
+            "20-29",
+            "30-39",
+            "40-49",
+            "50-59",
+            "60-69",
+            "70-79",
+            "80-100",
+        ]
+        new_cases = pd.DataFrame(index=pd.date_range(begin, end))
+        for age_group in age_groups:
+            new_cases[age_group] = Portugal.get_new(
+                "confirmed", data_begin=begin, data_end=end, age_group=age_group
+            )
+        new_cases = new_cases.fillna(0)
+
+        new_cases["age_group_0"] = (
+            new_cases["0-9"] + new_cases["10-19"] + new_cases["20-29"]
+        )
+        new_cases = new_cases.drop(columns=["0-9", "10-19", "20-29"])
+
+        new_cases["age_group_1"] = (
+            new_cases["30-39"] + new_cases["40-49"] + new_cases["50-59"]
+        )
+        new_cases = new_cases.drop(columns=["30-39", "40-49", "50-59"])
+
+        new_cases["age_group_2"] = new_cases["60-69"] + new_cases["70-79"]
+        new_cases = new_cases.drop(columns=["60-69", "70-79"])
+
+        new_cases["age_group_3"] = new_cases["80-100"]
+        new_cases = new_cases.drop(columns=["80-100"])
+        new_cases.index = new_cases.index.rename("date")
+        new_cases.to_csv(path + f"/Portugal/new_cases.csv", date_format="%d.%m.%y")
+
     france()
     germany()
     belgium()
+    portugal()
     log.info("Successfully created new_cases files!")
 
 
@@ -290,7 +336,17 @@ def config():
             conf["age_groups"]["age_group_1"] = [35, 59]
             conf["age_groups"]["age_group_2"] = [60, 79]
             conf["age_groups"]["age_group_3"] = [80, 100]
-        if country == "France":
+        elif country == "France":
+            conf["age_groups"]["age_group_0"] = [0, 29]
+            conf["age_groups"]["age_group_1"] = [30, 59]
+            conf["age_groups"]["age_group_2"] = [60, 79]
+            conf["age_groups"]["age_group_3"] = [80, 100]
+        elif country == "Belgium":
+            conf["age_groups"]["age_group_0"] = [0, 29]
+            conf["age_groups"]["age_group_1"] = [30, 59]
+            conf["age_groups"]["age_group_2"] = [60, 79]
+            conf["age_groups"]["age_group_3"] = [80, 100]
+        elif country == "Portugal":
             conf["age_groups"]["age_group_0"] = [0, 29]
             conf["age_groups"]["age_group_1"] = [30, 59]
             conf["age_groups"]["age_group_2"] = [60, 79]

@@ -46,9 +46,9 @@ def studentT_likelihood(modelParams, pos_tests, total_tests, deaths):
         likelihood_total_tests = yield _studentT_total_tests(modelParams, total_tests)
         # likelihood = tf.stack([likelihood, likelihood_total_tests], axis=-1)
 
-    if modelParams.data_summary["files"]["/deaths.csv"]:
-        likelihood_deaths = yield _studentT_deaths(modelParams, deaths)
-        # likelihood = tf.stack([likelihood, likelihood_deaths], axis=-1)
+    # if modelParams.data_summary["files"]["/deaths.csv"]:
+    # likelihood_deaths = yield _studentT_deaths(modelParams, deaths)
+    # likelihood = tf.stack([likelihood, likelihood_deaths], axis=-1)
     log.debug(f"likelihood:\n{likelihood}")
     return likelihood
 

@@ -48,10 +48,10 @@ log = logging.getLogger(__name__)
 # ------------------------------------------------------------------------------ #
 # Config/Globals
 # ------------------------------------------------------------------------------ #
-countries = ["France", "Germany"]
+countries = ["France", "Germany", "Belgium"]
 path = "../data"
 begin = datetime.datetime(2020, 5, 17)
-end = datetime.datetime(2020, 10, 18)
+end = datetime.datetime.now() - datetime.timedelta(days=4)
 _age_groups = ["age_group_0", "age_group_1", "age_group_2", "age_group_3"]
 policies = [
     "C1_School closing",
@@ -81,6 +81,7 @@ def interventions():
                 policy=policy, country=country, data_begin=begin, data_end=end,
             )
         interventions.index = interventions.index.rename("date")
+        interventions = interventions.ffill()  # Pad missing values with previous values
         interventions.to_csv(
             path + f"/{country}/interventions.csv", date_format="%d.%m.%y"
         )
@@ -102,6 +103,10 @@ def tests():
             dates = pd.date_range(begin - datetime.timedelta(days=14), end)
             tests = tests.reindex(dates)[begin:end].ffill() / 7
             tests.index.name = "date"
+        if country == "Belgium":
+            tests = data_retrieval.Belgium(True).get_new(
+                "tests", data_begin=begin, data_end=end
+            )
         tests.to_csv(path + f"/{country}/tests.csv", date_format="%d.%m.%y")
     log.info("Successfully created tests files!")
 
@@ -113,72 +118,117 @@ def new_cases():
     Age groups: 0-29,30-59,60-79,80+
     """
     # cases France
-    France = data_retrieval.countries.France(True)
-    age_groups = [
-        "09",
-        "19",
-        "29",
-        "39",
-        "49",
-        "59",
-        "69",
-        "79",
-        "89",
-        "90",
-    ]  # available age_groups
+    def france():
+        France = data_retrieval.countries.France(True)
+        age_groups = [
+            "09",
+            "19",
+            "29",
+            "39",
+            "49",
+            "59",
+            "69",
+            "79",
+            "89",
+            "90",
+        ]  # available age_groups
 
-    new_cases = pd.DataFrame()
-    for age_group in age_groups:
-        new_cases[age_group] = France.get_new(
-            "confirmed", data_begin=begin, data_end=end, age_group=age_group
-        )
+        new_cases = pd.DataFrame()
+        for age_group in age_groups:
+            new_cases[age_group] = France.get_new(
+                "confirmed", data_begin=begin, data_end=end, age_group=age_group
+            )
 
-    # We want to sum over 0-9,10-19 and 19-29 for the first age group:
-    new_cases["age_group_0"] = new_cases["09"] + new_cases["19"] + new_cases["29"]
-    new_cases = new_cases.drop(columns=["09", "19", "29"])
-    # Do the same for agegroups 30-39,40-49,50-59
-    new_cases["age_group_1"] = new_cases["39"] + new_cases["49"] + new_cases["59"]
-    new_cases = new_cases.drop(columns=["39", "49", "59"])
+        # We want to sum over 0-9,10-19 and 19-29 for the first age group:
+        new_cases["age_group_0"] = new_cases["09"] + new_cases["19"] + new_cases["29"]
+        new_cases = new_cases.drop(columns=["09", "19", "29"])
+        # Do the same for agegroups 30-39,40-49,50-59
+        new_cases["age_group_1"] = new_cases["39"] + new_cases["49"] + new_cases["59"]
+        new_cases = new_cases.drop(columns=["39", "49", "59"])
 
-    new_cases["age_group_2"] = new_cases["69"] + new_cases["79"]
-    new_cases = new_cases.drop(columns=["69", "79"])
+        new_cases["age_group_2"] = new_cases["69"] + new_cases["79"]
+        new_cases = new_cases.drop(columns=["69", "79"])
 
-    new_cases["age_group_3"] = new_cases["89"] + new_cases["90"]
-    new_cases = new_cases.drop(columns=["89", "90"])
-    new_cases.index = new_cases.index.rename("date")
-    new_cases.to_csv(path + f"/France/new_cases.csv", date_format="%d.%m.%y")
+        new_cases["age_group_3"] = new_cases["89"] + new_cases["90"]
+        new_cases = new_cases.drop(columns=["89", "90"])
+        new_cases.index = new_cases.index.rename("date")
+        new_cases.to_csv(path + f"/France/new_cases.csv", date_format="%d.%m.%y")
 
     # cases germany
-    Germany = data_retrieval.RKI(True)
-    age_groups = [
-        "A00-A04",
-        "A05-A14",
-        "A15-A34",
-        "A35-A59",
-        "A60-A79",
-        "A80+",
-    ]  # available age_groups
-    new_cases = pd.DataFrame()
-    for age_group in age_groups:
-        new_cases[age_group] = Germany.get_new(
-            "confirmed", data_begin=begin, data_end=end, age_group=age_group
+    def germany():
+        Germany = data_retrieval.RKI(True)
+        age_groups = [
+            "A00-A04",
+            "A05-A14",
+            "A15-A34",
+            "A35-A59",
+            "A60-A79",
+            "A80+",
+        ]  # available age_groups
+        new_cases = pd.DataFrame()
+        for age_group in age_groups:
+            new_cases[age_group] = Germany.get_new(
+                "confirmed", data_begin=begin, data_end=end, age_group=age_group
+            )
+
+        new_cases["age_group_0"] = (
+            new_cases["A00-A04"] + new_cases["A05-A14"] + new_cases["A15-A34"]
         )
+        new_cases = new_cases.drop(columns=["A00-A04", "A05-A14", "A15-A34"])
 
-    new_cases["age_group_0"] = (
-        new_cases["A00-A04"] + new_cases["A05-A14"] + new_cases["A15-A34"]
-    )
-    new_cases = new_cases.drop(columns=["A00-A04", "A05-A14", "A15-A34"])
+        new_cases["age_group_1"] = new_cases["A35-A59"]
+        new_cases = new_cases.drop(columns="A35-A59")
 
-    new_cases["age_group_1"] = new_cases["A35-A59"]
-    new_cases = new_cases.drop(columns="A35-A59")
+        new_cases["age_group_2"] = new_cases["A60-A79"]
+        new_cases = new_cases.drop(columns="A60-A79")
 
-    new_cases["age_group_2"] = new_cases["A60-A79"]
-    new_cases = new_cases.drop(columns="A60-A79")
+        new_cases["age_group_3"] = new_cases["A80+"]
+        new_cases = new_cases.drop(columns="A80+")
+        new_cases.index = new_cases.index.rename("date")
+        new_cases.to_csv(path + f"/Germany/new_cases.csv", date_format="%d.%m.%y")
 
-    new_cases["age_group_3"] = new_cases["A80+"]
-    new_cases = new_cases.drop(columns="A80+")
-    new_cases.index = new_cases.index.rename("date")
-    new_cases.to_csv(path + f"/Germany/new_cases.csv", date_format="%d.%m.%y")
+    def belgium():
+        Belgium = data_retrieval.Belgium(True)
+        age_groups = [
+            "0-9",
+            "10-19",
+            "20-29",
+            "30-39",
+            "40-49",
+            "50-59",
+            "60-69",
+            "70-79",
+            "80-89",
+            "90+",
+        ]
+        new_cases = pd.DataFrame(index=pd.date_range(begin, end))
+        for age_group in age_groups:
+            new_cases[age_group] = Belgium.get_new(
+                "confirmed", data_begin=begin, data_end=end, age_group=age_group
+            )
+        new_cases = new_cases.fillna(0)
+
+        new_cases["age_group_0"] = (
+            new_cases["0-9"] + new_cases["10-19"] + new_cases["20-29"]
+        )
+        new_cases = new_cases.drop(columns=["0-9", "10-19", "20-29"])
+
+        new_cases["age_group_1"] = (
+            new_cases["30-39"] + new_cases["40-49"] + new_cases["50-59"]
+        )
+        new_cases = new_cases.drop(columns=["30-39", "40-49", "50-59"])
+
+        new_cases["age_group_2"] = new_cases["60-69"] + new_cases["70-79"]
+        new_cases = new_cases.drop(columns=["60-69", "70-79"])
+
+        new_cases["age_group_3"] = new_cases["80-89"] + new_cases["90+"]
+        new_cases = new_cases.drop(columns=["80-89", "90+"])
+        new_cases.index = new_cases.index.rename("date")
+        new_cases.to_csv(path + f"/Belgium/new_cases.csv", date_format="%d.%m.%y")
+
+    france()
+    germany()
+    belgium()
     log.info("Successfully created new_cases files!")
 
 
@@ -189,6 +239,13 @@ def deaths():
     owd = data_retrieval.OWD(True)
     for country in countries:
         deaths = owd.get_new("deaths", country=country, data_begin=begin, data_end=end)
+        if country == "Belgium":
+            deaths = data_retrieval.Belgium(True).get_new(
+                "deaths", data_begin=begin, data_end=end
+            )
+            deaths.index.name = "date"
+            deaths.name = "new_deaths"
+
         deaths.to_csv(path + f"/{country}/deaths.csv", date_format="%d.%m.%y")
 
 
@@ -243,6 +300,20 @@ def config():
     log.info("Successfully created config files!")
 
 
+def check_dates():
+
+    # Get the length of the date column. Should be the same for all files!
+    files = ["deaths.csv", "interventions.csv", "new_cases.csv", "tests.csv"]
+    len_index = (end - begin).days + 1
+
+    for country in countries:
+        for f in files:
+            if len(pd.read_csv(path + f"/{country}/{f}")["date"]) != len_index:
+                log.error(
+                    f"Date index of File {path}/{country}/{f} does not match other files!"
+                )
+
+
 if __name__ == "__main__":
 
     # Check if folders for countries exist if not, create them!
@@ -258,3 +329,5 @@ if __name__ == "__main__":
     deaths()
     population()
     config()
+
+    check_dates()

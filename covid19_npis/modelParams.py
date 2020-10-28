@@ -129,28 +129,10 @@ class ModelParams:
             self._interventions = _int
         else:
             log.error("Supply /interventions.csv!")
-
-        """ # Update Data summary
+        self._check = check  # For data summary
+        """ # Update data tensor
         """
-        data = {  # Is set on init
-            "begin": _df.index.min(),
-            "end": _df.index.max(),
-            "age_groups": [],
-            "countries": [],
-            "interventions": [],
-            "files": check,
-        }
-        # Create countries lookup list dynamic from data dataframe
-        for i in range(len(_df.columns.levels[0])):
-            data["countries"].append(_df.columns.levels[0][i])
-        # Create age group list dynamic from data dataframe
-        for i in range(len(_df.columns.levels[1])):
-            data["age_groups"].append(_df.columns.levels[1][i])
-        # Create interventions list dynamic from interventions dataframe
-        for i in range(len(_int.columns.levels[1])):
-            data["interventions"].append(_int.columns.levels[1][i])
-
-        self._data_summary = data
+        self._update_data_summary()
 
         """ # Update positive test data tensor/df 
         set data tensor, replaces values smaller than 40 by nans.
@@ -172,8 +154,34 @@ class ModelParams:
             data_tensor[:i] = np.nan
         self._pos_tests_data_tensor = data_tensor
 
-        """ # Update total tests data tensor/df
+    def _update_data_summary(self):
+        """ # Update Data summary
         """
+        data = {  # Is set on init
+            "begin": self.data_begin,
+            "end": self.data_end,
+            "age_groups": [],
+            "countries": [],
+            "interventions": [],
+            "files": self._check,
+        }
+        # Create countries lookup list dynamic from data dataframe
+        for country_name in self.pos_tests_dataframe.columns.get_level_values(
+            level="country"
+        ).unique():
+            data["countries"].append(country_name)
+        # Create age group list dynamic from data dataframe
+        for age_group_name in self.pos_tests_dataframe.columns.get_level_values(
+            level="age_group"
+        ).unique():
+            data["age_groups"].append(age_group_name)
+        # Create interventions list dynamic from interventions dataframe
+        for i in self._interventions.columns.get_level_values(
+            level="intervention"
+        ).unique():
+            data["interventions"].append(i)
+
+        self._data_summary = data
 
     @property
     def spline_basis(self):
@@ -262,7 +270,7 @@ class ModelParams:
         and age groups.
         |shape| time, country, agegroup 
         """
-        return tf.constant(self._pos_tests_data_tensor, dtype="float32")
+        return self._pos_tests_data_tensor.astype(self.dtype)
 
     # ------------------------------------------------------------------------------ #
     # Total tests
@@ -280,7 +288,7 @@ class ModelParams:
         """
         |shape| time, country
         """
-        return tf.constant(self._dataframe_total_tests.to_numpy(), dtype="float32")
+        return self._dataframe_total_tests.to_numpy().astype(self.dtype)
 
     # ------------------------------------------------------------------------------ #
     # Number of deaths
@@ -299,7 +307,7 @@ class ModelParams:
         
         |shape| time, country
         """
-        return tf.constant(self._dataframe_deaths.to_numpy(), dtype="float32")
+        return self._dataframe_deaths.to_numpy().astype(self.dtype)
 
     # ------------------------------------------------------------------------------ #
     # Population

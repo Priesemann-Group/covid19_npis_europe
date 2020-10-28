@@ -51,12 +51,12 @@ from covid19_npis.model import main_model
 # Logs setup
 log = logging.getLogger()
 # Needed to set logging level before importing other modules
-log.setLevel(logging.DEBUG)
+# log.setLevel(logging.DEBUG)
 covid19_npis.utils.setup_colored_logs()
 logging.getLogger("parso.python.diff").disabled = True
 
 # For eventual debugging:
-tf.config.run_functions_eagerly(True)
+# tf.config.run_functions_eagerly(True)
 # tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
 
 # Force CPU
@@ -175,12 +175,12 @@ for name in dist_names:
 
 """ ## Plot time series
 """
-ts_names = ["positive_tests", "R_t", "h_0_t"]
+ts_names = ["positive_tests", "R_t", "h_0_t", "total_tests"]
 ts_fig = {}
 ts_axes = {}
 for name in ts_names:
     ts_fig[name], ts_axes[name] = covid19_npis.plot.timeseries(
-        trace, sample_state=sample_state, key=name, plot_chain_separated=True,
+        trace, sample_state=sample_state, key=name, plot_chain_separated=False,
     )
     # plot data into new_cases
     if name == "new_I_t" or name == "positive_tests":
@@ -188,11 +188,25 @@ for name in ts_names:
             for j, a in enumerate(modelParams.data_summary["age_groups"]):
                 ts_axes[name][j][i] = covid19_npis.plot.time_series._timeseries(
                     modelParams.pos_tests_dataframe.index[:],
-                    modelParams.pos_tests_dataframe[(c, a)].to_numpy()[:],
+                    modelParams.pos_tests_dataframe[c][a],
                     ax=ts_axes[name][j][i],
                     alpha=0.5,
+                    ls="-",
+                )
+    # plot data into new_cases
+    if name == "total_tests":
+        for i, c in enumerate(modelParams.data_summary["countries"]):
+            for j, a in enumerate(modelParams.data_summary["age_groups"]):
+                ts_axes[name][j][i] = covid19_npis.plot.time_series._timeseries(
+                    modelParams.total_tests_dataframe.index[:],
+                    modelParams.total_tests_dataframe.xs(c, level="country", axis=1)
+                    / modelParams.num_age_groups,
+                    ax=ts_axes[name][j][i],
+                    alpha=0.5,
+                    ls="-",
                 )
 
+    """
     # plot R_t data into R_t plot --> testing
     if name == "R_t":
         # Load data
@@ -204,6 +218,7 @@ for name in ts_names:
                 ts_axes["R_t"][j][i] = covid19_npis.plot.time_series._timeseries(
                     data.index, data[age_group], ax=ts_axes["R_t"][j][i], alpha=0.5,
                 )
+    """
     # Save figures
     for i, fig in enumerate(ts_fig[name]):
         if len(ts_fig[name]) > 1:

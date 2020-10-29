@@ -17,10 +17,129 @@ from .distributions import (
     Deterministic,
 )
 from .. import transformations
-from .utils import gamma
+from . import utils
 
 
-def calc_positive_tests(new_cases_delayed, phi_plus, phi_age, modelParams):
+def generate_testing(name_total, name_positive, modelParams, new_E_t):
+    r"""
+        High level function for generating/simulating testing behaviour.
+        
+        Constructs B splines
+        Delay cases
+
+        ToDo:
+        -----
+        - more documenation here
+
+        Parameters:
+        -----------
+        name_total: str,
+            Name for the total tests performed
+
+        name_positive: str,
+            Name for the positive tests performed
+
+        modelParams: :py:class:`covid19_npis.ModelParams`
+            Instance of modelParams, mainly used for number of age groups and
+            number of countries.
+
+        new_E_t: tf.Tensor
+            New cases :math:`\E_{\text{age}, a}.`
+            |shape| batch, time, country, age_group
+
+        Returns
+        -------
+        :
+            (:math:`n_{\Sigma, c,a}(t)`, :math:`n_{{+}, {c,a}}(t)`
+            Total and positive tests by age group and country
+            |shape| (batch, time, country, age_group) x 2
+    """
+
+    # Get basic functions for b-splines (used later)
+    B = construct_Bsplines_basis(modelParams)
+
+    """ Construct correlated fraction of positive tests (phi),
+    traced persons per case (eta), base rate of testing (xi)
+    and testing delay (m star)
+    """
+    (phi, eta, xi, m_ast) = yield construct_testing_state(
+        name_phi="phi_plus",
+        name_eta="eta",
+        name_xi="xi",
+        name_m_ast="m_ast",
+        modelParams=modelParams,
+        num_knots=B.shape[-1],
+    )
+
+    # Transfrom m_ast with reporting delay
+    m, theta = yield _construct_reporting_delay(
+        name="testing_delay", modelParams=modelParams, m_ast=m_ast
+    )
+
+    # Calculate time dependent variables via bsplines
+    phi_t = _calculate_Bsplines(phi, B)
+    eta_t = _calculate_Bsplines(eta, B)
+    xi_t = _calculate_Bsplines(xi, B)
+    m_t = _calculate_Bsplines(m, B)
+
+    log.debug(f"phi_t {phi_t}")
+    log.debug(f"eta_t {eta_t}")
+    log.debug(f"xi_t {xi_t}")
+    log.debug(f"m_t {m_t}")
+
+    # Construct gamma kernel from delay parameter m and add to trace
+    delay_kernel = yield _calc_reporting_delay_kernel(
+        name="reporting_delay_kernel", m=m_t, theta=theta
+    )
+
+    filter_axes_data = utils.get_filter_axis_data_from_dims(len(new_E_t.shape))
+    # Convolution with gamma kernel
+    new_E_t_delayed = utils.convolution_with_varying_kernel(
+        data=new_E_t,
+        kernel=delay_kernel,
+        data_time_axis=-3,
+        filter_axes_data=filter_axes_data,
+    )
+    new_E_t_delayed = yield Deterministic(
+        f"new_E_t_delayed",
+        new_E_t_delayed,
+        shape_label=("time", "country", "age_group"),
+    )
+    log.debug(f"new_E_t_delayed\n{new_E_t_delayed}")
+
+    """ # Postive tests
+    """
+    phi_age = yield _construct_phi_age(name="phi_age", modelParams=modelParams)
+    phi_age = tf.debugging.check_numerics(phi_age, f"phi_age:\n{phi_age}")
+
+    positive_tests = _calc_positive_tests(
+        new_E_t_delayed=new_E_t_delayed, phi_plus=phi_t, phi_age=phi_age,
+    )
+    positive_tests = yield Deterministic(
+        name_positive, positive_tests, shape_label=("time", "country", "age_group")
+    )
+    log.debug(f"positive_tests\n{positive_tests}")
+
+    """ # Total tests
+    """
+    phi_tests_reported = yield _construct_phi_tests_reported(
+        name="phi_tests_reported", modelParams=modelParams
+    )
+    total_tests = _calc_total_number_of_tests_performed(
+        new_E_t_delayed=new_E_t_delayed,
+        phi_tests_reported=phi_tests_reported,
+        phi_plus=phi_t,
+        eta=eta_t,
+        xi=xi_t,
+    )
+    total_tests = yield Deterministic(
+        name_total, total_tests, shape_label=("time", "country", "age_group")
+    )
+    log.debug(f"total_tests\n{total_tests}")
+    return (total_tests, positive_tests)
+
+
+def _calc_positive_tests(new_E_t_delayed, phi_plus, phi_age):
     r"""
         .. math::
 
@@ -34,7 +153,7 @@ def calc_positive_tests(new_cases_delayed, phi_plus, phi_age, modelParams):
             Name of the variable for the new positive cases :math:`n_{{+}, {c,a}}(t)`
             in the trace.
 
-        new_cases_delayed: tf.Tensor
+        new_E_t_delayed: tf.Tensor
             New cases with reporting delay :math:`\Tilde{E}_{\text{delayTest}, c,a}(t).`
             |shape| batch, time, country, age_group
 
@@ -46,10 +165,6 @@ def calc_positive_tests(new_cases_delayed, phi_plus, phi_age, modelParams):
             Fraction of positive tests :math:`\phi_{\text{age}, a}.`
             |shape| batch, age_group
 
-        modelParams: :py:class:`covid19_npis.ModelParams`
-            Instance of modelParams, mainly used for number of age groups and
-            number of countries.
-
         Returns
         -------
         :
@@ -57,14 +172,12 @@ def calc_positive_tests(new_cases_delayed, phi_plus, phi_age, modelParams):
             |shape| batch, time, country, age_group
     """
 
-    n_plus = tf.einsum(
-        "...tca,...tc,...a->...tca", new_cases_delayed, phi_plus, phi_age
-    )
+    n_plus = tf.einsum("...tca,...tc,...a->...tca", new_E_t_delayed, phi_plus, phi_age)
     return n_plus
 
 
-def calc_total_number_of_tests_performed(
-    new_cases_delayed, phi_tests_reported, phi_plus, eta, xi, modelParams
+def _calc_total_number_of_tests_performed(
+    new_E_t_delayed, phi_tests_reported, phi_plus, eta, xi
 ):
     r"""
         .. math::
@@ -80,7 +193,7 @@ def calc_total_number_of_tests_performed(
             Name of the variable for the total number of tests performed :math:`n_{\Sigma, c,a}(t)`
             in the trace.
 
-        new_cases_delayed: tf.Tensor
+        new_E_t_delayed: tf.Tensor
             New cases with reporting delay :math:`\Tilde{E}_{\text{delayTest}, c,a}(t).`
             |shape| batch, time, country, age_group
 
@@ -102,10 +215,6 @@ def calc_total_number_of_tests_performed(
             :math:`\xi_c(t).`
             |shape| batch, time, country
 
-        modelParams: :py:class:`covid19_npis.ModelParams`
-            Instance of modelParams, mainly used for number of age groups and
-            number of countries.
-
         Returns
         -------
         :
@@ -114,8 +223,8 @@ def calc_total_number_of_tests_performed(
     """
 
     inner = (
-        tf.einsum("...tca,...tc->...tca", new_cases_delayed, phi_plus)
-        + tf.einsum("...tca,...tc,...tc->...tca", new_cases_delayed, phi_plus, eta)
+        tf.einsum("...tca,...tc->...tca", new_E_t_delayed, phi_plus)
+        + tf.einsum("...tca,...tc,...tc->...tca", new_E_t_delayed, phi_plus, eta)
         + xi[..., tf.newaxis]
     )
     n_Sigma = tf.einsum("...c,...tca->...tca", phi_tests_reported, inner)
@@ -169,10 +278,10 @@ def _construct_phi_tests_reported(
     """
 
     sigma = yield HalfCauchy(
-        name=f"sigma_{name}", scale=sigma_scale, conditionally_independent=True,
+        name=f"{name}_sigma", scale=sigma_scale, conditionally_independent=True,
     )
     mu = yield Normal(
-        name=f"mu_{name}", loc=mu_loc, scale=mu_scale, conditionally_independent=True,
+        name=f"{name}_mu", loc=mu_loc, scale=mu_scale, conditionally_independent=True,
     )
     phi_dagger = yield Normal(
         name=f"{name}_dagger",
@@ -220,14 +329,14 @@ def _construct_phi_age(name, modelParams, sigma_scale=0.2):
     """
 
     sigma = yield HalfNormal(
-        name=f"sigma_{name}",
+        name=f"{name}_sigma",
         scale=sigma_scale,
         event_stack=modelParams.num_age_groups,
         conditionally_independent=True,
         shape_label="age_group",
         transform=transformations.SoftPlus(scale=sigma_scale),
     )
-    log.debug(f"phi_age sigma {sigma}")
+    log.debug(f"sigma_phi_age {sigma}")
 
     phi_cross = yield Normal(
         name=f"{name}_cross",
@@ -237,14 +346,14 @@ def _construct_phi_age(name, modelParams, sigma_scale=0.2):
         event_stack=modelParams.num_age_groups,
         conditionally_independent=True,
     )
-    log.debug(f"phi_age sigma {phi_cross}")
-
     phi_cross = tf.einsum("...a,...a->...a", phi_cross, sigma)
-    log.debug(f"phi_age sigma {phi_cross}")
+    log.debug(f"phi_age_cross{phi_cross}")
 
+    # Transform
     phi = yield Deterministic(
         name=name, value=tf.math.softplus(phi_cross), shape_label="age_group"
     )
+    log.debug(f"phi_age{phi}")
 
     return phi
 
@@ -255,8 +364,8 @@ def _construct_reporting_delay(
     m_ast,
     mu_loc=1.5,
     mu_scale=0.4,
-    sigma_theta_scale=0.2,
-    sigma_m_scale=3.0,
+    theta_sigma_scale=0.2,
+    m_sigma_scale=3.0,
 ):
     r"""
         .. math::
@@ -292,11 +401,11 @@ def _construct_reporting_delay(
             Scale parameter for the Normal distribution :math:`\mu_{\theta_{D_\text{test}}}.`
             |default| 0.4
 
-        sigma_theta_scale: optional
+        theta_sigma_scale: optional
             Scale parameter for the HalfNorml distribution :math:`\sigma_{\theta_{D_\text{test}}}.`
             |default| 0.2
 
-        sigma_m_scale: optional
+        m_sigma_scale: optional
             Scale parameter for the HalfNorml distribution :math:`\sigma_{m_{D\, \text{test}}}.`
             |default| 3.0
 
@@ -308,9 +417,9 @@ def _construct_reporting_delay(
     """
 
     # Theta
-    sigma_theta = yield HalfNormal(
-        name=f"sigma_theta_{name}",
-        scale=sigma_theta_scale,
+    theta_sigma = yield HalfNormal(
+        name=f"{name}_theta_sigma",
+        scale=theta_sigma_scale,
         conditionally_independent=True,
     )
     mu = yield Normal(
@@ -318,13 +427,13 @@ def _construct_reporting_delay(
     )
     mu = mu + mu_loc
     log.debug(f"mu delta m:\n{mu}")
-    log.debug(f"sigma_theta\n{sigma_theta}")
+    log.debug(f"theta_sigma\n{theta_sigma}")
     theta = (
         tf.einsum(
             "...c,...->...c",
             (
                 yield Normal(
-                    name=f"theta_{name}",
+                    name=f"{name}_theta",
                     loc=0.0,
                     scale=1.0,
                     event_stack=modelParams.num_countries,
@@ -332,14 +441,14 @@ def _construct_reporting_delay(
                     conditionally_independent=True,
                 )
             ),
-            sigma_theta,
+            theta_sigma,
         )
         + mu[..., tf.newaxis]
     )
 
     # m
-    sigma_m = yield HalfNormal(
-        name=f"sigma_m_{name}", scale=sigma_m_scale, conditionally_independent=True
+    m_sigma = yield HalfNormal(
+        name=f"{name}_m_sigma", scale=m_sigma_scale, conditionally_independent=True
     )
     delta_m = tf.einsum(
         "...c,...->...c",
@@ -353,7 +462,7 @@ def _construct_reporting_delay(
                 conditionally_independent=True,
             )
         ),
-        sigma_m,
+        m_sigma,
     )
 
     m = tf.math.softplus(m_ast + delta_m[..., tf.newaxis])
@@ -366,7 +475,7 @@ def _construct_reporting_delay(
     return (m, theta)
 
 
-def calc_reporting_kernel(m, theta, length_kernel=14):
+def _calc_reporting_delay_kernel(name, m, theta, length_kernel=14):
     r"""
     Calculates the pdf for the gamma reporting kernel.
 
@@ -378,11 +487,13 @@ def calc_reporting_kernel(m, theta, length_kernel=14):
 
     Parameters
     ----------
-    m :
+    name:
+        Name of the reporting delay kernel :math:`f_{c,t}(\tau)`
+    m:
         |shape| batch, time, country
-    theta : 
+    theta: 
         |shape| batch, country
-    length_kernel : optional
+    length_kernel: optional
         Length of the kernel in days
         |default| 14 days
 
@@ -406,21 +517,30 @@ def calc_reporting_kernel(m, theta, length_kernel=14):
     log.debug(f"theta\n{theta}")
 
     # Calculate pdf
-    kernel = gamma(t, m / theta + 1.0, 1.0 / theta,)
+    kernel = utils.gamma(t, m / theta + 1.0, 1.0 / theta,)
     kernel = tf.einsum("...ctk->...ckt", kernel)
+
+    kernel = yield Deterministic(
+        name, kernel, shape_label=("country", "kernel", "time")
+    )
+    log.debug(f"reportin delay kernel\n{kernel}")  # batch, country, kernel, time
+
     return kernel
 
 
 def construct_testing_state(
-    name,
+    name_phi,
+    name_eta,
+    name_xi,
+    name_m_ast,
     modelParams,
     num_knots,
     mu_cross_loc=0.0,
     mu_cross_scale=10.0,
-    mu_m_loc=12.0,
-    mu_m_scale=2.0,
+    m_mu_loc=12.0,
+    m_mu_scale=2.0,
     sigma_cross_scale=10.0,
-    sigma_m_scale=1.0,
+    m_sigma_scale=1.0,
 ):
     r"""
         .. math::
@@ -464,9 +584,17 @@ def construct_testing_state(
 
         Parameters
         ----------
-        name: str
-            Name of the studentT distribution variable :math:`(\phi^\dagger_{\text{tested},c,b},
-            \: \eta^\dagger_{\text{traced},c,b},\: \xi^\dagger_{c,b},\: m^\ast_{D_\text{test},c,b}).`
+        name_phi: str
+            Name of the fraction of positive tests variable :math:`\phi_{+,c,b}.`
+
+        name_eta: str
+            Name of the number of traced persons variable :math:`\eta_{\text{traced},c,b}.`
+
+        name_xi: str
+            Name of the base tests rate variable :math:`\xi_{c,b}.`
+
+        name_m_ast: str
+            Name of the testing delay variable :math:`m^*_{D_{test},c,b}.`
 
         modelParams: :py:class:`covid19_npis.ModelParams`
             Instance of modelParams, mainly used for number of age groups and
@@ -483,11 +611,11 @@ def construct_testing_state(
             Scale parameter for the three Normal distributions :math:`\mu_{\phi^\dagger_+},\: \mu_{\eta^\dagger_\text{traced}},\: \mu_{\xi^\dagger}.`
             |default| 10.0
 
-        mu_m_loc: optional
+        m_mu_loc: optional
             Location parameter for the Normal distribution :math:`\mu_{m_{D_\text{test}}}.`
             |default| 12.0
 
-        mu_m_scale: optional
+        m_mu_scale: optional
             Scale parameter for the Normal distribution :math:`\mu_{m_{D_\text{test}}}.`
             |default| 2.0
 
@@ -495,7 +623,7 @@ def construct_testing_state(
             Scale parameter for the three HalfCauchy distributions :math:`\sigma_\phi, \sigma_\eta, \sigma_\xi.`
             |default| 10.0
 
-        sigma_m_scale: optional
+        m_sigma_scale: optional
             Scale parameter for the HalfNormal distribution :math:`\sigma_m.`
             |default| 1.0
 
@@ -507,37 +635,75 @@ def construct_testing_state(
             |shape| 4 x (batch, country, spline),
     """
 
-    # sigma
-    sigma_m = yield HalfNormal(
-        name=f"sigma_m",
-        scale=sigma_m_scale,
+    """ First construct all hierachical variables: m,phi,xi,eta
+    """
+    # m
+    m_sigma = yield HalfNormal(
+        name=f"{name_m_ast}_sigma",
+        scale=m_sigma_scale,
         conditionally_independent=True,
-        transform=transformations.SoftPlus(scale=sigma_m_scale),
+        transform=transformations.SoftPlus(scale=m_sigma_scale),
     )
-    sigma_phi = yield HalfCauchy(
-        name=f"sigma_phi",
+    m_mu = yield Normal(
+        name=f"{name_m_ast}_mu",
+        loc=m_mu_loc,
+        scale=m_mu_scale,
+        conditionally_independent=True,
+    )
+    log.debug(f"m_sigma{m_sigma}")
+    log.debug(f"m_mu{m_mu}")
+
+    # Fraction of positive tests phi
+    phi_sigma = yield HalfCauchy(
+        name=f"{name_phi}_sigma",
         scale=sigma_cross_scale,
         conditionally_independent=True,
         transform=transformations.SoftPlus(scale=sigma_cross_scale),
     )
-    sigma_eta = yield HalfCauchy(
-        name=f"sigma_eta",
+    phi_mu_cross = yield Normal(
+        name=f"{name_phi}_mu_cross",
+        loc=mu_cross_loc,
+        scale=mu_cross_scale,
+        conditionally_independent=True,
+    )
+    log.debug(f"phi_sigma{phi_sigma}")
+    log.debug(f"phi_mu_cross{phi_mu_cross}")
+
+    # Eta
+    eta_sigma = yield HalfCauchy(
+        name=f"{name_eta}_sigma",
         scale=sigma_cross_scale,
         conditionally_independent=True,
         transform=transformations.SoftPlus(scale=sigma_cross_scale),
     )
-    sigma_xi = yield HalfCauchy(
-        name=f"sigma_xi",
+    eta_mu_cross = yield Normal(
+        name=f"{name_eta}_mu_cross",
+        loc=mu_cross_loc,
+        scale=mu_cross_scale,
+        conditionally_independent=True,
+    )
+    log.debug(f"eta_sigma{eta_sigma}")
+    log.debug(f"eta_mu_cross{eta_mu_cross}")
+
+    # Xi
+    xi_sigma = yield HalfCauchy(
+        name=f"{name_xi}_sigma",
         scale=10.0,
         conditionally_independent=True,
         transform=transformations.SoftPlus(scale=10.0),
     )
+    xi_mu_cross = yield Normal(
+        name=f"{name_xi}_mu_cross",
+        loc=mu_cross_loc,
+        scale=mu_cross_scale,
+        conditionally_independent=True,
+    )
 
-    log.debug(f"sigma_xi{sigma_xi}")
-    log.debug(f"sigma_eta{sigma_eta}")
-    log.debug(f"sigma_phi{sigma_phi}")
-    log.debug(f"sigma_m{sigma_m}")
+    log.debug(f"xi_sigma{xi_sigma}")
+    log.debug(f"xi_mu_cross{xi_mu_cross}")
 
+    """ Correlate with cholsky and multivariant normal distribution
+    """
     Sigma = yield LKJCholesky(
         name="Sigma_cholesky",
         dimension=4,
@@ -546,64 +712,36 @@ def construct_testing_state(
         transform=transformations.CorrelationCholesky(),
         conditionally_independent=True,
     )
-
     Sigma = tf.einsum(
         "...ij,...i->...ij",  # todo look at i,j
         Sigma,
-        tf.stack([sigma_phi, sigma_eta, sigma_xi, sigma_m], axis=-1),
+        tf.stack([phi_sigma, eta_sigma, xi_sigma, m_sigma], axis=-1),
     )
     Sigma = yield Deterministic(
-        f"Sigma_{name}", Sigma, shape_label=("testing_state_vars", "testing_state_vars")
+        f"Sigma", Sigma, shape_label=("testing_state_vars", "testing_state_vars"),
     )
     log.debug(f"Sigma state:\n{Sigma}")
 
-    # mu
-    mu_phi_cross = yield Normal(
-        name="mu_phi_cross",
-        loc=mu_cross_loc,
-        scale=mu_cross_scale,
-        conditionally_independent=True,
-    )
-    mu_eta_cross = yield Normal(
-        name="mu_eta_cross",
-        loc=mu_cross_loc,
-        scale=mu_cross_scale,
-        conditionally_independent=True,
-    )
-    mu_xi_cross = yield Normal(
-        name="mu_xi_cross",
-        loc=mu_cross_loc,
-        scale=mu_cross_scale,
-        conditionally_independent=True,
-    )
-    mu_m = yield Normal(
-        name="mu_m_cross",
-        loc=mu_m_loc,
-        scale=mu_m_scale,
-        conditionally_independent=True,
-    )
-
-    mu = tf.stack([mu_phi_cross, mu_eta_cross, mu_xi_cross, mu_m], axis=-1)
-    mu = yield Deterministic(f"mu_{name}", mu)
-
-    log.debug(f"mu state:\n{mu}")
-
+    # Stack all means for multivariant distribution
+    mu = tf.stack([phi_mu_cross, eta_mu_cross, xi_mu_cross, m_mu], axis=-1)
     state = yield MvNormalCholesky(
-        name=name,
+        name="testing_MvNormalCholesky",
         loc=mu,
         scale_tril=Sigma,
         validate_args=True,
         event_stack=(modelParams.num_countries, num_knots),
         shape_label=("country", "spline"),
     )
-
     log.debug(f"state:\n{state}")
+
+    """ Transform and add to trace
+    """
 
     # Get variables from state to transform them
     phi_cross = tf.gather(state, 0, axis=-1)
     eta_cross = tf.gather(state, 1, axis=-1)
     xi_cross = tf.gather(state, 2, axis=-1)
-    m_star = tf.gather(state, 3, axis=-1)
+    m_ast = tf.gather(state, 3, axis=-1)
 
     # Transform variables
     phi = tf.math.sigmoid(phi_cross)
@@ -614,7 +752,13 @@ def construct_testing_state(
         tf.reduce_sum(modelParams.N_data_tensor, axis=-1) / 10000,
     )
 
-    return (phi, eta, xi, m_star)
+    # Add all vars to the trace
+    phi_det = yield Deterministic(name=name_phi, value=Sigma,)
+    eta_det = yield Deterministic(name=name_eta, value=Sigma,)
+    xi_det = yield Deterministic(name=name_xi, value=Sigma,)
+    m_ast_det = yield Deterministic(name=name_m_ast, value=Sigma,)
+
+    return (phi, eta, xi, m_ast)
 
 
 def construct_Bsplines_basis(modelParams):
@@ -648,7 +792,7 @@ def construct_Bsplines_basis(modelParams):
     return tf.constant(B, dtype="float32")
 
 
-def calculate_Bsplines(coef, basis):
+def _calculate_Bsplines(coef, basis):
     r"""
         Calculates the Bsplines given the basis functions B and the coefficients x.
 

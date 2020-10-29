@@ -11,6 +11,10 @@ import covid19_npis
 from covid19_npis import transformations
 
 #  from covid19_npis.benchmarking import benchmark
+
+
+from covid19_npis.model import *
+
 from covid19_npis.model.distributions import (
     LKJCholesky,
     Deterministic,
@@ -30,7 +34,7 @@ def main_model(modelParams):
     """ # Create initial Reproduction Number R_0:
     The returned R_0 tensor has the |shape| batch, country, age_group.
     """
-    R_0 = yield covid19_npis.model.reproduction_number.construct_R_0(
+    R_0 = yield reproduction_number.construct_R_0(
         name="R_0",
         loc=2.0,
         scale=0.5,
@@ -44,7 +48,7 @@ def main_model(modelParams):
     Finally combine to R(t).
     The returned R(t) tensor has the |shape| time, batch, country, age_group.
     """
-    R_t = yield covid19_npis.model.reproduction_number.construct_R_t(R_0, modelParams)
+    R_t = yield reproduction_number.construct_R_t(R_0, modelParams)
     log.debug(f"R_t:\n{R_t}")
 
     """ # Create Contact matrix C:
@@ -79,7 +83,7 @@ def main_model(modelParams):
     (
         gen_kernel,  # shape: countries x len_gen_interv,
         mean_gen_interv,  #  shape g_mu: countries x 1
-    ) = yield covid19_npis.model.construct_generation_interval(l=len_gen_interv_kernel)
+    ) = yield construct_generation_interval(l=len_gen_interv_kernel)
     log.debug(f"gen_interv:\n{gen_kernel}")
 
     """ # Generate exponential distribution initial infections h_0(t):
@@ -88,7 +92,7 @@ def main_model(modelParams):
     to set to 0!
     The returned h_0(t) tensor has the |shape| time, batch, country, age_group.
     """
-    h_0_t = yield covid19_npis.model.construct_h_0_t(
+    h_0_t = yield construct_h_0_t(
         modelParams=modelParams,
         len_gen_interv_kernel=len_gen_interv_kernel,
         R_t=R_t,
@@ -114,150 +118,44 @@ def main_model(modelParams):
     This is done via Infection dynamics in InfectionModel, see describtion
     The returned tensor has the |shape| batch, time,country, age_group.
     """
-    new_I_t = covid19_npis.model.InfectionModel(
+    new_E_t = InfectionModel(
         N=N, h_0_t=h_0_t, R_t=R_t, C=C, gen_kernel=gen_kernel  # default valueOp:AddV2
     )
-    log.debug(f"new_I_t:\n{new_I_t[0,:]}")  # dimensons=t,c,a
+    log.debug(f"new_E_t:\n{new_E_t[0,:]}")  # dimensons=t,c,a
 
     # Clip in order to avoid infinities
-    new_I_t = tf.clip_by_value(new_I_t, 1e-7, 1e9)
+    new_E_t = tf.clip_by_value(new_E_t, 1e-7, 1e9)
 
-    # Add new_I_t to trace
-    new_I_t = yield Deterministic(
-        name="new_I_t", value=new_I_t, shape_label=("time", "country", "age_group"),
+    # Add new_E_t to trace
+    new_E_t = yield Deterministic(
+        name="new_E_t", value=new_E_t, shape_label=("time", "country", "age_group"),
     )
-    log.debug(f"new_I_t\n{new_I_t.shape}")
+    log.debug(f"new_E_t\n{new_E_t.shape}")
 
-    """ # Number of tests
-    Our real world data consists of reported cases i.e positiv test, number of tests total
-    and deaths. 
-
-    TODO:
-         - cleanup and maybe move some of this into a high level function
+    """ # Number of tests and deaths
+        We simulate our reported cases i.e positiv test and totalnumber of tests total
+        and deaths. 
     """
-    # Get basic functions for b-splines (used later)
-
-    B = covid19_npis.model.number_of_tests.construct_Bsplines_basis(modelParams)
-
-    (
-        phi,
-        eta,
-        xi,
-        m_star,
-    ) = yield covid19_npis.model.number_of_tests.construct_testing_state(
-        "testing_state", modelParams, num_knots=B.shape[-1]
-    )
-    phi = yield Deterministic(name="phi_deter", value=phi)
-    log.debug(f"new_I_t\n{new_I_t.shape}")
-    # Transform m_star and construct reporting delay
-
-    m, theta = yield covid19_npis.model.number_of_tests._construct_reporting_delay(
-        name="delay", modelParams=modelParams, m_ast=m_star
-    )
-    m_t = covid19_npis.model.number_of_tests.calculate_Bsplines(m, B)
-    log.debug(f"m_t {m_t}")
-
-    # Construct Bsplines we can maybe do it right after the studenT in the constructing
-    # State... on the full tensor
-    phi_t = covid19_npis.model.number_of_tests.calculate_Bsplines(phi, B)
-    eta_t = covid19_npis.model.number_of_tests.calculate_Bsplines(eta, B)
-    xi_t = covid19_npis.model.number_of_tests.calculate_Bsplines(xi, B)
-    m_t = covid19_npis.model.number_of_tests.calculate_Bsplines(m, B)
-
-    log.debug(f"phi_t {phi_t}")
-    log.debug(f"eta_t {eta_t}")
-    log.debug(f"xi_t {xi_t}")
-    log.debug(f"m_t {m_t}")
-    # We construct the gamma kernel for the reporting delay
-    delay_kernel = covid19_npis.model.number_of_tests.calc_reporting_kernel(m_t, theta)
-    delay_kernel = yield Deterministic(
-        "delay_kernel", delay_kernel, shape_label=("country", "kernel", "time")
-    )
-    log.debug(f"kernel\n{delay_kernel}")  # batch, country, kernel, time
-
-    delay_kernel = tf.debugging.check_numerics(
-        delay_kernel, f"delay_kernel\n{delay_kernel}"
-    )
-
-    log.debug(f"new_I_t\n{new_I_t}")  # batch, time, country, age_group
-    filter_axes_data = covid19_npis.model.utils.get_filter_axis_data_from_dims(
-        len(new_I_t.shape)
-    )
-
-    new_cases_delayed = convolution_with_varying_kernel(
-        data=new_I_t,
-        kernel=delay_kernel,
-        data_time_axis=-3,
-        filter_axes_data=filter_axes_data,
-    )
-    new_cases_delayed = tf.debugging.check_numerics(
-        new_cases_delayed, f"new_cases_delayed:\n{new_cases_delayed}"
-    )
-    new_cases_delayed = yield Deterministic(
-        "new_cases_delayed",
-        new_cases_delayed,
-        shape_label=("time", "country", "age_group"),
-    )
-    log.debug(f"new_cases_delayed\n{new_cases_delayed}")
-
-    # Calc positive tests
-    phi_age = yield covid19_npis.model.number_of_tests._construct_phi_age(
-        "phi_age", modelParams
-    )
-
-    phi_age = tf.debugging.check_numerics(phi_age, f"phi_age:\n{phi_age}")
-
-    positive_tests = covid19_npis.model.number_of_tests.calc_positive_tests(
-        new_cases_delayed=new_I_t,
-        phi_plus=phi_t,
-        phi_age=phi_age,
+    # Tests
+    total_tests, positive_tests = yield number_of_tests.generate_testing(
+        name_total="total_tests",
+        name_positive="positive_tests",
         modelParams=modelParams,
-    )
-    positive_tests = tf.clip_by_value(positive_tests, 1e-9, 1e9)  # remove?
-
-    positive_tests = tf.debugging.check_numerics(
-        positive_tests, f"positive_tests:\n{positive_tests}"  # remove?
+        new_E_t=new_E_t,
     )
 
-    positive_tests = yield Deterministic(
-        "positive_tests", positive_tests, shape_label=("time", "country", "age_group")
-    )
-    log.debug(f"positive_tests\n{positive_tests}")
-
-    # Calc total number of tests
-    phi_tests_reported = yield covid19_npis.model.number_of_tests._construct_phi_tests_reported(
-        name="phi_tests_reported", modelParams=modelParams
-    )
-
-    total_tests = covid19_npis.model.number_of_tests.calc_total_number_of_tests_performed(
-        new_cases_delayed=new_I_t,
-        phi_tests_reported=phi_tests_reported,
-        phi_plus=phi_t,
-        eta=eta_t,
-        xi=xi_t,
-        modelParams=modelParams,
-    )
-
-    total_tests = yield Deterministic(
-        "total_tests", total_tests, shape_label=("time", "country", "age_group")
-    )
-
-    log.debug(f"total_tests\n{total_tests}")
-    """
-    """  # Deaths
+    # Deaths
 
     # Infection fatality ratio
-    death_Phi = yield covid19_npis.model.deaths._calc_Phi_IFR(
-        name="IFR", modelParams=modelParams
-    )
+    death_Phi = yield deaths._calc_Phi_IFR(name="IFR", modelParams=modelParams)
     # Death reporting delay
-    death_m, death_theta = yield covid19_npis.model.deaths._construct_reporting_delay(
+    death_m, death_theta = yield deaths._construct_reporting_delay(
         name="delay_deaths", modelParams=modelParams
     )
     # Calculate new deaths delayed
-    deaths_delayed = yield covid19_npis.model.deaths.calc_delayed_deaths(
+    deaths_delayed = yield deaths.calc_delayed_deaths(
         name="cases_delayed_deaths",
-        new_cases=new_I_t,
+        new_cases=new_E_t,
         Phi_IFR=death_Phi,
         m=death_m,
         theta=death_theta,
@@ -268,7 +166,7 @@ def main_model(modelParams):
             - add deaths and total tests
     """
 
-    likelihood = yield covid19_npis.model.studentT_likelihood(
+    likelihood = yield studentT_likelihood(
         modelParams, positive_tests, total_tests, deaths_delayed
     )
     return likelihood

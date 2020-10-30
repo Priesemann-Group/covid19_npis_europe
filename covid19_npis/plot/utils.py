@@ -59,18 +59,18 @@ def check_for_shape_label(dist):
 
 def get_math_from_name(name):
     """
-        Gets math string from distribution name.
-        Returns "name" if no mathkey is found!
+    Gets math string from distribution name.
+    Returns "name" if no mathkey is found!
 
-        Parameters
-        ----------
-        name :
-            Name of the distribution/timeseries.
+    Parameters
+    ----------
+    name :
+        Name of the distribution/timeseries.
 
-        Returns
-        -------
-        : str
-            Mathstring for plotting
+    Returns
+    -------
+    : str
+        Mathstring for plotting
     """
 
     # Latex $..$ get casted before plotting

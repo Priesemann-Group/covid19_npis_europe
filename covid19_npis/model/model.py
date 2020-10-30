@@ -49,9 +49,7 @@ def main_model(modelParams):
     The returned R(t) tensor has the |shape| time, batch, country, age_group.
     """
     R_t = yield reproduction_number.construct_R_t(
-        name='R_t',
-        modelParams=modelParams,
-        R_0=R_0
+        name="R_t", modelParams=modelParams, R_0=R_0
     )
     log.debug(f"R_t:\n{R_t}")
 

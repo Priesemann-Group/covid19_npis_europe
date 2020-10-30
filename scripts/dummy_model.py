@@ -154,7 +154,7 @@ _, sample_state = pm.evaluate_model(main_model(modelParams))
 # Plot by name.
 dist_names = [
     "R_0",
-    "I_0_diff_base",
+    "E_0_diff_base",
     "g_mu",
     "g_theta",
     "sigma_likelihood_pos_tests",
@@ -194,7 +194,7 @@ for name in ts_names:
         plot_chain_separated=False,
     )
     # plot data into new_cases
-    if name == "new_I_t" or name == "positive_tests":
+    if name == "new_E_t" or name == "positive_tests":
         for i, c in enumerate(modelParams.data_summary["countries"]):
             for j, a in enumerate(modelParams.data_summary["age_groups"]):
                 ts_axes[name][j][i] = covid19_npis.plot.time_series._timeseries(

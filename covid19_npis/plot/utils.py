@@ -64,9 +64,9 @@ def get_math_from_name(name):
 
         Parameters
         ----------
-        name : 
+        name :
             Name of the distribution/timeseries.
-        
+
         Returns
         -------
         : str
@@ -77,7 +77,7 @@ def get_math_from_name(name):
     math_keys = {
         "g_mu": r"g_{\mu}",
         "g_theta": r"g_{\theta}",
-        "I_0_diff_base": r"I_{0,diff base}",
+        "E_0_diff_base": r"E_{0,diff base}",
         "R_0": r"R_{0}",
         "sigma": r"\sigma",
         "new_cases": r"N",

@@ -201,7 +201,7 @@ for name in ts_names:
         for i, c in enumerate(modelParams.data_summary["countries"]):
             ts_axes[name][i] = covid19_npis.plot.time_series._timeseries(
                 modelParams.total_tests_dataframe.index[:],
-                modelParams.total_tests_dataframe.xs(c, level="country", axis=1)
+                modelParams.total_tests_dataframe.xs(c, level="country", axis=1),
                 ax=ts_axes[name][i],
                 alpha=0.5,
                 ls="-",

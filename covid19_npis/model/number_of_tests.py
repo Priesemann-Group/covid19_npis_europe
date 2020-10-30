@@ -440,7 +440,10 @@ def _construct_reporting_delay(
         conditionally_independent=True,
     )
     mu = yield Normal(
-        name=f"mu_{name}", loc=0.0, scale=mu_scale, conditionally_independent=True,
+        name=f"mu_{name}",
+        loc=0.0,
+        scale=mu_scale,
+        conditionally_independent=True,
     )
     mu = mu + mu_loc
     log.debug(f"mu delta m:\n{mu}")
@@ -487,7 +490,11 @@ def _construct_reporting_delay(
     theta = tf.clip_by_value(theta, clip_value_min=0.1, clip_value_max=10)
 
     # We need to add the spline dimension at some point i.e. prop. expand delta_m
-    m = yield Deterministic(name=name, value=m, shape_label=("country", "spline"),)
+    m = yield Deterministic(
+        name=name,
+        value=m,
+        shape_label=("country", "spline"),
+    )
     log.debug(f"m_spline:\n{m}")
     return (m, theta)
 

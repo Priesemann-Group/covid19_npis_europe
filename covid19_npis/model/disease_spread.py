@@ -20,7 +20,11 @@ log = logging.getLogger(__name__)
 
 
 def construct_h_0_t(
-    modelParams, len_gen_interv_kernel, R_t, mean_gen_interv, mean_test_delay=10,
+    modelParams,
+    len_gen_interv_kernel,
+    R_t,
+    mean_gen_interv,
+    mean_test_delay=10,
 ):
     r"""
     Generates a prior for I_0_t, based on the observed number of cases during the first
@@ -218,7 +222,7 @@ def _construct_I_0_t_transposed(I_0, l=16):
 
 
 def construct_generation_interval(
-    name='g',mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 0.1, theta_theta=0.1, l=16
+    name="g", mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 0.1, theta_theta=0.1, l=16
 ):
     r"""
     Generates the generation interval with two underlying gamma distributions for mu and theta
@@ -406,7 +410,11 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
 
         log.debug(f"new:\n{new}")  # kernel_time,batch,country,age_group
         I_nextv = tf.concat(
-            [new[tf.newaxis, ...], I_lastv[:-1, ...],], axis=0,
+            [
+                new[tf.newaxis, ...],
+                I_lastv[:-1, ...],
+            ],
+            axis=0,
         )  # Create new infected population for new step, insert latest at front
 
         S_t = S_t - new
@@ -544,7 +552,10 @@ def InfectionModel_unrolled(N, I_0, R_t, C, g_p):
         # Calculate new infections
         new_I = tf.einsum("...ci,...cij,...cj->...cj", infectious, R_eff, f)
         # log.debug(f"new_I:\n{new_I}")
-        I_t = tf.concat([I_t, new_I[..., tf.newaxis, :, :]], axis=-3,)
+        I_t = tf.concat(
+            [I_t, new_I[..., tf.newaxis, :, :]],
+            axis=-3,
+        )
 
         S_t = S_t - new_I
 

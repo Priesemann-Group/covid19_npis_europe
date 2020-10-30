@@ -308,7 +308,11 @@ def construct_R_t(name, modelParams, R_0):
     alpha_i_c_a = yield Deterministic(
         name="alpha_i_c_a",
         value=(yield alpha()),
-        shape_label=("intervention", "country", "age_group",),
+        shape_label=(
+            "intervention",
+            "country",
+            "age_group",
+        ),
     )
     log.debug(f"alpha_i_c_a\n{alpha_i_c_a}")
 
@@ -361,7 +365,11 @@ def construct_R_t(name, modelParams, R_0):
     d_i_c_p = yield Deterministic(
         name="d_i_c_p",
         value=(yield date()),
-        shape_label=("intervention", "country", "change_point",),
+        shape_label=(
+            "intervention",
+            "country",
+            "change_point",
+        ),
     )
     log.debug(f"d_i_c_p\n{d_i_c_p}")
 
@@ -429,7 +437,9 @@ def construct_R_t(name, modelParams, R_0):
     log.debug(f"R_eff\n{R_eff}")
 
     R_t = yield Deterministic(
-        name=name, value=R_eff, shape_label=("time", "country", "age_group"),
+        name=name,
+        value=R_eff,
+        shape_label=("time", "country", "age_group"),
     )
 
     R_t = tf.einsum("...tca -> t...ca", R_t)
@@ -498,7 +508,11 @@ def construct_R_0(name, modelParams, loc, scale, hn_scale):
     R_0 = R_0_star[..., tf.newaxis] + delta_R_0_c
     # Softplus because we want to make sure that R_0 > 0.
     R_0 = 0.1 * tf.math.softplus(10 * R_0)
-    R_0 = yield Deterministic(name=name, value=R_0, shape_label=("country"),)
+    R_0 = yield Deterministic(
+        name=name,
+        value=R_0,
+        shape_label=("country"),
+    )
 
     return tf.repeat(R_0[..., tf.newaxis], repeats=modelParams.num_age_groups, axis=-1)
 

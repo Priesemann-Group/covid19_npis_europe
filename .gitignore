@@ -130,3 +130,6 @@ dmypy.json
 
 # Datafile population
 data/WPP2019_PopulationBySingleAgeSex_1950-2019.csv
+
+# figures
+.pdf

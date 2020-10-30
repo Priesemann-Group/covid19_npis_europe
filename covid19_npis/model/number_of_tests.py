@@ -229,25 +229,14 @@ def _calc_total_number_of_tests_performed(
             |shape| batch, time, country, age_group
     """
 
-    # Calc total number of tests
-    phi_tests_reported = yield _construct_phi_tests_reported(
-        name="phi_tests_reported",
-        modelParams=modelParams,
-    )
-
     inner = (
         tf.einsum("...tca,...tc->...tca", new_E_t_delayed, phi_plus)
         + tf.einsum("...tca,...tc,...tc->...tca", new_E_t_delayed, phi_plus, eta)
         + xi[..., tf.newaxis]
     )
-    total_tests = tf.einsum("...c,...tca->...tca", phi_tests_reported, inner)
+    n_Sigma = tf.einsum("...c,...tca->...tca", phi_tests_reported, inner)
 
-    total_tests = yield Deterministic(
-        name=name,
-        value=total_tests,
-        shape_label=("time", "country", "age_group"),
-    )
-    return total_tests
+    return n_Sigma
 
 
 def _construct_phi_tests_reported(

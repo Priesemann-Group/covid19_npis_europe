@@ -27,7 +27,7 @@ def construct_h_0_t(
     mean_test_delay=10,
 ):
     r"""
-    Generates a prior for I_0_t, based on the observed number of cases during the first
+    Generates a prior for E_0_t, based on the observed number of cases during the first
     5 days. Currently it is implemented to take the first value of R_t, and multiply the
     inverse of R_t with first observed values until the begin of the simulation is reached.
     This is then used as a prior for a lognormal distribution which set the h_0_t.
@@ -89,7 +89,7 @@ def construct_h_0_t(
         )
     avg_cases_begin = np.array(avg_cases_begin)
     h_0_t_mean = []
-    I_t = avg_cases_begin
+    E_t = avg_cases_begin
     log.debug(f"avg_cases_begin:\n{avg_cases_begin}")
 
     for i in range(diff_sim_data - len_gen_interv_kernel - mean_test_delay):
@@ -101,18 +101,18 @@ def construct_h_0_t(
             batch_dims=1,
         )
         """
-        # I_t = tf.linalg.matvec(R_eff_inv, I_t)
-        I_t = R_inv[0] * I_t
+        # E_t = tf.linalg.matvec(R_eff_inv, E_t)
+        E_t = R_inv[0] * E_t
 
-        log.debug(f"i, I_t:{i}\n{I_t}")
+        log.debug(f"i, E_t:{i}\n{E_t}")
 
     h_0_t_mean = [None for _ in range(len_gen_interv_kernel - 1, -1, -1)]
     for i in range(len_gen_interv_kernel - 1, -1, -1):
         # R = tf.gather(R_t_rescaled, i_sim_begin_list + i, axis=-3, batch_dims=1,))
-        # I_t = tf.linalg.matvec(R_eff_inv, I_t)
-        I_t = R_inv[0] * I_t
-        log.debug(f"i, I_t:{i}\n{I_t}")
-        h_0_t_mean[i] = I_t
+        # E_t = tf.linalg.matvec(R_eff_inv, E_t)
+        E_t = R_inv[0] * E_t
+        log.debug(f"i, E_t:{i}\n{E_t}")
+        h_0_t_mean[i] = E_t
     h_0_t_mean = tf.stack(h_0_t_mean, axis=-3) / len_gen_interv_kernel
     h_0_t_mean = tf.clip_by_value(h_0_t_mean, 1e-5, 1e6)
     log.debug(f"h_0_t_mean:\n{h_0_t_mean.shape}")
@@ -120,7 +120,7 @@ def construct_h_0_t(
     h_0_base = h_0_t_mean[..., 0:1, :, :] * tf.exp(
         (
             yield Normal(
-                name="I_0_diff_base",
+                name="E_0_diff_base",
                 loc=0.0,
                 scale=3.0,
                 conditionally_independent=True,
@@ -132,7 +132,7 @@ def construct_h_0_t(
     h_0_base_add = h_0_mean_diff * tf.exp(
         (
             yield Normal(
-                name="I_0_diff_add",
+                name="E_0_diff_add",
                 loc=0.0,
                 scale=1.0,
                 conditionally_independent=True,
@@ -178,17 +178,17 @@ def construct_h_0_t(
     return h_0_t
 
 
-def _construct_I_0_t_transposed(I_0, l=16):
+def _construct_E_0_t_transposed(E_0, l=16):
     r"""
-    Generates a exponential distributed :math:`I_t`, which goes :math:`l` steps into the past
+    Generates a exponential distributed :math:`E_t`, which goes :math:`l` steps into the past
     i.e has a length of :math:`l`. This is needed because of the convolution with the generation
     interval inside the time step function.
 
-    The :math:`I_t` is normalized by the initial :math:`I_0` values:
+    The :math:`E_t` is normalized by the initial :math:`E_0` values:
 
     .. math::
 
-        \sum_t{I_t} = I_0
+        \sum_t{E_t} = E_0
 
     TODO
     ----
@@ -197,28 +197,28 @@ def _construct_I_0_t_transposed(I_0, l=16):
 
     Parameters
     ----------
-        I_0:
-            Tensor of initial I_0 values.
+        E_0:
+            Tensor of initial E_0 values.
         l: number,optional
             Number of time steps we need to go into the past
             |default| 16
     Returns
     -------
     :
-        I_t
+        E_t
     """
 
     # Construct exponential function
-    exp = tf.math.exp(tf.range(start=l, limit=0.0, delta=-1.0, dtype=I_0.dtype))
+    exp = tf.math.exp(tf.range(start=l, limit=0.0, delta=-1.0, dtype=E_0.dtype))
 
     # Normalize to one
     exp, norm = tf.linalg.normalize(tensor=exp, ord=1, axis=0)
 
-    # sums every given I_0 with the exponential function values
-    I_0_t = tf.einsum("...ca,t->...tca", I_0, exp)
-    I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
+    # sums every given E_0 with the exponential function values
+    E_0_t = tf.einsum("...ca,t->...tca", E_0, exp)
+    E_0_t = tf.clip_by_value(E_0_t, 1e-7, 1e9)
 
-    return I_0_t
+    return E_0_t
 
 
 def construct_generation_interval(
@@ -333,8 +333,8 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
     r"""
     This function combines a variety of different steps:
 
-        #. Converts the given :math:`I_0` values  to an exponential distributed initial :math:`I_{0_t}` with an
-           length of :math:`l` this can be seen in :py:func:`_construct_I_0_t`.
+        #. Converts the given :math:`E_0` values  to an exponential distributed initial :math:`E_{0_t}` with an
+           length of :math:`l` this can be seen in :py:func:`_construct_E_0_t`.
 
         #. Calculates :math:`R_{eff}` for each time step using the given contact matrix :math:`C`:
 
@@ -353,7 +353,7 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
 
     Parameters
     ----------
-    I_0:
+    E_0:
         Initial number of infectious.
         |shape| batch_dims, country, age_group
     R_t:
@@ -378,19 +378,19 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
     # @tf.function(autograph=False)
     def loop_body(params, elems):
         # Unpack a:
-        # Old I_next is I_lastv now
+        # Old E_next is E_lastv now
         R, h = elems
-        I_t, I_lastv, S_t = params  # Internal state
+        E_t, E_lastv, S_t = params  # Internal state
 
         # Internal state
         f = S_t / N
 
         # Convolution:
 
-        log.debug(f"I_t {I_t}")
+        log.debug(f"E_t {E_t}")
         # Calc "infectious" people, weighted by serial_p (country x age_group)
 
-        infectious = tf.einsum("t...ca,...t->...ca", I_lastv, gen_kernel)  # Convolution
+        infectious = tf.einsum("t...ca,...t->...ca", E_lastv, gen_kernel)  # Convolution
 
         # Calculate effective R_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
         R_sqrt = tf.math.sqrt(R)
@@ -409,23 +409,23 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
         new = tf.clip_by_value(new, 0, 1e9)
 
         log.debug(f"new:\n{new}")  # kernel_time,batch,country,age_group
-        I_nextv = tf.concat(
+        E_nextv = tf.concat(
             [
                 new[tf.newaxis, ...],
-                I_lastv[:-1, ...],
+                E_lastv[:-1, ...],
             ],
             axis=0,
         )  # Create new infected population for new step, insert latest at front
 
         S_t = S_t - new
 
-        return new, I_nextv, S_t
+        return new, E_nextv, S_t
 
     # Number of days that we look into the past for our convolution
     len_gen_interv_kernel = gen_kernel.shape[-1]
 
-    I_0_initial = tf.zeros((len_gen_interv_kernel,) + R_t.shape[1:], dtype=R_t.dtype)
-    I_0_initial = I_0_initial + h_0_t[:len_gen_interv_kernel]
+    E_0_initial = tf.zeros((len_gen_interv_kernel,) + R_t.shape[1:], dtype=R_t.dtype)
+    E_0_initial = E_0_initial + h_0_t[:len_gen_interv_kernel]
     S_initial = N - tf.reduce_sum(h_0_t, axis=0)
 
     R_t_for_loop = R_t[len_gen_interv_kernel:]
@@ -437,7 +437,7 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
         as lists
     """
 
-    initial = (tf.zeros(S_initial.shape, dtype=S_initial.dtype), I_0_initial, S_initial)
+    initial = (tf.zeros(S_initial.shape, dtype=S_initial.dtype), E_0_initial, S_initial)
     out = tf.scan(fn=loop_body, elems=(R_t_for_loop, h_t_for_loop), initializer=initial)
     daily_infections_final = out[0]
     daily_infections_final = tf.concat(
@@ -450,13 +450,13 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
     return daily_infections_final  # batch_dims x time x country x age
 
 
-def InfectionModel_unrolled(N, I_0, R_t, C, g_p):
+def InfectionModel_unrolled(N, E_0, R_t, C, g_p):
     r"""
     This function unrolls the loop. It compiling time is slower (about 10 minutes)
     but the running time is faster and more parallel:
 
-        #. Converts the given :math:`I_0` values to an exponential distributed initial :math:`I_{0_t}` with an
-           length of :math:`l` this can be seen in :py:func:`_construct_I_0_t`.
+        #. Converts the given :math:`E_0` values to an exponential distributed initial :math:`E_{0_t}` with an
+           length of :math:`l` this can be seen in :py:func:`_construct_E_0_t`.
 
         #. Calculates :math:`R_{eff}` for each time step using the given contact matrix :math:`C`:
 
@@ -480,7 +480,7 @@ def InfectionModel_unrolled(N, I_0, R_t, C, g_p):
 
     Parameters
     ----------
-    I_0:
+    E_0:
         Initial number of infectious.
         |shape| batch_dims, country, age_group
     R_t:
@@ -507,25 +507,25 @@ def InfectionModel_unrolled(N, I_0, R_t, C, g_p):
     # Number of days that we look into the past for our convolution
     l = g_p.shape[-1] + 1
 
-    # Generate exponential distributed intial I_0_t
-    I_0_t = _construct_I_0_t_transposed(I_0, l - 1)
+    # Generate exponential distributed intial E_0_t
+    E_0_t = _construct_E_0_t_transposed(E_0, l - 1)
     # Clip in order to avoid infinities
-    I_0_t = tf.clip_by_value(I_0_t, 1e-7, 1e9)
-    log.debug(f"I_0_t:\n{I_0_t}")
+    E_0_t = tf.clip_by_value(E_0_t, 1e-7, 1e9)
+    log.debug(f"E_0_t:\n{E_0_t}")
 
     # TO DO: Documentation
     # log.debug(f"R_t outside scan:\n{R_t}")
     total_days = R_t.shape[0]
 
     # Initial susceptible population = total - infected
-    S_initial = N - tf.reduce_sum(I_0_t, axis=-3)
+    S_initial = N - tf.reduce_sum(E_0_t, axis=-3)
 
     """ Calculate time evolution of new, daily infections
         as well as time evolution of susceptibles
         as lists
     """
     S_t = S_initial
-    I_t = I_0_t  # has shape batch x time x coutry x age_group
+    E_t = E_0_t  # has shape batch x time x coutry x age_group
 
     for i in range(l - 1, total_days):
 
@@ -533,10 +533,10 @@ def InfectionModel_unrolled(N, I_0, R_t, C, g_p):
         f = S_t / N
 
         # These are the infections over which the convolution is done
-        # log.debug(f"I_lastv: {I_t}")
+        # log.debug(f"E_lastv: {E_t}")
 
         # Calc "infectious" people, weighted by serial_p (country x age_group)
-        infectious = tf.einsum("...tca,...t->...ca", I_t[..., -1:-l:-1, :, :], g_p)
+        infectious = tf.einsum("...tca,...t->...ca", E_t[..., -1:-l:-1, :, :], g_p)
 
         # Calculate effective R_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
         R_sqrt = tf.math.sqrt(R_t[i])
@@ -550,16 +550,16 @@ def InfectionModel_unrolled(N, I_0, R_t, C, g_p):
         # log.debug(f"f:\n{f}")
 
         # Calculate new infections
-        new_I = tf.einsum("...ci,...cij,...cj->...cj", infectious, R_eff, f)
-        # log.debug(f"new_I:\n{new_I}")
-        I_t = tf.concat(
-            [I_t, new_I[..., tf.newaxis, :, :]],
+        new_E = tf.einsum("...ci,...cij,...cj->...cj", infectious, R_eff, f)
+        # log.debug(f"new_E:\n{new_E}")
+        E_t = tf.concat(
+            [E_t, new_E[..., tf.newaxis, :, :]],
             axis=-3,
         )
 
-        S_t = S_t - new_I
+        S_t = S_t - new_E
 
-    return I_t  # batch_dims x time x country x age
+    return E_t  # batch_dims x time x country x age
 
 
 def construct_delay_kernel(name, modelParams, loc, scale, length_kernel):

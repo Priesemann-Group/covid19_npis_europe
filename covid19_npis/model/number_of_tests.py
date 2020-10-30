@@ -113,7 +113,9 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
     phi_age = tf.debugging.check_numerics(phi_age, f"phi_age:\n{phi_age}")
 
     positive_tests = _calc_positive_tests(
-        new_E_t_delayed=new_E_t_delayed, phi_plus=phi_t, phi_age=phi_age,
+        new_E_t_delayed=new_E_t_delayed,
+        phi_plus=phi_t,
+        phi_age=phi_age,
     )
     positive_tests = yield Deterministic(
         name_positive, positive_tests, shape_label=("time", "country", "age_group")
@@ -294,10 +296,15 @@ def _construct_phi_tests_reported(
     """
 
     sigma = yield HalfCauchy(
-        name=f"{name}_sigma", scale=sigma_scale, conditionally_independent=True,
+        name=f"{name}_sigma",
+        scale=sigma_scale,
+        conditionally_independent=True,
     )
     mu = yield Normal(
-        name=f"{name}_mu", loc=mu_loc, scale=mu_scale, conditionally_independent=True,
+        name=f"{name}_mu",
+        loc=mu_loc,
+        scale=mu_scale,
+        conditionally_independent=True,
     )
     phi_dagger = yield Normal(
         name=f"{name}_dagger",
@@ -541,7 +548,11 @@ def _calc_reporting_delay_kernel(name, m, theta, length_kernel=14):
     log.debug(f"theta\n{theta}")
 
     # Calculate pdf
-    kernel = utils.gamma(t, m / theta + 1.0, 1.0 / theta,)
+    kernel = utils.gamma(
+        t,
+        m / theta + 1.0,
+        1.0 / theta,
+    )
     kernel = tf.einsum("...ctk->...ckt", kernel)
 
     kernel = yield Deterministic(
@@ -742,7 +753,9 @@ def construct_testing_state(
         tf.stack([phi_sigma, eta_sigma, xi_sigma, m_sigma], axis=-1),
     )
     Sigma = yield Deterministic(
-        f"Sigma", Sigma, shape_label=("testing_state_vars", "testing_state_vars"),
+        f"Sigma",
+        Sigma,
+        shape_label=("testing_state_vars", "testing_state_vars"),
     )
     log.debug(f"Sigma state:\n{Sigma}")
 
@@ -777,10 +790,22 @@ def construct_testing_state(
     )
 
     # Add all vars to the trace
-    phi_det = yield Deterministic(name=name_phi, value=Sigma,)
-    eta_det = yield Deterministic(name=name_eta, value=Sigma,)
-    xi_det = yield Deterministic(name=name_xi, value=Sigma,)
-    m_ast_det = yield Deterministic(name=name_m_ast, value=Sigma,)
+    phi_det = yield Deterministic(
+        name=name_phi,
+        value=Sigma,
+    )
+    eta_det = yield Deterministic(
+        name=name_eta,
+        value=Sigma,
+    )
+    xi_det = yield Deterministic(
+        name=name_xi,
+        value=Sigma,
+    )
+    m_ast_det = yield Deterministic(
+        name=name_m_ast,
+        value=Sigma,
+    )
 
     return (phi, eta, xi, m_ast)
 

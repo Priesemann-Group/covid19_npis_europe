@@ -128,7 +128,9 @@ def main_model(modelParams):
 
     # Add new_E_t to trace
     new_E_t = yield Deterministic(
-        name="new_E_t", value=new_E_t, shape_label=("time", "country", "age_group"),
+        name="new_E_t",
+        value=new_E_t,
+        shape_label=("time", "country", "age_group"),
     )
     log.debug(f"new_E_t\n{new_E_t.shape}")
 
@@ -150,8 +152,7 @@ def main_model(modelParams):
     death_Phi = yield deaths._calc_Phi_IFR(name="IFR", modelParams=modelParams)
     # Death reporting delay
     death_m, death_theta = yield deaths._construct_reporting_delay(
-        name="delay_deaths",
-        modelParams=modelParams
+        name="delay_deaths", modelParams=modelParams
     )
     # Calculate new deaths delayed
     deaths_delayed = yield deaths.calc_delayed_deaths(
@@ -161,7 +162,7 @@ def main_model(modelParams):
         m=death_m,
         theta=death_theta,
     )
-    
+
     """ Likelihood
     TODO    - description on fitting data
             - add deaths and total tests

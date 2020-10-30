@@ -27,12 +27,12 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
     Constructs B splines
     Delay cases
 
-    ToDo:
+    ToDo
     -----
     - more documenation here
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     name_total: str,
         Name for the total tests performed
 
@@ -44,7 +44,7 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
         number of countries.
 
     new_E_t: tf.Tensor
-        New cases :math:`\E_{\text{age}, a}.`
+        New cases :math:`E_{\text{age}, a}.`
         |shape| batch, time, country, age_group
 
     Returns
@@ -138,7 +138,7 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
     total_tests_compact = yield Deterministic(
         f"{name_total}_compact",
         tf.reduce_sum(total_tests, axis=-1),
-        shape_label=("time", "country", "age_group"),
+        shape_label=("time", "country"),
     )
     log.debug(f"total_tests\n{total_tests}")
     return (total_tests, positive_tests)

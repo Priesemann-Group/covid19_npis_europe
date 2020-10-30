@@ -92,11 +92,11 @@ def timeseries(
         else:
             time = model_name + "/" + dist.name + "_dim_0"
             label1 = model_name + "/" + dist.name + "_dim_1"
-        cols = 1
-        rows = shape[1]  # not time
+        cols = shape[1]
+        rows = 1  # not time
 
         fig, axes = plt.subplots(
-            rows, cols, figsize=(6, 3 * rows), constrained_layout=True,
+            rows, cols, figsize=(6 * cols, 3 * rows), constrained_layout=True,
         )
         for i, value in enumerate(df.index.get_level_values(label1).unique()):
             df_t = df.xs(value, level=label1)
@@ -116,6 +116,11 @@ def timeseries(
                         label=f"Chain {c}",
                     )
                     axes[i].legend()
+
+        # Set labels on y-axis
+        for i in range(cols):
+            axes[i].set_title(df.index.get_level_values(label1).unique()[i])
+
         return fig, axes
 
     def timeseries_ndim_3():
@@ -168,7 +173,7 @@ def timeseries(
                         )
                         axes[j][i].legend()
 
-                # Set labels on y-axis
+        # Set labels on y-axis
         for i in range(rows):
             axes[i][0].set_ylabel(df.index.get_level_values(label2).unique()[i])
         # Set labels on x-axis
@@ -336,7 +341,7 @@ def _timeseries(
     # ------------------------------------------------------------------------------ #
     # formatting
     # ------------------------------------------------------------------------------ #
-    _format_date_xticks(ax)
+    _format_date_xticks(ax, interval=2)
 
     return ax
 
@@ -344,11 +349,11 @@ def _timeseries(
 # ------------------------------------------------------------------------------ #
 # Formating and util
 # ------------------------------------------------------------------------------ #
-def _format_date_xticks(ax, minor=None):
+def _format_date_xticks(ax, minor=None, interval=1):
     # ensuring utf-8 helps on some setups
     locale.setlocale(locale.LC_ALL, rcParams.locale + ".UTF-8")
     ax.xaxis.set_major_locator(
-        mpl.dates.WeekdayLocator(interval=1, byweekday=mpl.dates.SU)
+        mpl.dates.WeekdayLocator(interval=interval, byweekday=mpl.dates.SU)
     )
     if minor is None:
         # overwrite local argument with rc params only if default.
@@ -356,3 +361,8 @@ def _format_date_xticks(ax, minor=None):
     if minor is True:
         ax.xaxis.set_minor_locator(mpl.dates.DayLocator())
     ax.xaxis.set_major_formatter(mpl.dates.DateFormatter(rcParams["date_format"]))
+
+    for label in ax.get_xticklabels():
+        label.set_rotation(rcParams["timeseries_xticklabel_rotation"])
+        label.set_ha("center")
+    # ax.set_xticklabels(ax.get_xticklabels(), rotation=, ha='right')

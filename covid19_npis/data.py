@@ -208,32 +208,20 @@ class Country(object):
 
     - new_cases.csv
         - Time/Date column has to be named "date" or "time"
-        - Age group columns have to be named consistent between different data and
-        countries
-
-
+        - Age group columns have to be named consistent between different data and countries
     - interventions.csv
         - Time/Date column has to be named "date" or "time"
-        - Different intervention as additional columns with intervention name as
-        column name
-
-
+        - Different intervention as additional columns with intervention name as column name
     - tests.csv
         - Time/Date column has to be named "date" or "time"
         - Daily performed tests column with name "tests"
-
-
     - deaths.csv
         - Time/Date column has to be named "date" or "time"
         - Daily deaths column has to be named "deaths"
         - Optional: Daily deaths per age group same column names as in new_cases
-
-
     - population.csv
         - Age column named "age"
         - Column Number of people per age named "PopTotal"
-
-
     - config.json, dict:
         - name : "country_name"
         - age_groups : dict

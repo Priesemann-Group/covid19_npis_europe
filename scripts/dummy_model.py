@@ -81,8 +81,8 @@ c2 = covid19_npis.data.Country(
 )
 """
 
-c1 = covid19_npis.data.Country("../data/test_country_1",)  # Data folder for germany
-c2 = covid19_npis.data.Country("../data/test_country_2",)
+c1 = covid19_npis.data.Country("../data/Germany",)  # Data folder for germany
+c2 = covid19_npis.data.Country("../data/France",)
 
 # Construct our modelParams from the data.
 modelParams = covid19_npis.ModelParams(countries=[c1, c2])
@@ -109,8 +109,8 @@ begin_time = time.time()
 
 trace = pm.sample(
     main_model(modelParams),
-    num_samples=200,
-    burn_in=400,
+    num_samples=100,
+    burn_in=200,
     use_auto_batching=False,
     num_chains=2,
     xla=True,
@@ -197,17 +197,15 @@ for name in ts_names:
                     ls="-",
                 )
     # plot data into new_cases
-    if name == "total_tests":
+    if name == "total_tests_compact":
         for i, c in enumerate(modelParams.data_summary["countries"]):
-            for j, a in enumerate(modelParams.data_summary["age_groups"]):
-                ts_axes[name][j][i] = covid19_npis.plot.time_series._timeseries(
-                    modelParams.total_tests_dataframe.index[:],
-                    modelParams.total_tests_dataframe.xs(c, level="country", axis=1)
-                    / modelParams.num_age_groups,
-                    ax=ts_axes[name][j][i],
-                    alpha=0.5,
-                    ls="-",
-                )
+            ts_axes[name][i] = covid19_npis.plot.time_series._timeseries(
+                modelParams.total_tests_dataframe.index[:],
+                modelParams.total_tests_dataframe.xs(c, level="country", axis=1)
+                ax=ts_axes[name][i],
+                alpha=0.5,
+                ls="-",
+            )
 
     """
     # plot R_t data into R_t plot --> testing

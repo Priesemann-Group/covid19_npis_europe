@@ -17,6 +17,7 @@ def get_rcparams_default():
         color_prior="#708090",
         color_posterior="tab:green",
         color_annot="#646464",
+        timeseries_xticklabel_rotation=45,  # In degree
     )
 
     return par

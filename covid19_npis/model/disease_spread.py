@@ -281,7 +281,7 @@ def construct_generation_interval(
     # and https://en.wikipedia.org/wiki/Gamma_distribution
 
     g_mu = yield Gamma(
-        name="g_mu",
+        name=f"{name}_mu",
         concentration=g["mu"]["k"],
         rate=1.0 / g["mu"]["θ"],
         conditionally_independent=True,
@@ -299,7 +299,7 @@ def construct_generation_interval(
     g["θ"]["θ"] = theta_theta
 
     g_theta = yield Gamma(
-        name="g_theta",
+        name=f"{name}_theta",
         concentration=g["θ"]["k"],
         rate=1.0 / g["θ"]["θ"],
         conditionally_independent=True,

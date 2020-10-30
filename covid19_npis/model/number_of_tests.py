@@ -440,7 +440,7 @@ def _construct_reporting_delay(
         conditionally_independent=True,
     )
     mu = yield Normal(
-        name=f"mu_{name}",
+        name=f"{name}_mu",
         loc=0.0,
         scale=mu_scale,
         conditionally_independent=True,

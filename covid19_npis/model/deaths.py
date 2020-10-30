@@ -22,12 +22,12 @@ from .utils import gamma, get_filter_axis_data_from_dims, convolution_with_fixed
 def _construct_reporting_delay(
     name,
     modelParams,
-    sigma_theta_scale=0.3,
-    mu_theta_loc=1.5,
-    mu_theta_scale=0.3,
-    sigma_m_scale=4.0,
-    mu_m_loc=21.0,
-    mu_m_scale=2.0,
+    theta_sigma_scale=0.3,
+    theta_mu_loc=1.5,
+    theta_mu_scale=0.3,
+    m_sigma_scale=4.0,
+    m_mu_loc=21.0,
+    m_mu_scale=2.0,
 ):
     r"""
         .. math::
@@ -44,29 +44,29 @@ def _construct_reporting_delay(
         Parameters
         ----------
         name: str
-            Name of the reporting delay variable :math:`m_{D_\text{test},c,b}.`  
+            Name of the reporting delay variable :math:`m_{D_\text{test},c,b}.`
 
         modelParams: :py:class:`covid19_npis.ModelParams`
             Instance of modelParams, mainly used for number of age groups and
             number of countries.
 
-        sigma_theta_scale: optional
+        theta_sigma_scale: optional
             Scale parameter for the Normal distribution :math:`\sigma_{\theta_{D_\text{death}}}.`
             |default| 0.3
-        mu_theta_loc: optional
+        theta_mu_loc: optional
             Location parameter for the Normal distribution :math:`\mu_{\theta_{D_\text{death}}}.`
             |default| 1.5
-        mu_theta_scale: optional
+        theta_mu_scale: optional
             Scale parameter for the HalfNormal distribution :math:`\mu_{\theta_{D_\text{death}}}.`
             |default| 0.3
 
-        sigma_m_scale: optional
+        m_sigma_scale: optional
             Scale parameter for the HalfNormal distribution :math:`\sigma_{m_{D_\text{test}}}.`
             |default| 4.0
-        mu_m_loc: optional
+        m_mu_loc: optional
             Location parameter for the Normal distribution :math:`\mu_{m_{D_\text{death}}}.`
             |default| 21.0
-        mu_m_scale: optional
+        m_mu_scale: optional
             Scale parameter for the Normal distribution :math:`\mu_{m_{D_\text{death}}}.`
             |default| 2.0
 
@@ -79,20 +79,20 @@ def _construct_reporting_delay(
 
     """ # Theta
     """
-    sigma_theta = yield HalfNormal(
-        name=f"sigma_theta_{name}",
-        scale=sigma_theta_scale,
+    theta_sigma = yield HalfNormal(
+        name=f"{name}_theta_sigma",
+        scale=theta_sigma_scale,
         conditionally_independent=True,
     )
 
-    mu_theta = (
+    theta_mu = (
         yield Normal(
-            name=f"mu_theta_{name}",
+            name=f"{name}_theta_mu",
             loc=0.0,
-            scale=mu_theta_scale,
+            scale=theta_mu_scale,
             conditionally_independent=True,
         )
-    ) + mu_theta_loc
+    ) + theta_mu_loc
 
     # theta_dagger = N(μ,θ)
     theta_dagger = (
@@ -100,7 +100,7 @@ def _construct_reporting_delay(
             "...c,...->...c",
             (
                 yield Normal(
-                    name=f"theta_dagger_{name}",
+                    name=f"{name}_theta_dagger",
                     loc=0.0,
                     scale=1.0,
                     event_stack=modelParams.num_countries,
@@ -108,37 +108,37 @@ def _construct_reporting_delay(
                     conditionally_independent=True,
                 )
             ),
-            sigma_theta,
+            theta_sigma,
         )
-        + mu_theta[..., tf.newaxis]
+        + theta_mu[..., tf.newaxis]
     )
 
     theta = yield Deterministic(
-        name=f"theta_{name}",
+        name=f"{name}_theta",
         value=0.25 * tf.math.softplus(4 * theta_dagger),
         shape_label=("country"),
     )
 
     """ # Mean m
     """
-    sigma_m = yield HalfNormal(
-        name=f"sigma_m_{name}", scale=sigma_m_scale, conditionally_independent=True,
+    m_sigma = yield HalfNormal(
+        name=f"{name}_m_sigma", scale=m_sigma_scale, conditionally_independent=True,
     )
     mu_m = (
         yield Normal(
-            name=f"mu_m_{name}",
+            name=f"{name}_mu_m",
             loc=0.0,
-            scale=mu_m_scale,
+            scale=m_mu_scale,
             conditionally_independent=True,
         )
-    ) + mu_m_loc
+    ) + m_mu_loc
     # m_dagger = N(μ,θ)
     m_dagger = (
         tf.einsum(
             "...c,...->...c",
             (
                 yield Normal(
-                    name=f"m_dagger_{name}",
+                    name=f"{name}_m_dagger",
                     loc=0.0,
                     scale=1.0,
                     event_stack=modelParams.num_countries,
@@ -146,13 +146,13 @@ def _construct_reporting_delay(
                     conditionally_independent=True,
                 )
             ),
-            sigma_m,
+            m_sigma,
         )
         + mu_m[..., tf.newaxis]
     )
 
     m = yield Deterministic(
-        name=f"m_{name}", value=tf.math.softplus(m_dagger), shape_label=("country")
+        name=f"{name}_m", value=tf.math.softplus(m_dagger), shape_label=("country")
     )
 
     return m, theta
@@ -178,7 +178,7 @@ def _calc_Phi_IFR(
     .. math::
 
         \text{IFR}_c(a^*) &= \frac{1}{100} \exp{\left(\beta_{\text{IFR,c}} + \alpha_\text{IFR} \cdot a\right)} \\
-   
+
     .. math::
 
         \phi_{\text{IFR}, c,a} = \frac{1}{\sum_{a^* = a_\text{beg}(a)}^{a_\text{end}(a)}  N_\text{pop}\left(a^*\right)}\sum_{a^* = a_\text{beg}(a)}^{a_\text{end}(a)} N_{\text{pop}, c}\left(a^*\right) \text{IFR}_c\left(a^* \right),
@@ -186,7 +186,7 @@ def _calc_Phi_IFR(
     Parameters
     ----------
     name: str
-        Name of the infection fatatlity ratio variable :math:`\phi_{\text{IFR}, c,a}.` 
+        Name of the infection fatatlity ratio variable :math:`\phi_{\text{IFR}, c,a}.`
 
     modelParams: :py:class:`covid19_npis.ModelParams`
         Instance of modelParams, mainly used for number of age groups and
@@ -212,14 +212,14 @@ def _calc_Phi_IFR(
     """
 
     alpha = yield Normal(
-        name=f"alpha_{name}",
+        name=f"{name}_alpha",
         loc=alpha_loc,
         scale=alpha_scale,
         conditionally_independent=True,
     )
 
     beta = yield Normal(
-        name=f"beta_{name}",
+        name=f"{name}_beta",
         loc=beta_loc,
         scale=beta_scale,
         conditionally_independent=True,

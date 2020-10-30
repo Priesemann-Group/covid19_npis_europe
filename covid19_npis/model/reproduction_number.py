@@ -58,7 +58,7 @@ def _create_distributions(modelParams):
             \Delta \alpha^\dagger_a &\sim \mathcal{N}\left(0, \sigma_{\alpha, \text{age}}\right)\quad \forall a, \\
             \sigma_{\alpha, \text{country}}  &\sim HalfNormal\left(0.1\right),\\
             \sigma_{\alpha, \text{age}} &\sim HalfNormal\left(0.1\right)
-        
+
         .. math::
 
             l^\dagger_{\text{positive}} &\sim \mathcal{N}\left(3, 1\right),\\
@@ -77,7 +77,7 @@ def _create_distributions(modelParams):
         ----------
         modelParams: :py:class:`covid19_npis.ModelParams`
             Instance of modelParams, mainly used for number of age groups and
-            number of countries. 
+            number of countries.
 
         Return
         ------
@@ -89,21 +89,21 @@ def _create_distributions(modelParams):
     """
         Δ Alpha cross for each country and age group with hyperdistributions
     """
-    sigma_a_c = HalfNormal(
-        "sigma_alpha_country",
+    alpha_sigma_c = HalfNormal(
+        name="alpha_sigma_country",
         scale=0.1,
         transform=transformations.SoftPlus(scale=0.1),
         conditionally_independent=True,
     )
-    sigma_a_a = HalfNormal(
-        "sigma_alpha_age_group",
+    alpha_sigma_a = HalfNormal(
+        name="alpha_sigma_age_group",
         scale=0.1,
         transform=transformations.SoftPlus(scale=0.1),
         conditionally_independent=True,
     )
-    # We need to multiply sigma_a_c and sigma_a_a later. (See construct R_t)
+    # We need to multiply alpha_sigma_c and alpha_sigma_a later. (See construct R_t)
     delta_alpha_cross_c = Normal(
-        "delta_alpha_cross_c",
+        name="delta_alpha_cross_c",
         loc=0.0,
         scale=1.0,
         event_stack=(1, modelParams.num_countries, 1),  # intervention country age_group
@@ -111,7 +111,7 @@ def _create_distributions(modelParams):
         conditionally_independent=True,
     )
     delta_alpha_cross_a = Normal(
-        "delta_alpha_cross_a",
+        name="delta_alpha_cross_a",
         loc=0.0,
         scale=1.0,
         event_stack=(
@@ -123,7 +123,7 @@ def _create_distributions(modelParams):
         conditionally_independent=True,
     )
     alpha_cross_i = Normal(
-        "alpha_cross_i",
+        name="alpha_cross_i",
         loc=-1.0,  # See publication for reasoning behind -1 and 2
         scale=2.0,
         conditionally_independent=True,
@@ -138,32 +138,32 @@ def _create_distributions(modelParams):
     """
         l distributions
     """
-    sigma_l_interv = HalfNormal(
-        "sigma_l_interv",
+    l_sigma_interv = HalfNormal(
+        name="l_sigma_interv",
         scale=1.0,
         transform=transformations.SoftPlus(),
         conditionally_independent=True,
     )
 
     delta_l_cross_i = Normal(
-        "delta_l_cross_i",
+        name="delta_l_cross_i",
         loc=0.0,
         scale=1.0,
         conditionally_independent=True,
         event_stack=(modelParams.num_interventions,),
         shape_label=("intervention"),
     )
-    log.debug(f"sigma_l_interv\n{sigma_l_interv}")
+    log.debug(f"l_sigma_interv\n{l_sigma_interv}")
     # Δl_i^cross was created in intervention class see above
     l_positive_cross = Normal(
-        "l_positive_cross",
+        name="l_positive_cross",
         loc=3.0,
         scale=1.0,
         conditionally_independent=True,
         event_stack=(1,),
     )
     l_negative_cross = Normal(
-        "l_negative_cross",
+        name="l_negative_cross",
         loc=5.0,
         scale=2.0,
         conditionally_independent=True,
@@ -173,20 +173,20 @@ def _create_distributions(modelParams):
     """
         date d distributions
     """
-    sigma_d_interv = HalfNormal(
-        "sigma_d_interv",
+    d_sigma_interv = HalfNormal(
+        name="d_sigma_interv",
         scale=0.3,
         transform=transformations.SoftPlus(scale=0.3),
         conditionally_independent=True,
     )
-    sigma_d_country = HalfNormal(
-        "sigma_d_country",
+    d_sigma_country = HalfNormal(
+        name="d_sigma_country",
         scale=0.3,
         transform=transformations.SoftPlus(scale=0.3),
         conditionally_independent=True,
     )
     delta_d_i = Normal(
-        "delta_d_i",
+        name="delta_d_i",
         loc=0.0,
         scale=1.0,
         event_stack=(modelParams.num_interventions, 1, 1),
@@ -194,7 +194,7 @@ def _create_distributions(modelParams):
         conditionally_independent=True,
     )
     delta_d_c = Normal(
-        "delta_d_c",
+        name="delta_d_c",
         loc=0.0,
         scale=1.0,
         event_stack=(1, modelParams.num_countries, 1),
@@ -204,27 +204,27 @@ def _create_distributions(modelParams):
 
     # We create a dict here to pass all distributions to another function
     distributions = {}
-    distributions["sigma_a_c"] = sigma_a_c
-    distributions["sigma_a_a"] = sigma_a_a
+    distributions["alpha_sigma_c"] = alpha_sigma_c
+    distributions["alpha_sigma_a"] = alpha_sigma_a
     distributions["delta_alpha_cross_c"] = delta_alpha_cross_c
     distributions["delta_alpha_cross_a"] = delta_alpha_cross_a
     distributions["alpha_cross_i"] = alpha_cross_i
-    distributions["sigma_l_interv"] = sigma_l_interv
+    distributions["l_sigma_interv"] = l_sigma_interv
     distributions["l_positive_cross"] = l_positive_cross
     distributions["l_negative_cross"] = l_negative_cross
     distributions["delta_l_cross_i"] = delta_l_cross_i
-    distributions["sigma_d_interv"] = sigma_d_interv
-    distributions["sigma_d_country"] = sigma_d_country
+    distributions["d_sigma_interv"] = d_sigma_interv
+    distributions["d_sigma_country"] = d_sigma_country
     distributions["delta_d_i"] = delta_d_i
     distributions["delta_d_c"] = delta_d_c
 
     return distributions
 
 
-def construct_R_t(R_0, modelParams):
+def construct_R_t(name, modelParams, R_0):
     r"""
         Constructs the time dependent reproduction number :math:`R(t)` for every country and age group.
-        There are a lot of things happening here be sure to check our paper for more indepth explanations! 
+        There are a lot of things happening here be sure to check our paper for more indepth explanations!
 
         We build the effectivity in an hierarchical manner in the unbounded space:
 
@@ -232,7 +232,7 @@ def construct_R_t(R_0, modelParams):
 
             \alpha_{i,c,a} &= \frac{1}{1+e^{-\alpha^\dagger_{i,c,a}}},\\
             \alpha^\dagger_{i,c,a} &= \alpha^\dagger_i + \Delta \alpha^\dagger_c + \Delta \alpha^\dagger_{a}
-        
+
         The length of the change point depends on the intervention and whether the
         strength is increasing or decreasing:
 
@@ -251,7 +251,7 @@ def construct_R_t(R_0, modelParams):
         And finally the time dependent reproduction number :math:`R^*_e`:
 
         .. math::
-            
+
             \gamma_{i,c,p}(t) &= \frac{1}{1+e^{-4/l_{i, \text{sign}\left(\Delta \gamma\right)} \cdot (t - d_{i,c,p})}} \cdot \Delta \gamma_{i,c,p}^{\text{data}}\\
             \gamma_{i,c}(t) &= \sum_p \gamma_{i,c,p}(t)\\
             R^*_e &= R^*_0 e^{-\sum_i^{N_i}\alpha_{i, c, a} \gamma_{i,c}(t)}
@@ -262,14 +262,15 @@ def construct_R_t(R_0, modelParams):
         Parameters
         ----------
 
-        R_0: tf.tensor
-            Initial reproduction number. Should be constructed using 
-            :py:func:`construct_R_0` or :py:func:`construct_R_0_old`.
-            |shape| batch, country, age group
-
+        name: str
+            Name of the distribution (gets added to trace).
         modelParams: :py:class:`covid19_npis.ModelParams`
             Instance of modelParams, mainly used for number of age groups and
-            number of countries. 
+            number of countries.
+        R_0: tf.tensor
+            Initial reproduction number. Should be constructed using
+            :py:func:`construct_R_0` or :py:func:`construct_R_0_old`.
+            |shape| batch, country, age group
 
         Return
         ------
@@ -287,16 +288,16 @@ def construct_R_t(R_0, modelParams):
         Helper function to construct the alpha_i_c_a tensor
         """
         delta_alpha_cross_c = yield distributions["delta_alpha_cross_c"]
-        sigma_a_c = yield distributions["sigma_a_c"]
+        alpha_sigma_c = yield distributions["alpha_sigma_c"]
 
         delta_alpha_cross_c = tf.einsum(  # Multiply distribution by hyperprior
-            "...ica,...->...ica", delta_alpha_cross_c, sigma_a_c
+            "...ica,...->...ica", delta_alpha_cross_c, alpha_sigma_c
         )
 
         delta_alpha_cross_a = yield distributions["delta_alpha_cross_a"]
-        sigma_a_a = yield distributions["sigma_a_a"]
+        alpha_sigma_a = yield distributions["alpha_sigma_a"]
         delta_alpha_cross_a = tf.einsum(  # Multiply distribution by hyperprior
-            "...ica,...->...ica", delta_alpha_cross_a, sigma_a_a
+            "...ica,...->...ica", delta_alpha_cross_a, alpha_sigma_a
         )
         # Draw for the interventions
         alpha_cross_i = yield distributions["alpha_cross_i"]
@@ -316,13 +317,13 @@ def construct_R_t(R_0, modelParams):
         Helper function to construct the l_i,sign(Δγ) tensor
         """
         delta_l_cross_i = yield distributions["delta_l_cross_i"]
-        sigma_l_interv = yield distributions["sigma_l_interv"]
+        l_sigma_interv = yield distributions["l_sigma_interv"]
         delta_l_cross_i = tf.einsum(  # Multiply distribution by hyperprior
-            "...i,...->...i", delta_l_cross_i, sigma_l_interv
+            "...i,...->...i", delta_l_cross_i, l_sigma_interv
         )
         l_positive_cross = yield distributions["l_positive_cross"]
         l_negative_cross = yield distributions["l_negative_cross"]
-        # TODO:  NEED TO DETECT WHEATHER TO USE POSITIVE OR NEGATIVE l_cross
+        # TODO:  NEED TO DETECT WHETHER TO USE POSITIVE OR NEGATIVE l_cross
         l_cross_i_sign = l_positive_cross + delta_l_cross_i
 
         return tf.math.softplus(l_cross_i_sign)
@@ -340,15 +341,15 @@ def construct_R_t(R_0, modelParams):
         Returns multiple tensors one for each change point.
         """
         delta_d_i = yield distributions["delta_d_i"]
-        sigma_d_interv = yield distributions["sigma_d_interv"]
+        d_sigma_interv = yield distributions["d_sigma_interv"]
         delta_d_i = tf.einsum(  # Multiply distribution by hyperprior
-            "...ica,...->...ica", delta_d_i, sigma_d_interv
+            "...ica,...->...ica", delta_d_i, d_sigma_interv
         )
 
         delta_d_c = yield distributions["delta_d_c"]
-        sigma_d_country = yield distributions["sigma_d_country"]
+        d_sigma_country = yield distributions["d_sigma_country"]
         delta_d_c = tf.einsum(  # Multiply distribution by hyperprior
-            "...ica,...->...ica", delta_d_c, sigma_d_country
+            "...ica,...->...ica", delta_d_c, d_sigma_country
         )
         # Get data tensor padded with 0 if the cp does not exist for an intervention/country combo
         d_data = (
@@ -389,11 +390,11 @@ def construct_R_t(R_0, modelParams):
             Iterate over all changepoints in an intervention and sum up over every change point.
             We padded the date tensor earlier so we do NOT want to sum over the additional entries!
         """
-        list_gamma_i_c = []
+        gamma_list_i_c = []
         for i, intervention in enumerate(
             modelParams.countries[0].interventions
         ):  # Should be same across all countries -> 0
-            list_gamma_c = []
+            gamma_list_c = []
             gamma_c_p = tf.gather(gamma_i_c_p, i, axis=-4)
             for c, country in enumerate(modelParams.countries):
                 gamma_p = tf.gather(gamma_c_p, c, axis=-3)
@@ -405,10 +406,10 @@ def construct_R_t(R_0, modelParams):
 
                 # Calculate the sum over all change points
                 gamma_values = tf.math.reduce_sum(gamma_p, axis=-2)
-                list_gamma_c.append(gamma_values)
-            list_gamma_i_c.append(list_gamma_c)
+                gamma_list_c.append(gamma_values)
+            gamma_list_i_c.append(gamma_list_c)
 
-        gamma = tf.convert_to_tensor(list_gamma_i_c)
+        gamma = tf.convert_to_tensor(gamma_list_i_c)
 
         # Transpose batch into front
         gamma = tf.einsum("ic...t -> ...ict", gamma)
@@ -428,7 +429,7 @@ def construct_R_t(R_0, modelParams):
     log.debug(f"R_eff\n{R_eff}")
 
     R_t = yield Deterministic(
-        name="R_t", value=R_eff, shape_label=("time", "country", "age_group"),
+        name=name, value=R_eff, shape_label=("time", "country", "age_group"),
     )
 
     R_t = tf.einsum("...tca -> t...ca", R_t)
@@ -436,7 +437,7 @@ def construct_R_t(R_0, modelParams):
     return R_t  # shape time, batch, country, age_group
 
 
-def construct_R_0(name, loc, scale, hn_scale, modelParams):
+def construct_R_0(name, modelParams, loc, scale, hn_scale):
     r"""
         Constructs R_0 in the following hierarchical manner:
 
@@ -451,6 +452,9 @@ def construct_R_0(name, loc, scale, hn_scale, modelParams):
         ----------
         name: str
             Name of the distribution (gets added to trace).
+        modelParams: :py:class:`covid19_npis.ModelParams`
+            Instance of modelParams, mainly used for number of age groups and
+            number of countries.
         loc: number
             Location parameter of the R^*_0 Normal distribution.
         scale: number
@@ -472,8 +476,8 @@ def construct_R_0(name, loc, scale, hn_scale, modelParams):
         # transform=transformations.Normal(shift=loc),
     )
 
-    sigma_R_0_c = yield HalfNormal(
-        name="sigma_R_0_c",
+    R_0_sigma_c = yield HalfNormal(
+        name="R_0_sigma_c",
         scale=hn_scale,
         conditionally_independent=True,
         transform=transformations.SoftPlus(scale=hn_scale),
@@ -488,7 +492,7 @@ def construct_R_0(name, loc, scale, hn_scale, modelParams):
             shape_label=("country"),
             conditionally_independent=True,
         )
-    ) * sigma_R_0_c[..., tf.newaxis]
+    ) * R_0_sigma_c[..., tf.newaxis]
 
     # Add to trace via deterministic
     R_0 = R_0_star[..., tf.newaxis] + delta_R_0_c
@@ -499,27 +503,30 @@ def construct_R_0(name, loc, scale, hn_scale, modelParams):
     return tf.repeat(R_0[..., tf.newaxis], repeats=modelParams.num_age_groups, axis=-1)
 
 
-def construct_R_0_old(name, mean, beta, modelParams):
+def construct_R_0_old(name, modelParams, mean, beta):
     r"""
     Old constructor of :math:`R_0` using a gamma distribution:
 
-    .. math::
+        .. math::
 
-        R_0 &\sim Gamma\left(\mu=2.5,\beta=2.0\right)
+            R_0 &\sim Gamma\left(\mu=2.5,\beta=2.0\right)
 
-    Parameters
-    ----------
-    name: string
-        Name of the distribution for trace and debugging.
-    mean:
-        Mean :math:`\mu` of the gamma distribution.
-    beta:
-        Rate :math:`\beta` of the gamma distribution.
+        Parameters
+        ----------
+        name: string
+            Name of the distribution for trace and debugging.
+        modelParams: :py:class:`covid19_npis.ModelParams`
+            Instance of modelParams, mainly used for number of age groups and
+            number of countries.
+        mean:
+            Mean :math:`\mu` of the gamma distribution.
+        beta:
+            Rate :math:`\beta` of the gamma distribution.
 
-    Returns
-    -------
-    :
-        R_0 tensor |shape| batch, country, age_group
+        Returns
+        -------
+        :
+            R_0 tensor |shape| batch, country, age_group
 
     """
     event_shape = (modelParams.num_countries, modelParams.num_age_groups)

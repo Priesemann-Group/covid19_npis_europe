@@ -31,11 +31,25 @@ def construct_h_0_t(
 
     Parameters
     ----------
-
+        modelParams: :py:class:`covid19_npis.ModelParams`
+            Instance of modelParams, mainly used for number of age groups and
+            number of countries.
+        len_gen_interv_kernel: number
+            ...some description
+        R_t: tf.tensor
+            Time dependent reproduction number tensor :math:`R(t)`.
+            |shape| time, batch, country, age group
+        mean_gen_interv: countries
+            ...some description
+        mean_test_delay: number, optional
+            ...some description
+            |default| 10
     Returns
     -------
     :
-        I_t
+        h_0_t:
+            some description
+            |shape| time, batch, country, age_group
     """
     batch_dims = tuple(R_t.shape)[:-3]
     data = modelParams.pos_tests_data_tensor
@@ -102,7 +116,7 @@ def construct_h_0_t(
     h_0_base = h_0_t_mean[..., 0:1, :, :] * tf.exp(
         (
             yield Normal(
-                "I_0_diff_base",
+                name="I_0_diff_base",
                 loc=0.0,
                 scale=3.0,
                 conditionally_independent=True,
@@ -114,7 +128,7 @@ def construct_h_0_t(
     h_0_base_add = h_0_mean_diff * tf.exp(
         (
             yield Normal(
-                "I_0_diff_add",
+                name="I_0_diff_add",
                 loc=0.0,
                 scale=1.0,
                 conditionally_independent=True,
@@ -204,11 +218,11 @@ def _construct_I_0_t_transposed(I_0, l=16):
 
 
 def construct_generation_interval(
-    mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 0.1, theta_theta=0.1, l=16
+    name='g',mu_k=4.8 / 0.04, mu_theta=0.04, theta_k=0.8 / 0.1, theta_theta=0.1, l=16
 ):
     r"""
     Generates the generation interval with two underlying gamma distributions for mu and theta
-        
+
         .. math::
 
             g(\tau) = Gamma(\tau;
@@ -225,6 +239,8 @@ def construct_generation_interval(
 
     Parameters
     ----------
+    name: string
+        Name of the distribution for trace and debugging.
     mu_k : number, optional
         Concentration/k parameter for underlying gamma distribution of mu (:math:`\mu_{D_{\text{gene}}}`).
         |default| 120
@@ -302,7 +318,7 @@ def construct_generation_interval(
     g = gamma(tf.range(0.1, l + 0.1, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
     # g = weibull(tf.range(1, l, dtype=g_mu.dtype), g_mu / g_theta, 1.0 / g_theta)
 
-    g = yield Deterministic("g", g)
+    g = yield Deterministic(name=name, value=g)
     return (
         g,
         tf.expand_dims(g_mu, axis=-1),
@@ -431,7 +447,7 @@ def InfectionModel_unrolled(N, I_0, R_t, C, g_p):
     This function unrolls the loop. It compiling time is slower (about 10 minutes)
     but the running time is faster and more parallel:
 
-        #. Converts the given :math:`I_0` values  to an exponential distributed initial :math:`I_{0_t}` with an
+        #. Converts the given :math:`I_0` values to an exponential distributed initial :math:`I_{0_t}` with an
            length of :math:`l` this can be seen in :py:func:`_construct_I_0_t`.
 
         #. Calculates :math:`R_{eff}` for each time step using the given contact matrix :math:`C`:
@@ -535,10 +551,10 @@ def InfectionModel_unrolled(N, I_0, R_t, C, g_p):
     return I_t  # batch_dims x time x country x age
 
 
-def construct_delay_kernel(name, loc, scale, length_kernel, modelParams):
+def construct_delay_kernel(name, modelParams, loc, scale, length_kernel):
     r"""
         Constructs delay :math:`d` in hierarchical manner:
-        
+
         .. math::
 
             \mu_c^d &\sim \text{LogNormal}\left(\mu=2.5,\sigma=0.1\right) \quad \forall c \\
@@ -549,15 +565,16 @@ def construct_delay_kernel(name, loc, scale, length_kernel, modelParams):
         ----------
         name:
             Name of the delay distribution
+        modelParams: :py:class:`covid19_npis.ModelParams`
+            Instance of modelParams, mainly used for number of age groups and
+            number of countries.
         loc:
             Location of the hierarchical Lognormal distribution for the mean of the delay.
         scale:
             Theta parameter for now#
         length_kernel:
             Length of the delay kernel in days.
-        modelParams: :py:class:`covid19_npis.ModelParams`
-            Instance of modelParams, mainly used for number of age groups and
-            number of countries. 
+
         Returns
         -------
         :
@@ -569,8 +586,8 @@ def construct_delay_kernel(name, loc, scale, length_kernel, modelParams):
         Think about sigma distribution and how to parameterize it. Also implement that.
 
     """
-    mean_delay = yield LogNormal(
-        name="mean_delay",
+    delay_mean = yield LogNormal(
+        name="delay_mean",
         loc=np.log(loc, dtype="float32"),
         scale=0.1,
         event_stack=(
@@ -579,7 +596,7 @@ def construct_delay_kernel(name, loc, scale, length_kernel, modelParams):
         ),  # country, time placeholder -> we do not want to do tf.expanddims
         conditionally_independent=True,
     )
-    theta_delay = scale  # For now
+    delay_theta = scale  # For now
 
     # Time tensor
     t = tf.range(
@@ -587,7 +604,7 @@ def construct_delay_kernel(name, loc, scale, length_kernel, modelParams):
     )  # The gamma function does not like 0!
     log.debug(f"time\n{t}")
     # Create gamma pdf from sampled mean and scale.
-    delay = gamma(t, mean_delay / theta_delay, 1.0 / theta_delay)
+    delay = gamma(t, delay_mean / delay_theta, 1.0 / delay_theta)
     log.debug(f"delay\n{delay}")
     # Reshape delay i.e. add age group such that |shape| batch, time, country, age group
     delay = tf.stack([delay] * modelParams.num_age_groups, axis=-1)

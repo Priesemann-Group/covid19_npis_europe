@@ -36,10 +36,10 @@ def main_model(modelParams):
     """
     R_0 = yield reproduction_number.construct_R_0(
         name="R_0",
+        modelParams=modelParams,
         loc=2.0,
         scale=0.5,
         hn_scale=0.3,  # Scale parameter of HalfNormal for each country
-        modelParams=modelParams,
     )
     log.debug(f"R_0:\n{R_0}")
 
@@ -101,8 +101,8 @@ def main_model(modelParams):
     )
     # Add h_0(t) to trace
     yield Deterministic(
-        "h_0_t",
-        tf.einsum("t...ca->...tca", h_0_t),
+        name="h_0_t",
+        value=tf.einsum("t...ca->...tca", h_0_t),
         shape_label=("time", "country", "age_group"),
     )
     log.debug(f"h_0(t):\n{h_0_t}")
@@ -134,7 +134,7 @@ def main_model(modelParams):
 
     """ # Number of tests and deaths
         We simulate our reported cases i.e positiv test and totalnumber of tests total
-        and deaths. 
+        and deaths.
     """
     # Tests
     total_tests, positive_tests = yield number_of_tests.generate_testing(

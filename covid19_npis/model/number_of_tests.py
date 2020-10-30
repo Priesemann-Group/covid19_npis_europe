@@ -214,7 +214,7 @@ def _calc_total_number_of_tests_performed(
             Number of traced persons per case with subsequent negative test per case
             :math:`\eta_{\text{traced}, c}(t).`
             |shape| batch, time, country
-        
+
         xi: tf.Tensor
             Base rate of testing per day that leads to negative tests
             :math:`\xi_c(t).`
@@ -227,14 +227,25 @@ def _calc_total_number_of_tests_performed(
             |shape| batch, time, country, age_group
     """
 
+    # Calc total number of tests
+    phi_tests_reported = yield _construct_phi_tests_reported(
+        name="phi_tests_reported",
+        modelParams=modelParams,
+    )
+
     inner = (
         tf.einsum("...tca,...tc->...tca", new_E_t_delayed, phi_plus)
         + tf.einsum("...tca,...tc,...tc->...tca", new_E_t_delayed, phi_plus, eta)
         + xi[..., tf.newaxis]
     )
-    n_Sigma = tf.einsum("...c,...tca->...tca", phi_tests_reported, inner)
+    total_tests = tf.einsum("...c,...tca->...tca", phi_tests_reported, inner)
 
-    return n_Sigma
+    total_tests = yield Deterministic(
+        name=name,
+        value=total_tests,
+        shape_label=("time", "country", "age_group"),
+    )
+    return total_tests
 
 
 def _construct_phi_tests_reported(
@@ -305,6 +316,7 @@ def _construct_phi_tests_reported(
 
 def _construct_phi_age(name, modelParams, sigma_scale=0.2):
     r"""
+        Fraction of positive tests :math:`\phi_{\text{age}, a}.`
 
         .. math::
 
@@ -383,17 +395,17 @@ def _construct_reporting_delay(
             \sigma_{m_{D\, \text{test}}} &\sim HalfNormal(3), \label{eq:prior_delta_m_delay}\\
             \theta_{D_\text{test}, c} &\sim \mathcal{N}(\mu_{\theta_{D_\text{test}}},\sigma_{\theta_{D_\text{test}}}),\\
             \mu_{\theta_{D_\text{test}}} &\sim \mathcal{N}(1.5, 0.4),\\
-            \sigma_{\theta_{D_\text{test}}} &\sim HalfNormal(0.2). 
+            \sigma_{\theta_{D_\text{test}}} &\sim HalfNormal(0.2).
 
         Parameters
         ----------
         name: str
-            Name of the reporting delay variable :math:`m_{D_\text{test},c,b}.`  
+            Name of the reporting delay variable :math:`m_{D_\text{test},c,b}.`
 
         modelParams: :py:class:`covid19_npis.ModelParams`
             Instance of modelParams, mainly used for number of age groups and
-            number of countries.    
-        
+            number of countries.
+
         m_ast: tf.Tensor
             :math:`m^\ast_{D_\text{test}, c,b}`
             |shape| batch, country, spline
@@ -496,7 +508,7 @@ def _calc_reporting_delay_kernel(name, m, theta, length_kernel=14):
         Name of the reporting delay kernel :math:`f_{c,t}(\tau)`
     m:
         |shape| batch, time, country
-    theta: 
+    theta:
         |shape| batch, country
     length_kernel: optional
         Length of the kernel in days
@@ -549,7 +561,7 @@ def construct_testing_state(
 ):
     r"""
         .. math::
-            
+
             (\phi^\dagger_{\text{tested},c,b},
             \: \eta^\dagger_{\text{traced},c,b},
             \: \xi^\dagger_{c,b},
@@ -580,7 +592,7 @@ def construct_testing_state(
 
         at last we transform the variables :math:`\phi_{+,c,b},\: \eta_{\text{traced},c,b},\: \xi_{c,b}`
 
-        .. math:: 
+        .. math::
 
             \phi_{+,c,b} &= \frac{e^{\phi^\dagger_{+,c,b}}}{e^{\phi^\dagger_{+,c,b}} + 1},\\
             \eta_{\text{traced},c,b} &= \ln \left(1 + e^{ \eta^\dagger_{\text{traced},c,b}} \right),\\
@@ -634,7 +646,7 @@ def construct_testing_state(
 
         Returns
         -------
-        : 
+        :
             Testing state tuple :math:`(\phi_{+,c,b},
             \: \eta_{\text{traced},c,b},\: \xi_{c,b},\: m_{D_\text{test},c,b}),\: \theta_{D_\text{test}}.`
             |shape| 4 x (batch, country, spline),

@@ -36,8 +36,8 @@ dists_to_modify = [
 
 class DistributionAdditions:
     """
-        Additional kwargs for every distribution.
-        Every distribution class should inherit this class. 
+    Additional kwargs for every distribution.
+    Every distribution class should inherit this class.
     """
 
     def __init__(self, *args, **kwargs):

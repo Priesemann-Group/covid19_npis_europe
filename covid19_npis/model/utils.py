@@ -367,7 +367,7 @@ def concatenate_axes(tensor, axis1, axis2):
 def slice_of_axis(tensor, axis, begin, end):
     """
     Returns the tensor where the axis `axis` is sliced from `begin` to `end`
-    
+
     Parameters
     ----------
     tensor : tensor
@@ -416,7 +416,7 @@ def convolution_with_fixed_kernel(
         Each of this dimension is therefore subject to a different filter
     padding : int
         By default, the padding is set to length of data_time_axis divided by 4.
-    
+
     Returns
     -------
     A convolved tensor with the same shape as data.
@@ -499,7 +499,7 @@ def convolution_with_varying_kernel(data, kernel, data_time_axis, filter_axes_da
     filter_axes_data : tuple
         the axes of `data`, to which the `filter_axes` of `kernel` should be mapped to.
         Each of this dimension is therefore subject to a different filter
-    
+
     Returns
     -------
     A convolved tensor with the same shape as data.
@@ -546,8 +546,8 @@ def convolution_with_map(data, kernel, modelParams):
     """
     Parameters
     ----------
-    data: 
-        |shape| batch, time, country, agegroup 
+    data:
+        |shape| batch, time, country, agegroup
     """
     data = tf.einsum("...tca->...cat", data)
     kernel_len = kernel.shape[-1]
@@ -592,7 +592,7 @@ def convolution_with_map(data, kernel, modelParams):
 
 def get_filter_axis_data_from_dims(ndim):
     """
-    Returns filter axis data from len(new_I_t.shape) 
+    Returns filter axis data from len(new_I_t.shape)
     """
     if ndim == 4:
         filter_axes_data = [

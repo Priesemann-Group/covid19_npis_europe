@@ -127,7 +127,7 @@ def construct_h_0_t(
     log.debug(f"R_t:\n{R_t.shape}")
 
     h_0_t_rand = tf.math.cumsum(
-        tf.concat([h_0_base, h_0_base_add,], axis=-3,), axis=-3
+        tf.concat([h_0_base, h_0_base_add,], axis=-3,), axis=-3,
     )  # shape:  batch_dims x len_gen_interv_kernel x countries x age_groups
 
     h_0_t_rand = tf.einsum(

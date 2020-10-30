@@ -72,15 +72,18 @@ covid19_npis.utils.split_cpu_in_logical_devices(4)
 """
 
 # Load our data from csv files into our own custom data classes
-
-c1 = covid19_npis.data.Country("../data/Germany",)  # name
-c2 = covid19_npis.data.Country("../data/France",)
-
-
 """
-c1 = covid19_npis.data.Country("../data/Germany",)  # Data folder for germany
-c2 = covid19_npis.data.Country("../data/France",)
+c1 = covid19_npis.data.Country(
+    "../data/Germany",
+)  # name
+c2 = covid19_npis.data.Country(
+    "../data/France",
+)
 """
+
+c1 = covid19_npis.data.Country("../data/test_country_1",)  # Data folder for germany
+c2 = covid19_npis.data.Country("../data/test_country_2",)
+
 # Construct our modelParams from the data.
 modelParams = covid19_npis.ModelParams(countries=[c1, c2])
 
@@ -175,7 +178,7 @@ for name in dist_names:
 
 """ ## Plot time series
 """
-ts_names = ["positive_tests", "R_t", "h_0_t", "total_tests"]
+ts_names = ["positive_tests", "R_t", "h_0_t", "total_tests_compact"]
 ts_fig = {}
 ts_axes = {}
 for name in ts_names:

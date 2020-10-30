@@ -20,20 +20,20 @@ from .. import modelParams
 
 def _fsigmoid(t, l, d):
     r"""
-        Calculates and returns
+    Calculates and returns
 
-        .. math::
+    .. math::
 
-            \frac{1}{1+e^{-4/l*(t-d)}}
+        \frac{1}{1+e^{-4/l*(t-d)}}
 
-        Parameters
-        ----------
-        t:
-            Time, "variable"
-        l:
-            Length of the change point, determines scale
-        d:
-            Date of the change point, determines location
+    Parameters
+    ----------
+    t:
+        Time, "variable"
+    l:
+        Length of the change point, determines scale
+    d:
+        Date of the change point, determines location
     """
     # Prep dimensions
     d = tf.expand_dims(d, axis=-1)
@@ -365,7 +365,7 @@ def construct_R_t(R_0, modelParams):
     log.debug(f"d_i_c_p\n{d_i_c_p}")
 
     def gamma(d_i_c_p, l_i_sign):
-        """ 
+        """
         Helper function to construct gamma_i_c_p and calculate gamma_i_c
         """
         # Create time index tensor of length modelParams.simlength
@@ -501,25 +501,25 @@ def construct_R_0(name, loc, scale, hn_scale, modelParams):
 
 def construct_R_0_old(name, mean, beta, modelParams):
     r"""
-        Old constructor of :math:`R_0` using a gamma distribution:
+    Old constructor of :math:`R_0` using a gamma distribution:
 
-        .. math::
-            
-            R_0 &\sim Gamma\left(\mu=2.5,\beta=2.0\right)
+    .. math::
 
-        Parameters
-        ----------
-        name: string
-            Name of the distribution for trace and debugging.
-        mean: 
-            Mean :math:`\mu` of the gamma distribution.
-        beta:
-            Rate :math:`\beta` of the gamma distribution.
+        R_0 &\sim Gamma\left(\mu=2.5,\beta=2.0\right)
 
-        Returns
-        -------
-        : 
-            R_0 tensor |shape| batch, country, age_group
+    Parameters
+    ----------
+    name: string
+        Name of the distribution for trace and debugging.
+    mean:
+        Mean :math:`\mu` of the gamma distribution.
+    beta:
+        Rate :math:`\beta` of the gamma distribution.
+
+    Returns
+    -------
+    :
+        R_0 tensor |shape| batch, country, age_group
 
     """
     event_shape = (modelParams.num_countries, modelParams.num_age_groups)

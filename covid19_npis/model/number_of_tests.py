@@ -22,37 +22,37 @@ from . import utils
 
 def generate_testing(name_total, name_positive, modelParams, new_E_t):
     r"""
-        High level function for generating/simulating testing behaviour.
-        
-        Constructs B splines
-        Delay cases
+    High level function for generating/simulating testing behaviour.
 
-        ToDo:
-        -----
-        - more documenation here
+    Constructs B splines
+    Delay cases
 
-        Parameters:
-        -----------
-        name_total: str,
-            Name for the total tests performed
+    ToDo:
+    -----
+    - more documenation here
 
-        name_positive: str,
-            Name for the positive tests performed
+    Parameters:
+    -----------
+    name_total: str,
+        Name for the total tests performed
 
-        modelParams: :py:class:`covid19_npis.ModelParams`
-            Instance of modelParams, mainly used for number of age groups and
-            number of countries.
+    name_positive: str,
+        Name for the positive tests performed
 
-        new_E_t: tf.Tensor
-            New cases :math:`\E_{\text{age}, a}.`
-            |shape| batch, time, country, age_group
+    modelParams: :py:class:`covid19_npis.ModelParams`
+        Instance of modelParams, mainly used for number of age groups and
+        number of countries.
 
-        Returns
-        -------
-        :
-            (:math:`n_{\Sigma, c,a}(t)`, :math:`n_{{+}, {c,a}}(t)`
-            Total and positive tests by age group and country
-            |shape| (batch, time, country, age_group) x 2
+    new_E_t: tf.Tensor
+        New cases :math:`\E_{\text{age}, a}.`
+        |shape| batch, time, country, age_group
+
+    Returns
+    -------
+    :
+        (:math:`n_{\Sigma, c,a}(t)`, :math:`n_{{+}, {c,a}}(t)`
+        Total and positive tests by age group and country
+        |shape| (batch, time, country, age_group) x 2
     """
 
     # Get basic functions for b-splines (used later)
@@ -135,41 +135,46 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
     total_tests = yield Deterministic(
         name_total, total_tests, shape_label=("time", "country", "age_group")
     )
+    total_tests_compact = yield Deterministic(
+        f"{name_total}_compact",
+        tf.reduce_sum(total_tests, axis=-1),
+        shape_label=("time", "country", "age_group"),
+    )
     log.debug(f"total_tests\n{total_tests}")
     return (total_tests, positive_tests)
 
 
 def _calc_positive_tests(new_E_t_delayed, phi_plus, phi_age):
     r"""
-        .. math::
+    .. math::
 
-            n_{{+}, {c,a}}(t) =\Tilde{E}_{\text{delayTest}, {c,a}}(t) \cdot \phi_{+, c}(t) \cdot \phi_{\text{age}, a},
+        n_{{+}, {c,a}}(t) =\Tilde{E}_{\text{delayTest}, {c,a}}(t) \cdot \phi_{+, c}(t) \cdot \phi_{\text{age}, a},
 
 
-        Parameters
-        -----------
+    Parameters
+    -----------
 
-        name: str
-            Name of the variable for the new positive cases :math:`n_{{+}, {c,a}}(t)`
-            in the trace.
+    name: str
+        Name of the variable for the new positive cases :math:`n_{{+}, {c,a}}(t)`
+        in the trace.
 
-        new_E_t_delayed: tf.Tensor
-            New cases with reporting delay :math:`\Tilde{E}_{\text{delayTest}, c,a}(t).`
-            |shape| batch, time, country, age_group
+    new_E_t_delayed: tf.Tensor
+        New cases with reporting delay :math:`\Tilde{E}_{\text{delayTest}, c,a}(t).`
+        |shape| batch, time, country, age_group
 
-        phi_plus: tf.Tensor
-            Fraction of positive tests :math:`\phi_{+, c}(t).`
-            |shape| batch, time, country
+    phi_plus: tf.Tensor
+        Fraction of positive tests :math:`\phi_{+, c}(t).`
+        |shape| batch, time, country
 
-        phi_age: tf.Tensor
-            Fraction of positive tests :math:`\phi_{\text{age}, a}.`
-            |shape| batch, age_group
+    phi_age: tf.Tensor
+        Fraction of positive tests :math:`\phi_{\text{age}, a}.`
+        |shape| batch, age_group
 
-        Returns
-        -------
-        :
-            :math:`n_{{+}, {c,a}}(t)`
-            |shape| batch, time, country, age_group
+    Returns
+    -------
+    :
+        :math:`n_{{+}, {c,a}}(t)`
+        |shape| batch, time, country, age_group
     """
 
     n_plus = tf.einsum("...tca,...tc,...a->...tca", new_E_t_delayed, phi_plus, phi_age)
@@ -763,7 +768,7 @@ def construct_testing_state(
 
 def construct_Bsplines_basis(modelParams):
     r"""
-    Function to construct the basis functions for all BSplines, should only be called 
+    Function to construct the basis functions for all BSplines, should only be called
     once. Uses splipy python library.
 
     Parameters
@@ -778,7 +783,7 @@ def construct_Bsplines_basis(modelParams):
         |default| 3
 
     knots: list, optional
-        Knots array used for constructing the BSplines. 
+        Knots array used for constructing the BSplines.
         |default| one knot every 7 days
 
     Returns
@@ -794,29 +799,29 @@ def construct_Bsplines_basis(modelParams):
 
 def _calculate_Bsplines(coef, basis):
     r"""
-        Calculates the Bsplines given the basis functions B and the coefficients x.
+    Calculates the Bsplines given the basis functions B and the coefficients x.
 
-        .. math::
+    .. math::
 
-            x(t) = \sum_{b} x_b B_b(t)
+        x(t) = \sum_{b} x_b B_b(t)
 
 
-        Parameters
-        ----------
+    Parameters
+    ----------
 
-        coef: 
-            Coefficients :math:`x`.
-            |shape| ...,country, spline
+    coef:
+        Coefficients :math:`x`.
+        |shape| ...,country, spline
 
-        basis:
-            Basis functions tensor :math:`B.`
-            |shape| time, spline
+    basis:
+        Basis functions tensor :math:`B.`
+        |shape| time, spline
 
-        Returns
-        -------
-        :
-            :math:`x(t)`
-            |shape| ...,time, country
+    Returns
+    -------
+    :
+        :math:`x(t)`
+        |shape| ...,time, country
 
     """
 

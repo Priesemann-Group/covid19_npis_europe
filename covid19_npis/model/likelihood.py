@@ -13,30 +13,30 @@ log = logging.getLogger(__name__)
 
 def studentT_likelihood(modelParams, pos_tests, total_tests, deaths):
     """
-        Highlevel function for the likelihood of our model.
-        At the moment there are 3 function calls inside this function:
-            - positive tests :py:func:`_studentT_positive_tests`
-            - total tests :py:func:`_studentT_total_tests`
-            - deaths :py:func:`_studentT_deaths`
+    Highlevel function for the likelihood of our model.
+    At the moment there are 3 function calls inside this function:
+        - positive tests :py:func:`_studentT_positive_tests`
+        - total tests :py:func:`_studentT_total_tests`
+        - deaths :py:func:`_studentT_deaths`
 
 
-        Parameters
-        ----------
-        modelParams: :py:class:`covid19_npis.ModelParams`
-            Instance of modelParams, mainly used for number of age groups and
-            number of countries.
+    Parameters
+    ----------
+    modelParams: :py:class:`covid19_npis.ModelParams`
+        Instance of modelParams, mainly used for number of age groups and
+        number of countries.
 
-        pos_tests: tf.Tensor
-            Inferred tensor for the number of positive tests recorded. 
-            |shape| batch, time, country, age_group
+    pos_tests: tf.Tensor
+        Inferred tensor for the number of positive tests recorded.
+        |shape| batch, time, country, age_group
 
-        total_tests: tf.Tensor
-            Inferred tensor for the number of total tests recorded. 
-            |shape| batch, time, country, age_group
+    total_tests: tf.Tensor
+        Inferred tensor for the number of total tests recorded.
+        |shape| batch, time, country, age_group
 
-        deaths: tf.Tensor
-            Inferred tensor for the number of total tests recorded. 
-            |shape| batch, time, country, age_group
+    deaths: tf.Tensor
+        Inferred tensor for the number of total tests recorded.
+        |shape| batch, time, country, age_group
 
     """
 
@@ -55,21 +55,21 @@ def studentT_likelihood(modelParams, pos_tests, total_tests, deaths):
 
 def _studentT_positive_tests(modelParams, pos_tests):
     r"""
-        Creates studentT likelihood for the recorded positive tests.
+    Creates studentT likelihood for the recorded positive tests.
 
-        .. math::
+    .. math::
 
-            \text{Add math}
+        \text{Add math}
 
-        Parameters
-        ----------
-        modelParams: :py:class:`covid19_npis.ModelParams`
-            Instance of modelParams, mainly used for number of age groups and
-            number of countries.
+    Parameters
+    ----------
+    modelParams: :py:class:`covid19_npis.ModelParams`
+        Instance of modelParams, mainly used for number of age groups and
+        number of countries.
 
-        pos_tests: tf.Tensor
-            Inferred tensor for the number of positive tests recorded. 
-            |shape| batch, time, country, age_group
+    pos_tests: tf.Tensor
+        Inferred tensor for the number of positive tests recorded.
+        |shape| batch, time, country, age_group
     """
 
     # Scale of the likelihood sigma
@@ -108,21 +108,21 @@ def _studentT_positive_tests(modelParams, pos_tests):
 
 def _studentT_total_tests(modelParams, total_tests):
     """
-        Creates studentT likelihood for the recorded total tests.
+    Creates studentT likelihood for the recorded total tests.
 
-        .. math::
+    .. math::
 
-            \text{Add math}
+        \text{Add math}
 
-        Parameters
-        ----------
-        modelParams: :py:class:`covid19_npis.ModelParams`
-            Instance of modelParams, mainly used for number of age groups and
-            number of countries.
+    Parameters
+    ----------
+    modelParams: :py:class:`covid19_npis.ModelParams`
+        Instance of modelParams, mainly used for number of age groups and
+        number of countries.
 
-        total_tests: tf.Tensor
-            Inferred tensor for the number of total tests recorded. 
-            |shape| batch, time, country, age_group
+    total_tests: tf.Tensor
+        Inferred tensor for the number of total tests recorded.
+        |shape| batch, time, country, age_group
     """
 
     # Sadly we do not have age strata for the total performed test. We sum over the
@@ -168,21 +168,21 @@ def _studentT_total_tests(modelParams, total_tests):
 
 def _studentT_deaths(modelParams, deaths):
     """
-        Creates studentT likelihood for the recorded deaths.
+    Creates studentT likelihood for the recorded deaths.
 
-        .. math::
+    .. math::
 
-            \text{Add math}
+        \text{Add math}
 
-        Parameters
-        ----------
-        modelParams: :py:class:`covid19_npis.ModelParams`
-            Instance of modelParams, mainly used for number of age groups and
-            number of countries.
+    Parameters
+    ----------
+    modelParams: :py:class:`covid19_npis.ModelParams`
+        Instance of modelParams, mainly used for number of age groups and
+        number of countries.
 
-        total_tests: tf.Tensor
-            Inferred tensor for the number of total tests recorded. 
-            |shape| batch, time, country, age_group
+    total_tests: tf.Tensor
+        Inferred tensor for the number of total tests recorded.
+        |shape| batch, time, country, age_group
     """
 
     # Sadly we do not have age strata for the number of deaths in most countries.

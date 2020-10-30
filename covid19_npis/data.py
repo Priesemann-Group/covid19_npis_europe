@@ -13,7 +13,7 @@ def convert_trace_to_dataframe_list(trace, sample_state):
     r"""
     Converts the pymc4 arviz trace to multiple pandas dataframes.
     Also sets the right labels for the  dimensions i.e splits data by
-    country and age group. 
+    country and age group.
 
     Do not look too much into this function if you want to keep your sanity!
 
@@ -22,7 +22,7 @@ def convert_trace_to_dataframe_list(trace, sample_state):
     trace: arivz InferenceData
 
     sample_state: pymc4 sample state
-        
+
     Returns
     -------
     list of pd.DataFrame
@@ -58,7 +58,7 @@ def convert_trace_to_dataframe(trace, sample_state, key, data_type=None):
     r"""
     Converts the pymc4 arviz trace for a single key to a pandas dataframes.
     Also sets the right labels for the  dimensions i.e splits data by
-    country and age group. 
+    country and age group.
 
     Do not look too much into this function if you want to keep your sanity!
 
@@ -143,7 +143,7 @@ def convert_trace_to_dataframe(trace, sample_state, key, data_type=None):
     # Rename dimensions if shape labels are present
     if hasattr(dist, "shape_label"):
         for i in range(ndim):
-            if isinstance(dist.shape_label, (list, tuple,)):
+            if isinstance(dist.shape_label, (list, tuple,),):
                 label = dist.shape_label[i]
             else:
                 label = dist.shape_label
@@ -202,52 +202,52 @@ def select_from_dataframe(df, axis=0, **kwargs):
 
 
 class Country(object):
-    """ Country data class!
-        Contains death, new_cases/positive tests, daily tests, interventions and config data for a specific country.
-        Retrieves this data from a gives folder. There are the following specifications for the data:
+    """Country data class!
+    Contains death, new_cases/positive tests, daily tests, interventions and config data for a specific country.
+    Retrieves this data from a gives folder. There are the following specifications for the data:
 
-        - new_cases.csv
-            - Time/Date column has to be named "date" or "time"
-            - Age group columns have to be named consistent between different data and
-            countries 
-
-
-        - interventions.csv
-            - Time/Date column has to be named "date" or "time"
-            - Different intervention as additional columns with intervention name as
-            column name
+    - new_cases.csv
+        - Time/Date column has to be named "date" or "time"
+        - Age group columns have to be named consistent between different data and
+        countries
 
 
-        - tests.csv
-            - Time/Date column has to be named "date" or "time"
-            - Daily performed tests column with name "tests"
+    - interventions.csv
+        - Time/Date column has to be named "date" or "time"
+        - Different intervention as additional columns with intervention name as
+        column name
 
 
-        - deaths.csv
-            - Time/Date column has to be named "date" or "time"
-            - Daily deaths column has to be named "deaths"
-            - Optional: Daily deaths per age group same column names as in new_cases
+    - tests.csv
+        - Time/Date column has to be named "date" or "time"
+        - Daily performed tests column with name "tests"
 
 
-        - population.csv
-            - Age column named "age"
-            - Column Number of people per age named "PopTotal"
+    - deaths.csv
+        - Time/Date column has to be named "date" or "time"
+        - Daily deaths column has to be named "deaths"
+        - Optional: Daily deaths per age group same column names as in new_cases
 
 
-        - config.json, dict:
-            - name : "country_name"
-            - age_groups : dict 
-                - "column_name" : [age_lower, age_upper]
+    - population.csv
+        - Age column named "age"
+        - Column Number of people per age named "PopTotal"
 
 
-        Also calculates change points and interventions automatically on init.
+    - config.json, dict:
+        - name : "country_name"
+        - age_groups : dict
+            - "column_name" : [age_lower, age_upper]
 
-        Parameters
-        ----------
-        path_to_folder : string
-            Filepath to the folder, which holds all the data for the country!
-            Should be something like "../data/Germany".
-            That is new_cases.csv, interventions.csv, population.csv
+
+    Also calculates change points and interventions automatically on init.
+
+    Parameters
+    ----------
+    path_to_folder : string
+        Filepath to the folder, which holds all the data for the country!
+        Should be something like "../data/Germany".
+        That is new_cases.csv, interventions.csv, population.csv
 
     """
 
@@ -351,6 +351,8 @@ class Country(object):
         else:
             self.data_population = None
 
+        log.info(f"Loaded data for {self.name}.")
+
     def __check_for_age_group_names(self):
         for age_group in self.age_groups:
             if age_group not in self.data_new_cases.columns.get_level_values(
@@ -363,7 +365,7 @@ class Country(object):
 
     def _load_csv_with_date_index(self, filepath):
         """
-            Loads csv file with date column
+        Loads csv file with date column
         """
         data = pd.read_csv(filepath)
         if "date" in data.columns:
@@ -377,21 +379,21 @@ class Country(object):
 
     def _to_iso(self, df, name=None):
         """
-            Create multicolumn from normal columns with country at level 0
-            and name for level 1. Or only constructs one level if no name is supplied.
+        Create multicolumn from normal columns with country at level 0
+        and name for level 1. Or only constructs one level if no name is supplied.
 
-            Parameters
-            ----------
-            df : pandas.DataFrame
+        Parameters
+        ----------
+        df : pandas.DataFrame
 
-            name: str, optional
+        name: str, optional
         """
 
         if name is None:
             if len(df.columns) != 1:
                 log.warning(f"Multiple columns found in {df.name}! Using first one!")
             df.columns = pd.MultiIndex(
-                levels=[[self.name,],], codes=[[0,],], names=["country"]
+                levels=[[self.name,],], codes=[[0,],], names=["country"],
             )
             return df
 
@@ -403,18 +405,18 @@ class Country(object):
 
     def create_change_points(self, df):
         """
-            Create change points for a single intervention and also adds
-            interventions if they do not exist yet.
+        Create change points for a single intervention and also adds
+        interventions if they do not exist yet.
 
-            Parameters
-            ----------
-            df : pandas.DataFrame
-                Single intervention column with datetime index.
+        Parameters
+        ----------
+        df : pandas.DataFrame
+            Single intervention column with datetime index.
 
-            Returns
-            -------
-            :
-                Change points dict :code:`{name:[cps]}`
+        Returns
+        -------
+        :
+            Change points dict :code:`{name:[cps]}`
         """
         # Add intervention also checks if it exists
         num_stages = df.max()  # 0,1,2,3 -> 4
@@ -449,16 +451,16 @@ class Country(object):
     @classmethod
     def add_intervention(cls, name, num_stages):
         """
-            Constructs and adds intervention to the class attributes if that
-            intervention does not exist yet! This is done by name check.
+        Constructs and adds intervention to the class attributes if that
+        intervention does not exist yet! This is done by name check.
 
-            Parameters
-            ----------
-            name : string
-                Name of the intervention
+        Parameters
+        ----------
+        name : string
+            Name of the intervention
 
-            time_series : pandas.DataFrame
-                Intervention indexs as time series with datetime index!
+        time_series : pandas.DataFrame
+            Intervention indexs as time series with datetime index!
         """
 
         # Break if intervention does already exist!
@@ -477,17 +479,17 @@ class Country(object):
     @classmethod
     def set_intervention_alpha_prior(cls, name, prior_loc, prior_scale):
         """
-            Manual set prior for effectivity alpha for a intervention via the name.
-            That is it set prior_alpha_loc and prior_alpha_scale of a Intervention instance.
+        Manual set prior for effectivity alpha for a intervention via the name.
+        That is it set prior_alpha_loc and prior_alpha_scale of a Intervention instance.
 
-            Parameters
-            ----------
-            name: string
-                Name of intervention
+        Parameters
+        ----------
+        name: string
+            Name of intervention
 
-            prior_loc : number
+        prior_loc : number
 
-            prior_scale: number
+        prior_scale: number
         """
 
         for interv in cls.interventions:
@@ -513,17 +515,17 @@ class Country(object):
 
 class Intervention(object):
     """
-        Parameters
-        ----------
-        name : string
-            Name of the intervention
+    Parameters
+    ----------
+    name : string
+        Name of the intervention
 
-        num_stages: int,
-            Number of different stages the intervention can have.
+    num_stages: int,
+        Number of different stages the intervention can have.
 
-        prior_alpha_loc : number, optional
+    prior_alpha_loc : number, optional
 
-        prior_alpha_scale : number, optional
+    prior_alpha_scale : number, optional
     """
 
     def __init__(self, name, num_stages, prior_alpha_loc=0.1, prior_alpha_scale=0.1):
@@ -541,19 +543,19 @@ class Intervention(object):
 
 class Change_point(object):
     """
-        Parameters
-        ----------
-        prior_date_loc : number
-            Mean of prior distribution for the location (date) of the change point.
+    Parameters
+    ----------
+    prior_date_loc : number
+        Mean of prior distribution for the location (date) of the change point.
 
-        gamma_max:
-            Gamma max value for change point
+    gamma_max:
+        Gamma max value for change point
 
-        length : number, optional
-            Length of change point
+    length : number, optional
+        Length of change point
 
-        prior_date_scale : number, optional
-            Scale of prior distribution for the location (date) of the change point.
+    prior_date_scale : number, optional
+        Scale of prior distribution for the location (date) of the change point.
     """
 
     def __init__(self, date_data, gamma_max):

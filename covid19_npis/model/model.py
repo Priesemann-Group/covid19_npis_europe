@@ -31,7 +31,7 @@ log = logging.getLogger(__name__)
 @pm.model()
 def main_model(modelParams):
 
-    """ # Create initial Reproduction Number R_0:
+    """# Create initial Reproduction Number R_0:
     The returned R_0 tensor has the |shape| batch, country, age_group.
     """
     R_0 = yield reproduction_number.construct_R_0(

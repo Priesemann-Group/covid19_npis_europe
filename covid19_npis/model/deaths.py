@@ -122,9 +122,7 @@ def _construct_reporting_delay(
     """ # Mean m
     """
     m_sigma = yield HalfNormal(
-        name=f"{name}_m_sigma",
-        scale=m_sigma_scale,
-        conditionally_independent=True,
+        name=f"{name}_m_sigma", scale=m_sigma_scale, conditionally_independent=True,
     )
     mu_m = (
         yield Normal(
@@ -269,7 +267,7 @@ def _calc_Phi_IFR(
     return Phi_IFR
 
 
-def calc_delayed_deaths(name, new_cases, Phi_IFR, m, theta, length_kernel=14):
+def calc_delayed_deaths(name, new_cases, Phi_IFR, m, theta, length_kernel=40):
     r"""
     Calculates delayed deahs from IFR and delay kernel.
 
@@ -316,27 +314,23 @@ def calc_delayed_deaths(name, new_cases, Phi_IFR, m, theta, length_kernel=14):
     tau = tf.range(
         0.01, length_kernel + 0.01, 1.0, dtype="float32"
     )  # The gamma function does not like 0!
-
     # Get shapes right we want c,t
-    m = m[..., tf.newaxis, tf.newaxis]  # |shape| batch, country, age, time
-    theta = theta[..., tf.newaxis, tf.newaxis]  # |shape| batch, country, age, time
+
+    m = m[..., :, tf.newaxis]  # |shape| batch, country, time
+    theta = theta[..., :, tf.newaxis]  # |shape| batch, country, time
     # Calculate pdf
-    kernel = gamma(
-        tau,
-        m / theta + 1.0,
-        1.0 / theta,
-    )  # add age group dimension
+    kernel = gamma(tau, m / theta + 1.0, 1.0 / theta,)  # add age group dimension
     log.debug(f"kernel deaths\n{kernel}")
     log.debug(f"new_cases deaths\n{new_cases}")
 
     """ # Calc delayed deaths
     """
     if len(new_cases.shape) == 5:
-        filter_axes_data = [-5, -4, -2, -1]
+        filter_axes_data = [-5, -4, -2]
     elif len(new_cases.shape) == 4:
-        filter_axes_data = [-4, -2, -1]
+        filter_axes_data = [-4, -2]
     else:
-        filter_axes_data = [-2, -1]
+        filter_axes_data = [-2]
 
     dd = convolution_with_fixed_kernel(
         data=new_cases,
@@ -344,6 +338,7 @@ def calc_delayed_deaths(name, new_cases, Phi_IFR, m, theta, length_kernel=14):
         data_time_axis=-3,
         filter_axes_data=filter_axes_data,
     )
+
     log.debug(f"dd\n{dd.shape}")
     delayed_deaths = yield Deterministic(
         name=name,

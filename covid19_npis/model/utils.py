@@ -382,7 +382,7 @@ def slice_of_axis(tensor, axis, begin, end):
     """
 
     begin_axis = begin % tensor.shape[axis]
-    size_axis = (end - begin) % tensor.shape[axis]
+    size_axis = (end - begin - 1) % tensor.shape[axis] + 1
 
     begin_arr = np.zeros(len(tensor.shape), dtype="int")
     size_arr = np.array(tensor.shape)
@@ -424,19 +424,17 @@ def convolution_with_fixed_kernel(
     len_kernel = kernel.shape[-1]
     len_time = data.shape[data_time_axis]
 
-    # Add batch shapes to filter axes
-    while len(filter_axes_data) < len(data.shape) - 1:
-        filter_axes_data = [0] + list(filter_axes_data)
-
     data_time_axis = positive_axes(data_time_axis, ndim=len(data.shape))
 
     if padding is None:
         padding = np.ceil(len_time / 4).astype("int32")
 
-    kernel_for_frame = tf.repeat(kernel[..., tf.newaxis], repeats=padding, axis=-1)
+    kernel_for_frame = tf.repeat(
+        tf.reverse(kernel, axis=(-1,))[..., tf.newaxis], repeats=padding, axis=-1
+    )
 
     kernel_for_frame = tf.linalg.diag(
-        kernel_for_frame, k=(-len_kernel + 1, 0), num_rows=len_kernel + padding - 1
+        kernel_for_frame, k=(0, len_kernel - 1), num_rows=len_kernel + padding - 1
     )  # dimensions: conv_axes x copies for frame (padding) x time
 
     # if a filter_axis is larger then the data_time_axis, it has to be increased by one, as

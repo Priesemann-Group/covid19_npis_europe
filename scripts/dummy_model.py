@@ -121,13 +121,19 @@ end_time = time.time()
 log.info("running time: {:.1f}s".format(end_time - begin_time))
 
 # Save trace
-import datetime
-import arviz
+import pickle
 
 today = datetime.datetime.now()
-trace.posterior.to_netcdf(
-    f"./traces/{today.strftime('%y_%m_%d_%H')}.h5", engine="scipy"
+pickle.dump(
+    [main_model, trace],
+    open(f"./traces/{today.strftime('%y_%m_%d_%H')}", "wb"),
 )
+"""
+
+with open(f"./traces/{today.strftime('%y_%m_%d_%H')}", "rb") as f:
+    [main_model, trace] = pickle.load(f)
+"""
+
 
 """ # 3. Plotting
 """

@@ -10,18 +10,18 @@ log = logging.getLogger(__name__)
 
 class ModelParams:
     """
-        This is a class for all model parameters. It is mainly used to have a convenient
-        to access data in model wide parameters e.g. start date for simulation.
+    This is a class for all model parameters. It is mainly used to have a convenient
+    to access data in model wide parameters e.g. start date for simulation.
 
 
-        This class also contains the data used for fitting. `dataframe` is the original
-        dataframe. `data_tensor` is a tensor in the correct shape (time x countries x age)
-        with values replace by nans when no data is available.
+    This class also contains the data used for fitting. `dataframe` is the original
+    dataframe. `data_tensor` is a tensor in the correct shape (time x countries x age)
+    with values replace by nans when no data is available.
 
-        Parameters
-        ----------
-        countries: list of covid19_npis.data.Country objects
-            Data objects for multiple countries
+    Parameters
+    ----------
+    countries: list of covid19_npis.data.Country objects
+        Data objects for multiple countries
     """
 
     def __init__(
@@ -155,15 +155,13 @@ class ModelParams:
         i_data_begin_list = np.maximum(i_data_begin_list, self._min_offset_sim_data)
         self._indices_begin_data = i_data_begin_list
 
-
-
         """ # Update deaths data tensor/df
         set data tensor, replaces values smaller than 40 by nans.
         """
         deaths_tensor = (
             self._dataframe_deaths.to_numpy()
             .astype(self.dtype)
-            .reshape((-1, len(self.countries)))         ## assumes non-age-stratified data
+            .reshape((-1, len(self.countries)))  ## assumes non-age-stratified data
         )
         i_data_begin_list = []
         for c in range(deaths_tensor.shape[1]):
@@ -171,8 +169,12 @@ class ModelParams:
             i_data_begin = np.min(np.nonzero(mask)[0])
             i_data_begin_list.append(i_data_begin)
         i_data_begin_list = np.array(i_data_begin_list)
-        i_data_begin_list = np.maximum(i_data_begin_list, self._min_offset_sim_death_data)
-        self._indices_begin_data = np.maximum(i_data_begin_list,self._indices_begin_data)
+        i_data_begin_list = np.maximum(
+            i_data_begin_list, self._min_offset_sim_death_data
+        )
+        self._indices_begin_data = np.maximum(
+            i_data_begin_list, self._indices_begin_data
+        )
 
         for i in i_data_begin_list:
             data_tensor[:i] = np.nan
@@ -181,8 +183,7 @@ class ModelParams:
         self._deaths_data_tensor = deaths_tensor
 
     def _update_data_summary(self):
-        """ # Update Data summary
-        """
+        """# Update Data summary"""
         data = {  # Is set on init
             "begin": self.data_begin,
             "end": self.data_end,

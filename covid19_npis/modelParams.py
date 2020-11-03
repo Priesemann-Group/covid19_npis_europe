@@ -9,10 +9,10 @@ log = logging.getLogger(__name__)
 
 
 class ModelParams:
-    """ 
+    """
         This is a class for all model parameters. It is mainly used to have a convenient
         to access data in model wide parameters e.g. start date for simulation.
-        
+
 
         This class also contains the data used for fitting. `dataframe` is the original
         dataframe. `data_tensor` is a tensor in the correct shape (time x countries x age)
@@ -29,6 +29,8 @@ class ModelParams:
         countries,
         min_offset_sim_data=20,
         minimal_daily_cases=40,
+        min_offset_sim_death_data=40,
+        minimal_daily_deaths=40,
         spline_degree=3,
         spline_stride=7,
         dtype="float32",
@@ -37,6 +39,8 @@ class ModelParams:
         self._dtype = dtype
         self._min_offset_sim_data = min_offset_sim_data
         self._minimal_daily_cases = minimal_daily_cases
+        self._min_offset_sim_death_data = min_offset_sim_death_data
+        self._minimal_daily_deaths = minimal_daily_deaths
         self._spline_degree = spline_degree
         self._spline_stride = spline_stride
 
@@ -61,7 +65,7 @@ class ModelParams:
     def countries(self, countries):
         """
         Every time the countries are set we want to update every other,
-        data variable i.e. dataframe, data summary and data_tensor. 
+        data variable i.e. dataframe, data summary and data_tensor.
         This is done here!
         """
         self._countries = countries
@@ -134,7 +138,7 @@ class ModelParams:
         """
         self._update_data_summary()
 
-        """ # Update positive test data tensor/df 
+        """ # Update positive test data tensor/df
         set data tensor, replaces values smaller than 40 by nans.
         """
         data_tensor = (
@@ -150,9 +154,31 @@ class ModelParams:
         i_data_begin_list = np.array(i_data_begin_list)
         i_data_begin_list = np.maximum(i_data_begin_list, self._min_offset_sim_data)
         self._indices_begin_data = i_data_begin_list
+
+
+
+        """ # Update deaths data tensor/df
+        set data tensor, replaces values smaller than 40 by nans.
+        """
+        deaths_tensor = (
+            self._dataframe_deaths.to_numpy()
+            .astype(self.dtype)
+            .reshape((-1, len(self.countries)))         ## assumes non-age-stratified data
+        )
+        i_data_begin_list = []
+        for c in range(deaths_tensor.shape[1]):
+            mask = deaths_tensor[:, c] > self._minimal_daily_deaths
+            i_data_begin = np.min(np.nonzero(mask)[0])
+            i_data_begin_list.append(i_data_begin)
+        i_data_begin_list = np.array(i_data_begin_list)
+        i_data_begin_list = np.maximum(i_data_begin_list, self._min_offset_sim_death_data)
+        self._indices_begin_data = np.maximum(i_data_begin_list,self._indices_begin_data)
+
         for i in i_data_begin_list:
             data_tensor[:i] = np.nan
+            deaths_tensor[:i] = np.nan
         self._pos_tests_data_tensor = data_tensor
+        self._deaths_data_tensor = deaths_tensor
 
     def _update_data_summary(self):
         """ # Update Data summary
@@ -268,7 +294,7 @@ class ModelParams:
         """
         Tensor of daily new cases / positive tests for countries/regions
         and age groups.
-        |shape| time, country, agegroup 
+        |shape| time, country, agegroup
         """
         return self._pos_tests_data_tensor.astype(self.dtype)
 
@@ -304,10 +330,10 @@ class ModelParams:
     @property
     def deaths_data_tensor(self):
         """
-        
+
         |shape| time, country
         """
-        return self._dataframe_deaths.to_numpy().astype(self.dtype)
+        return self._deaths_data_tensor.astype(self.dtype)
 
     # ------------------------------------------------------------------------------ #
     # Population

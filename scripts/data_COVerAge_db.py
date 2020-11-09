@@ -7,8 +7,7 @@ import sys
 import logging
 import json
 
-sys.path.append("../covid19_inference")
-
+sys.path.append("../covid_inference")
 import covid19_inference as cov19
 
 
@@ -151,17 +150,25 @@ def config(country):
 
 def tests(country):
     # Tests
+    name = country
     if country == "Czechia":
         country = "Czech Republic"
 
     tests = owd.get_new(
         "tests", country=country, data_begin=data_begin, data_end=data_end
     )
-    if country == "Germany":
+    if country in ["Germany", "Netherlands", "Spain"]:
         # We map the weekly tests to the median each day
         tests = owd.get_total("tests", country=country).diff()
+        # Get time diffs
+        tests = pd.DataFrame(tests)
+        tests["delta"] = tests.index
+        tests["delta"] = tests["delta"] - tests["delta"].shift()
+        tests = tests.dropna()
+
+        tests = tests["total_tests"] / tests["delta"].apply(lambda x: x.days)
         dates = pd.date_range(data_begin - datetime.timedelta(days=14), data_end)
-        tests = tests.reindex(dates)[data_begin:data_end].ffill() / 7
+        tests = tests.reindex(dates)[data_begin:data_end].ffill()
         tests.index.name = "date"
     if country == "Belgium":
         tests = cov19.data_retrieval.Belgium(True).get_new(
@@ -171,9 +178,28 @@ def tests(country):
         # Fill na if they do not fill
         tests = tests.reindex(pd.date_range(data_begin, data_end))
         tests.index.name = "date"
-
-        tests.to_csv(path + country + "/tests.csv", date_format="%d.%m.%y")
+    tests.to_csv(path + name + "/tests.csv", date_format="%d.%m.%y")
     log.info(f"Successfully created tests file for {country}!")
+
+
+def interventions(country):
+    """
+    Gets interventions from oxford interventions tracker and saves to
+    interventions.csv
+    """
+
+    interventions = pd.DataFrame()
+    for policy in policies:
+        interventions[policy] = ox.get_time_data(
+            policy=policy,
+            country=country,
+            data_begin=data_begin,
+            data_end=data_begin,
+        )
+    interventions.index = interventions.index.rename("date")
+    interventions = interventions.ffill()  # Pad missing values with previous values
+    interventions.to_csv(path + country + "/interventions.csv", date_format="%d.%m.%y")
+    log.info(f"Successfully created interventions file for {country}!")
 
 
 def align_age_groups(country):
@@ -255,11 +281,11 @@ def align_age_groups(country):
     cases.index.name = "date"
     helper_cases(cases).to_csv(path + country + "/new_cases.csv")
 
-    deaths = pd.read_csv(path + country + "/deaths.csv").set_index("Unnamed: 0")
-    deaths.index.name = "date"
+    # deaths = pd.read_csv(path + country + "/deaths.csv").set_index("Unnamed: 0")
+    # deaths.index.name = "date"
 
     # For now we just sum all deaths (lazy)
-    deaths.sum(axis=1).to_csv(path + country + "/deaths.csv")
+    # deaths.sum(axis=1).to_csv(path + country + "/deaths.csv")
     log.info(f"Successfully aligned age_groups for {country}!")
 
 
@@ -287,29 +313,50 @@ countries = [
     "Czechia",
     "Bulgaria",
 ]
-
+policies = [
+    "C1_School closing",
+    "C2_Workplace closing",
+    "C3_Cancel public events",
+    "C4_Restrictions on gatherings",
+    "C6_Stay at home requirements",
+]
 
 if not os.path.isdir(path):
     os.mkdir(path)
 
 
 owd = cov19.data_retrieval.OWD(True)
+ox = cov19.data_retrieval.OxCGRT(True)  # interv
 
 for country in countries:
     if not os.path.isdir(path + country):
         os.mkdir(path + country)
 
     get_data(country, "Cases", data_begin, data_end).to_csv(
-        path + country + "/new_cases.csv"
+        path + country + "/new_cases.csv",
+        date_format="%d.%m.%y",
     )
     log.info(f"Successfully created new cases file for {country}!")
 
-    get_data(country, "Deaths", data_begin, data_end).to_csv(
-        path + country + "/deaths.csv"
-    )
+    if country == "Czechia":
+        owd.get_new(
+            "deaths", country="Czech Republic", data_begin=data_begin, data_end=data_end
+        ).to_csv(
+            path + country + "/deaths.csv",
+            date_format="%d.%m.%y",
+        )
+    else:
+        owd.get_new(
+            "deaths", country=country, data_begin=data_begin, data_end=data_end
+        ).to_csv(
+            path + country + "/deaths.csv",
+            date_format="%d.%m.%y",
+        )
     log.info(f"Successfully created deaths file for {country}!")
 
     align_age_groups(country)
+
+    interventions(country)
 
     tests(country)
 

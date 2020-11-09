@@ -30,7 +30,7 @@ class ModelParams:
         min_offset_sim_data=20,
         minimal_daily_cases=40,
         min_offset_sim_death_data=40,
-        minimal_daily_deaths=40,
+        minimal_daily_deaths=10,
         spline_degree=3,
         spline_stride=7,
         dtype="float32",
@@ -156,7 +156,7 @@ class ModelParams:
         self._indices_begin_data = i_data_begin_list
 
         """ # Update deaths data tensor/df
-        set data tensor, replaces values smaller than 40 by nans.
+        set data tensor, replaces values smaller than 10 by nans.
         """
         deaths_tensor = (
             self._dataframe_deaths.to_numpy()

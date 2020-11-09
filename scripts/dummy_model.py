@@ -80,17 +80,36 @@ c2 = covid19_npis.data.Country(
     "../data/France",
 )
 """
-
-c1 = covid19_npis.data.Country("../data/Germany",)  # Data folder for germany
-c2 = covid19_npis.data.Country("../data/France",)
+countries = [
+    "Germany",
+    "Belgium",
+    "Czechia",
+    "Denmark",
+    "Finland",
+    "Greece",
+    # "Italy",
+    "Netherlands",
+    "Portugal",
+    # "Romania",
+    # "Spain",
+    "Sweden",
+    "Switzerland",
+]
+c = [
+    covid19_npis.data.Country(
+        f"../data/coverage_db/{country}",
+    )
+    for country in countries
+]
 
 # Construct our modelParams from the data.
-modelParams = covid19_npis.ModelParams(countries=[c1, c2])
+modelParams = covid19_npis.ModelParams(countries=c)
 
 # Test shapes, should be all 3:
 def print_dist_shapes(st):
     for name, dist in itertools.chain(
-        st.discrete_distributions.items(), st.continuous_distributions.items(),
+        st.discrete_distributions.items(),
+        st.continuous_distributions.items(),
     ):
         print(dist.log_prob(st.all_values[name]).shape, name)
     for p in st.potentials:
@@ -189,7 +208,10 @@ ts_fig = {}
 ts_axes = {}
 for name in ts_names:
     ts_fig[name], ts_axes[name] = covid19_npis.plot.timeseries(
-        trace, sample_state=sample_state, key=name, plot_chain_separated=False,
+        trace,
+        sample_state=sample_state,
+        key=name,
+        plot_chain_separated=False,
     )
     # plot data into new_cases
     if name == "new_E_t" or name == "positive_tests":

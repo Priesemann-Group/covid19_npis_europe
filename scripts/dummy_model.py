@@ -42,7 +42,6 @@ sys.path.append("../")
 
 
 import covid19_npis
-from covid19_npis.model import main_model
 
 
 """ # Debugging and other snippets
@@ -56,12 +55,12 @@ covid19_npis.utils.setup_colored_logs()
 logging.getLogger("parso.python.diff").disabled = True
 
 # For eventual debugging:
-# tf.config.run_functions_eagerly(True)
+tf.config.run_functions_eagerly(True)
 # tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
 
 # Force CPU
-covid19_npis.utils.force_cpu_for_tensorflow()
-covid19_npis.utils.split_cpu_in_logical_devices(4)
+# covid19_npis.utils.force_cpu_for_tensorflow()
+covid19_npis.utils.split_cpu_in_logical_devices(32)
 
 
 """ # 1. Data Retrieval
@@ -103,6 +102,10 @@ c = [
 # Construct our modelParams from the data.
 modelParams = covid19_npis.ModelParams(countries=c, minimal_daily_deaths=1)
 
+
+# Define our model
+this_model = covid19_npis.model.main_model(modelParams)
+
 # Test shapes, should be all 3:
 def print_dist_shapes(st):
     for name, dist in itertools.chain(
@@ -113,9 +116,7 @@ def print_dist_shapes(st):
         print(p.value.shape, p.name)
 
 
-_, sample_state = pm.evaluate_model_transformed(
-    main_model(modelParams), sample_shape=(3,)
-)
+_, sample_state = pm.evaluate_model_transformed(this_model, sample_shape=(3,))
 print_dist_shapes(sample_state)
 
 """ # 2. MCMC Sampling
@@ -124,9 +125,9 @@ print_dist_shapes(sample_state)
 begin_time = time.time()
 
 trace = pm.sample(
-    main_model(modelParams),
-    num_samples=100,
-    burn_in=200,
+    this_model,
+    num_samples=1000,
+    burn_in=2000,
     use_auto_batching=False,
     num_chains=2,
     xla=True,
@@ -138,13 +139,14 @@ log.info("running time: {:.1f}s".format(end_time - begin_time))
 
 # Save trace
 import pickle
+import datetime
 
 today = datetime.datetime.now()
 pickle.dump(
-    [main_model, trace], open(f"./traces/{today.strftime('%y_%m_%d_%H')}", "wb"),
+    trace, open(f"./traces/{today.strftime('%y_%m_%d_%H')}", "wb"),
 )
-"""
 
+"""
 with open(f"./traces/{today.strftime('%y_%m_%d_%H')}", "rb") as f:
     [main_model, trace] = pickle.load(f)
 """
@@ -157,10 +159,11 @@ import pandas as pd
 
 """ ## Sample for prior plots and also covert to nice format
 """
+
 trace_prior = pm.sample_prior_predictive(
-    main_model(modelParams), sample_shape=(1000,), use_auto_batching=False
+    this_model, sample_shape=(1000,), use_auto_batching=False
 )
-_, sample_state = pm.evaluate_model(main_model(modelParams))
+_, sample_state = pm.evaluate_model(this_model)
 
 
 """ ## Plot distributions

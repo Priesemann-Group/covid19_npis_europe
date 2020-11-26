@@ -15,18 +15,21 @@ logging.getLogger("numexpr").setLevel(logging.WARNING)
 log = logging.getLogger("COVerAge DL")
 
 
-def download_url(name, url, save_path, chunk_size=128):
+def download_url(name, url, save_path, chunk_size=1024):
     r = requests.get(url, stream=True)
+    pbar = tqdm(
+        desc=f"{name} download",
+        unit="B",
+        total=int(r.headers["Content-Length"],),
+        unit_scale=True,
+    )
+
     with open(save_path, "wb") as fd:
-        for chunk in tqdm(
-            r.iter_content(chunk_size=chunk_size),
-            desc=f"{name} download",
-            unit="B",
-            total=int(r.headers["Content-Length"],),
-            unit_scale=True,
-        ):
+        for chunk in r.iter_content(chunk_size=chunk_size):
             if chunk:  # filter out keep-alive new chunks
                 fd.write(chunk)
+                pbar.update(chunk_size)
+    pbar.close()
 
 
 def get_data(country, measure, data_begin, data_end):
@@ -50,9 +53,12 @@ def get_data(country, measure, data_begin, data_end):
     # Select measure cases
     measure = data.xs(measure, level="Measure")
 
-    # Sum over all entries i.e m and f
-    measure = measure.groupby(["Date", "Age", "AgeInt"]).sum()
+    # Select male and female
+    measure = measure.reset_index()
+    if "b" in measure["Sex"]:
+        measure = measure[measure["Sex"] == "b"]
 
+    measure = measure.groupby(["Date", "Age", "AgeInt"]).sum()
     # Create age_string in format no1-no2 inclusive
     if country == "Czechia":
         measure = measure.reset_index()
@@ -75,6 +81,9 @@ def get_data(country, measure, data_begin, data_end):
         ret_measure[age_str] = measure.xs(age_str, level="age_str").reindex(
             pd.date_range(data_begin, data_end)
         )["Value"]
+
+    # Calculate daily cases
+    ret_measure = ret_measure.diff()
 
     return ret_measure
 
@@ -303,7 +312,7 @@ df = pd.read_csv("../data/raw/coverage_db/Data/inputDB.csv", low_memory=False, h
 df["Date"] = pd.to_datetime(df["Date"], format="%d.%m.%Y")
 # Set index of dataframe
 df = df.set_index(
-    ["Country", "Region", "Date", "Age", "AgeInt", "Measure", "Metric", "Short"]
+    ["Country", "Region", "Date", "Age", "AgeInt", "Sex", "Measure", "Metric", "Short"]
 )
 
 # Download new population file

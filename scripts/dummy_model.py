@@ -1,28 +1,25 @@
 import sys
 import logging
-
-
 import time
 import itertools
 import os
 
 """
+SM: I dont know what this is doing, please explain :)
+
 os.environ["KMP_BLOCKTIME"] = "1"
 os.environ["KMP_SETTINGS"] = "1"
 os.environ["KMP_AFFINITY"] = "granularity=fine,verbose,compact,1,0"
 """
-
 import pymc4 as pm
 import tensorflow as tf
-
-# Mute Tensorflow warnings ...
-logging.getLogger("tensorflow").setLevel(logging.ERROR)
-
 import numpy as np
 import time
 import os
 
 """
+SM: I dont know what this is doing, please explain :)
+
 old_opts = tf.config.optimizer.get_experimental_options()
 print(old_opts)
 tf.config.optimizer.set_experimental_options(
@@ -39,8 +36,6 @@ tf.config.optimizer.set_experimental_options(
 print(tf.config.optimizer.get_experimental_options())
 """
 sys.path.append("../")
-
-
 import covid19_npis
 
 
@@ -53,14 +48,19 @@ log = logging.getLogger()
 # log.setLevel(logging.DEBUG)
 covid19_npis.utils.setup_colored_logs()
 logging.getLogger("parso.python.diff").disabled = True
+# Mute Tensorflow warnings ...
+# logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
 # For eventual debugging:
-tf.config.run_functions_eagerly(True)
+# tf.config.run_functions_eagerly(True)
 # tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
+
+if tf.executing_eagerly():
+    log.warning("Running in eager mode!")
 
 # Force CPU
 # covid19_npis.utils.force_cpu_for_tensorflow()
-covid19_npis.utils.split_cpu_in_logical_devices(32)
+# covid19_npis.utils.split_cpu_in_logical_devices(32)
 
 
 """ # 1. Data Retrieval
@@ -71,14 +71,7 @@ covid19_npis.utils.split_cpu_in_logical_devices(32)
 """
 
 # Load our data from csv files into our own custom data classes
-"""
-c1 = covid19_npis.data.Country(
-    "../data/Germany",
-)  # name
-c2 = covid19_npis.data.Country(
-    "../data/France",
-)
-"""
+
 countries = [
     "Germany",
     "Belgium",

@@ -20,7 +20,9 @@ def download_url(name, url, save_path, chunk_size=1024):
     pbar = tqdm(
         desc=f"{name} download",
         unit="B",
-        total=int(r.headers["Content-Length"],),
+        total=int(
+            r.headers["Content-Length"],
+        ),
         unit_scale=True,
     )
 
@@ -35,7 +37,6 @@ def download_url(name, url, save_path, chunk_size=1024):
 def get_data(country, measure, data_begin, data_end):
     """
     Gets the dataframe tuple for the selected country
-
     Parameters
     ----------
     country: str
@@ -100,7 +101,9 @@ def population(country):
     data = data["PopTotal"]
     data = data * 1000
     data.index.name = "age"
-    data.astype("int64").to_csv(path + country + "/population.csv",)
+    data.astype("int64").to_csv(
+        path + country + "/population.csv",
+    )
     log.debug(f"Successfully created population file for {country}!")
 
 
@@ -176,7 +179,10 @@ def interventions(country):
     interventions = pd.DataFrame()
     for policy in policies:
         interventions[policy] = ox.get_time_data(
-            policy=policy, country=c_name_dl, data_begin=data_begin, data_end=data_end,
+            policy=policy,
+            country=c_name_dl,
+            data_begin=data_begin,
+            data_end=data_end,
         )
     interventions.index = interventions.index.rename("date")
     interventions = interventions.ffill()  # Pad missing values with previous values
@@ -206,7 +212,9 @@ def align_age_groups(country):
             df["age_group_0"] = cases[[str(x) for x in range(0, 29)]].sum(axis=1)
             df["age_group_1"] = cases[[str(x) for x in range(30, 59)]].sum(axis=1)
             df["age_group_2"] = cases[[str(x) for x in range(60, 79)]].sum(axis=1)
-            df["age_group_3"] = cases[[str(x) for x in range(80, 120)]].sum(axis=1)
+            df["age_group_3"] = cases[
+                [str(x) for x in range(80, 120) if str(x) in cases.keys()]
+            ].sum(axis=1)
         elif country == "Bulgaria":
             df["age_group_0"] = cases["0-19"] + cases["20-29"]
             df["age_group_1"] = cases["30-39"] + cases["40-49"] + cases["50-59"]
@@ -245,7 +253,9 @@ def align_age_groups(country):
             df["age_group_0"] = cases[[str(x) for x in range(0, 29)]].sum(axis=1)
             df["age_group_1"] = cases[[str(x) for x in range(30, 59)]].sum(axis=1)
             df["age_group_2"] = cases[[str(x) for x in range(60, 79)]].sum(axis=1)
-            df["age_group_3"] = cases[[str(x) for x in range(80, 120)]].sum(axis=1)
+            df["age_group_3"] = cases[
+                [str(x) for x in range(80, 120) if str(x) in cases.keys()]
+            ].sum(axis=1)
         elif country == "Bulgaria":
             df["age_group_0"] = cases["0-19"] + cases["20-29"]
             df["age_group_1"] = cases["30-39"] + cases["40-49"] + cases["50-59"]
@@ -272,7 +282,11 @@ def align_age_groups(country):
 
 
 def download_and_save_file(
-    url, f_name, path="../data/download/", timestamp=False, overwrite=False,
+    url,
+    f_name,
+    path="../data/download/",
+    timestamp=False,
+    overwrite=False,
 ):
     """
     Downloads a file and saves it to a path
@@ -375,7 +389,8 @@ for country in countries_bar:
         os.mkdir(path + country)
 
     get_data(country, "Cases", data_begin, data_end).to_csv(
-        path + country + "/new_cases.csv", date_format="%d.%m.%y",
+        path + country + "/new_cases.csv",
+        date_format="%d.%m.%y",
     )
     log.debug(f"Successfully created new cases file for {country}!")
 
@@ -383,13 +398,15 @@ for country in countries_bar:
         owd.get_new(
             "deaths", country="Czech Republic", data_begin=data_begin, data_end=data_end
         ).to_csv(
-            path + country + "/deaths.csv", date_format="%d.%m.%y",
+            path + country + "/deaths.csv",
+            date_format="%d.%m.%y",
         )
     else:
         owd.get_new(
             "deaths", country=country, data_begin=data_begin, data_end=data_end
         ).to_csv(
-            path + country + "/deaths.csv", date_format="%d.%m.%y",
+            path + country + "/deaths.csv",
+            date_format="%d.%m.%y",
         )
     log.debug(f"Successfully created deaths file for {country}!")
 

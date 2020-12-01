@@ -88,7 +88,9 @@ countries = [
     "Switzerland",
 ]
 c = [
-    covid19_npis.data.Country(f"../data/coverage_db/{country}",)
+    covid19_npis.data.Country(
+        f"../data/coverage_db/{country}",
+    )
     for country in countries
 ]
 
@@ -102,7 +104,8 @@ this_model = covid19_npis.model.main_model(modelParams)
 # Test shapes, should be all 3:
 def print_dist_shapes(st):
     for name, dist in itertools.chain(
-        st.discrete_distributions.items(), st.continuous_distributions.items(),
+        st.discrete_distributions.items(),
+        st.continuous_distributions.items(),
     ):
         print(dist.log_prob(st.all_values[name]).shape, name)
     for p in st.potentials:
@@ -119,8 +122,8 @@ begin_time = time.time()
 
 trace = pm.sample(
     this_model,
-    num_samples=1000,
-    burn_in=2000,
+    num_samples=100,
+    burn_in=200,
     use_auto_batching=False,
     num_chains=2,
     xla=True,
@@ -136,7 +139,8 @@ import datetime
 
 today = datetime.datetime.now()
 pickle.dump(
-    trace, open(f"./traces/{today.strftime('%y_%m_%d_%H')}", "wb"),
+    trace,
+    open(f"./traces/{today.strftime('%y_%m_%d_%H')}", "wb"),
 )
 
 """
@@ -200,7 +204,10 @@ ts_fig = {}
 ts_axes = {}
 for name in ts_names:
     ts_fig[name], ts_axes[name] = covid19_npis.plot.timeseries(
-        trace, sample_state=sample_state, key=name, plot_chain_separated=False,
+        trace,
+        sample_state=sample_state,
+        key=name,
+        plot_chain_separated=False,
     )
     # plot data into new_cases
     if name == "new_E_t" or name == "positive_tests":

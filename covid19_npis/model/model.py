@@ -165,6 +165,41 @@ def main_model(modelParams):
         theta=death_theta,
     )
 
+    """ add weekly modulations
+    TODO    - put in wrapper function?
+            - get proper parameters
+            - write function
+            - check: which ones should be modulated? (mostly: positive tests!)
+            - check: are case numbers same as in unmodulated case? need some kind of normalization?
+    """
+
+    total_tests = yield modulation.weekly_modulation(
+        name="tests_total_modulated",
+        modelParams=modelParams,
+        cases=total_tests,
+        week_modulation_type="abs_sine",
+        pr_mean_weekend_factor=0.3,
+        pr_sigma_weekend_factor=0.5,
+    )
+
+    positive_tests = yield modulation.weekly_modulation(
+        name="tests_positive_modulated",
+        modelParams=modelParams,
+        cases=positive_tests,
+        week_modulation_type="abs_sine",
+        pr_mean_weekend_factor=0.3,
+        pr_sigma_weekend_factor=0.5,
+    )
+
+    deaths_delayed = yield modulation.weekly_modulation(
+        name="cases_deaths_modulated",
+        modelParams=modelParams,
+        cases=deaths_delayed,
+        week_modulation_type="abs_sine",
+        pr_mean_weekend_factor=0.3,
+        pr_sigma_weekend_factor=0.5,
+    )
+
     """ Likelihood
     TODO    - description on fitting data
             - add deaths and total tests

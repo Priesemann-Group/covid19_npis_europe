@@ -101,8 +101,8 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
         filter_axes_data=filter_axes_data,
     )
     new_E_t_delayed = yield Deterministic(
-        f"new_E_t_delayed",
-        new_E_t_delayed,
+        name=f"new_E_t_delayed",
+        value=new_E_t_delayed,
         shape_label=("time", "country", "age_group"),
     )
     log.debug(f"new_E_t_delayed\n{new_E_t_delayed}")
@@ -118,7 +118,9 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
         phi_age=phi_age,
     )
     positive_tests = yield Deterministic(
-        name_positive, positive_tests, shape_label=("time", "country", "age_group")
+        name=name_positive,
+        value=positive_tests,
+        shape_label=("time", "country", "age_group"),
     )
     log.debug(f"positive_tests\n{positive_tests}")
 
@@ -135,11 +137,11 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
         xi=xi_t,
     )
     total_tests = yield Deterministic(
-        name_total, total_tests, shape_label=("time", "country", "age_group")
+        name=name_total, value=total_tests, shape_label=("time", "country", "age_group")
     )
     total_tests_compact = yield Deterministic(
-        f"{name_total}_compact",
-        tf.reduce_sum(total_tests, axis=-1),
+        name=f"{name_total}_compact",
+        value=tf.reduce_sum(total_tests, axis=-1),
         shape_label=("time", "country"),
     )
     log.debug(f"total_tests\n{total_tests}")
@@ -545,7 +547,7 @@ def _calc_reporting_delay_kernel(name, m, theta, length_kernel=14):
     kernel = tf.einsum("...ctk->...ckt", kernel)
 
     kernel = yield Deterministic(
-        name, kernel, shape_label=("country", "kernel", "time")
+        name=name, value=kernel, shape_label=("country", "kernel", "time")
     )
     log.debug(f"reportin delay kernel\n{kernel}")  # batch, country, kernel, time
 
@@ -742,8 +744,8 @@ def construct_testing_state(
         tf.stack([phi_sigma, eta_sigma, xi_sigma, m_sigma], axis=-1),
     )
     Sigma = yield Deterministic(
-        f"Sigma",
-        Sigma,
+        name=f"Sigma",
+        value=Sigma,
         shape_label=("testing_state_vars", "testing_state_vars"),
     )
     log.debug(f"Sigma state:\n{Sigma}")

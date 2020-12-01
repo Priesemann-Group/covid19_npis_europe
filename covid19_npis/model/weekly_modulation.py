@@ -13,6 +13,16 @@ from . import utility as ut
 
 log = logging.getLogger(__name__)
 
+from covid19_npis import transformations
+from covid19_npis.model.distributions import (
+    Normal,
+    LogNormal,
+    Deterministic,
+    HalfNormal,
+    Gamma,
+    VonMises,
+)
+
 
 def week_modulation(
     name,
@@ -82,15 +92,24 @@ def week_modulation(
         modulation
         """
 
-        # offset of weekly modulation minimum
-        offset_rad = pm.VonMises(name=name_offset_modulation + "_rad", mu=0, kappa=0.01)
+        """
+        # TODO: - which shape does the modulation have to be? i guess time,age,country?
+        """
+
+        # offset-distribution of weekly modulation minimum
+        offset_rad = VonMises(
+            name=name_offset_modulation + "_rad",
+            loc=0,
+            concentration=1,
+            event_stack=(1, modelParams.num_countries, 1),
+            shape_label=(None, "country", None),
+        )
+
         offset = yield Deterministic(
             name=name_offset_modulation,
             value=offset_rad / (2 * np.pi) * 7,
             shape_label=(),
         )
-
-        # amplitude of weekly modulation
 
         t = np.arange(shape_modulation[0]) - model.sim_begin.weekday()  # Sunday @ zero
         modulation = 1 - tt.abs_(tt.sin(t / 7 * np.pi + offset_rad / 2))
@@ -103,9 +122,16 @@ def week_modulation(
         name="delta_d_i",
         loc=0.0,
         scale=1.0,
-        event_stack=(modelParams.num_interventions, 1, 1),
         shape_label=("intervention", None, None),
         conditionally_independent=True,
+    )
+
+    # amplitude of weekly modulation
+    weight = yield HalfNormal(
+        name="weekly_modulation_weight",
+        scale=0.5,
+        conditionally_independent=True,
+        transform=transformations.SoftPlus(scale=0.5),
     )
 
     # Get the shape of the modulation from the shape of our simulation

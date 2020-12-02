@@ -29,7 +29,7 @@ class ModelParams:
         countries,
         min_offset_sim_data=20,
         minimal_daily_cases=40,
-        min_offset_sim_death_data=40,
+        min_offset_sim_death_data=30,
         minimal_daily_deaths=10,
         spline_degree=3,
         spline_stride=7,

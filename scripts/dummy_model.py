@@ -122,8 +122,8 @@ begin_time = time.time()
 
 trace = pm.sample(
     this_model,
-    num_samples=100,
-    burn_in=200,
+    num_samples=200,
+    burn_in=100,
     use_auto_batching=False,
     num_chains=2,
     xla=True,

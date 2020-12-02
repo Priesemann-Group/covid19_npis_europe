@@ -3,6 +3,7 @@ import tensorflow_probability as tfp
 import logging
 import pymc4 as pm
 import numpy as np
+import pandas as pd
 
 log = logging.getLogger(__name__)
 
@@ -15,9 +16,84 @@ from .distributions import (
     MvStudentT,
     MvNormalCholesky,
     Deterministic,
+    VonMises,
 )
 from .. import transformations
 from . import utils
+
+def weekly_modulation(name,modelParams,cases,week_modulation_type="abs_sine"):
+    r"""
+    Adds a weekly modulation of the number of new cases:
+    .. math::
+        \text{new\_cases} &= \text{new\_cases\_raw} \cdot (1-f(t))\,, \qquad\text{with}\\
+        f(t) &= f_w \cdot \left(1 - \left|\sin\left(\frac{\pi}{7} t- \frac{1}{2}\Phi_w\right)\right| \right),
+    if ``week_modulation_type`` is ``"abs_sine"`` (the default). If ``week_modulation_type`` is ``"step"``, the
+    new cases are simply multiplied by the weekend factor on the days set by ``weekend_days``
+    The weekend factor :math:`f_w` follows a Lognormal distribution with
+    median ``pr_mean_weekend_factor`` and sigma ``pr_sigma_weekend_factor``. It is hierarchically constructed if
+    the input is two-dimensional by the function :func:`hierarchical_normal` with default arguments.
+    The offset from Sunday :math:`\Phi_w` follows a flat :class:`~pymc3.distributions.continuous.VonMises` distribution
+    and is the same for all regions.
+    Parameters
+    ----------
+    cases : :class:`~theano.tensor.TensorVariable`
+        The input array of daily new cases, can be one- or two-dimensional
+    name_cases : str or None,
+        The name under which to save the cases as a trace variable.
+        Default: None, cases are not stored in the trace.
+    week_modulation_type : str
+        The type of modulation, accepts ``"step"`` or  ``"abs_sine`` (the default).
+    pr_mean_weekend_factor : float
+        Sets the prior mean of the factor :math:`f_w` by which weekends are counted.
+    pr_sigma_weekend_factor : float
+        Sets the prior sigma of the factor :math:`f_w` by which weekends are counted.
+    weekend_days : tuple of ints
+        The days counted as weekend if ``week_modulation_type`` is ``"step"``
+    model : :class:`Cov19Model`
+        if none, it is retrieved from the context
+    Returns
+    -------
+    new_cases : :class:`~theano.tensor.TensorVariable`
+    """
+
+    log.debug("Week modulation")
+
+    """
+    # TODO: - general check of function
+            - which shape does the modulation have to be? i guess time,country,age?
+            - check prior parameters
+            - check: which ones should be modulated? (mostly: positive tests!)
+            - different modulations across: age, country?
+            - check: are (cumulative) case numbers same as in unmodulated case? need some kind of normalization?
+            - store and plot parameters at end
+    """
+    # offset-distribution of weekly modulation minimum
+    offset = yield VonMises(
+        name=name + "_offset",
+        loc=0,
+        concentration=1,
+        conditionally_independent=True,
+        event_stack=(1, modelParams.num_countries, 1),
+        shape_label=(None, "country", None),
+    )
+
+    # amplitude of weekly modulation
+    weight_cross = yield Normal(
+        name=name + "_weight",
+        loc=0,
+        scale=2,
+        conditionally_independent=True,
+        event_stack=(1, modelParams.num_countries, 1),
+        shape_label=(None, "country", None),
+        # transform=transformations.SoftPlus(scale=0.5),
+    )
+    weight = tf.math.sigmoid(weight_cross)
+
+    t = pd.date_range(start=modelParams.data_begin,end=modelParams.data_end).weekday    # create array with weekdays
+    f = (1 - weight) * (1 - tf.math.abs(tf.math.sin(t[np.newaxis,...,np.newaxis,np.newaxis] / 7 * np.pi + offset / 2))) # modulation factor
+    new_cases_inferred = cases * (1 - f)    # total modulation
+
+    return new_cases_inferred
 
 
 def generate_testing(name_total, name_positive, modelParams, new_E_t):
@@ -117,6 +193,14 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
         phi_plus=phi_t,
         phi_age=phi_age,
     )
+
+    positive_tests = yield weekly_modulation(
+        name="weekly_modulation",
+        modelParams=modelParams,
+        cases=positive_tests,
+        week_modulation_type="abs_sine",
+    )
+
     positive_tests = yield Deterministic(
         name=name_positive,
         value=positive_tests,
@@ -783,19 +867,19 @@ def construct_testing_state(
     # Add all vars to the trace
     phi_det = yield Deterministic(
         name=name_phi,
-        value=Sigma,
+        value=phi,#Sigma,
     )
     eta_det = yield Deterministic(
         name=name_eta,
-        value=Sigma,
+        value=eta,#Sigma,
     )
     xi_det = yield Deterministic(
         name=name_xi,
-        value=Sigma,
+        value=xi,#Sigma,
     )
     m_ast_det = yield Deterministic(
         name=name_m_ast,
-        value=Sigma,
+        value=m_ast,#Sigma,
     )
 
     return (phi, eta, xi, m_ast)

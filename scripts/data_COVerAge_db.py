@@ -302,7 +302,7 @@ def download_and_save_file(
     if not os.path.isfile(path + f_name) or overwrite:
         download_url(os.path.splitext(f_name)[0], url, path + f_name)
     else:
-        log.info(f"Found exisiting {path + f_name}, skipping download.")
+        log.info(f"Found existing {path + f_name}, skipping download.")
     return path + f_name
 
 

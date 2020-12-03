@@ -446,3 +446,8 @@ class ModelParams:
 
     def date_to_index(self, date):
         return (date - self._data_summary["begin"]).days
+
+    def get_weekdays(self):
+        return pd.date_range(
+            start=modelParams.data_begin, end=modelParams.data_end
+        ).weekday

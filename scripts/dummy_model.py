@@ -122,8 +122,8 @@ begin_time = time.time()
 
 trace = pm.sample(
     this_model,
-    num_samples=200,
-    burn_in=100,
+    num_samples=20,
+    burn_in=10,
     use_auto_batching=False,
     num_chains=2,
     xla=True,
@@ -178,6 +178,8 @@ dist_names = [
     "l_i_sign",
     "d_i_c_p",
     "C",
+    "positive_tests_modulation_offset",
+    "positive_tests_modulation_weight",
 ]
 
 dist_fig = {}

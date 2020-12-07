@@ -29,7 +29,7 @@ class ModelParams:
         countries,
         min_offset_sim_data=20,
         minimal_daily_cases=40,
-        min_offset_sim_death_data=30,
+        min_offset_sim_death_data=40,
         minimal_daily_deaths=10,
         spline_degree=3,
         spline_stride=7,
@@ -154,6 +154,9 @@ class ModelParams:
         i_data_begin_list = np.array(i_data_begin_list)
         i_data_begin_list = np.maximum(i_data_begin_list, self._min_offset_sim_data)
         self._indices_begin_data = i_data_begin_list
+        for c, i in enumerate(self._indices_begin_data):
+            data_tensor[:i, c, :] = np.nan
+        self._pos_tests_data_tensor = data_tensor
 
         """ # Update deaths data tensor/df
         set data tensor, replaces values smaller than 10 by nans.
@@ -175,11 +178,8 @@ class ModelParams:
         self._indices_begin_data = np.maximum(
             i_data_begin_list, self._indices_begin_data
         )
-
-        for i in i_data_begin_list:
-            data_tensor[:i] = np.nan
-            deaths_tensor[:i] = np.nan
-        self._pos_tests_data_tensor = data_tensor
+        for c, i in enumerate(i_data_begin_list):
+            deaths_tensor[:i, c] = np.nan
         self._deaths_data_tensor = deaths_tensor
 
     def _update_data_summary(self):

@@ -52,7 +52,7 @@ logging.getLogger("parso.python.diff").disabled = True
 # logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
 # For eventual debugging:
-# tf.config.run_functions_eagerly(True)
+tf.config.run_functions_eagerly(True)
 # tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
 
 if tf.executing_eagerly():
@@ -126,7 +126,7 @@ trace = pm.sample(
     burn_in=10,
     use_auto_batching=False,
     num_chains=2,
-    xla=True,
+    xla=False,
     # sampler_type="nuts",
 )
 

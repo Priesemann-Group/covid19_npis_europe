@@ -45,7 +45,7 @@ import covid19_npis
 # Logs setup
 log = logging.getLogger()
 # Needed to set logging level before importing other modules
-# log.setLevel(logging.DEBUG)
+log.setLevel(logging.DEBUG)
 covid19_npis.utils.setup_colored_logs()
 logging.getLogger("parso.python.diff").disabled = True
 # Mute Tensorflow warnings ...
@@ -119,7 +119,7 @@ print_dist_shapes(sample_state)
 """
 
 begin_time = time.time()
-
+log.info("start")
 trace = pm.sample(
     this_model,
     num_samples=20,

@@ -78,16 +78,16 @@ def weekly_modulation(name, modelParams, cases, week_modulation_type="abs_sine")
     )
     weight = tf.math.sigmoid(weight_cross)
 
-    t = modelParams.get_weekdays()  # create array with weekdays
+    t = modelParams.get_weekdays()  # get array with weekdays
     f = (1 - weight) * (
         1
         - tf.math.abs(
             tf.math.sin(
-                t[tf.newaxis, :, tf.newaxis, tf.newaxis] / 7 * tf.constant(np.pi)
-                + offset / 2
+                tf.reshape(t, (1, -1, 1, 1)) / 7 * tf.constant(np.pi) + offset / 2
             )
         )
-    )  # modulation factor
+    )
+    # modulation factor
     cases_modulated = cases * (1 - f)  # total modulation
 
     yield Deterministic(

@@ -448,4 +448,10 @@ class ModelParams:
         return (date - self._data_summary["begin"]).days
 
     def get_weekdays(self):
-        return pd.date_range(start=self.data_begin, end=self.data_end).weekday
+        self._weekdays_data_tensor = tf.constant(
+            pd.date_range(
+                start=modelParams.data_begin, end=modelParams.data_end
+            ).weekday,
+            tf.float32,
+        )
+        return self._weekdays_data_tensor

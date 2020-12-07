@@ -86,7 +86,7 @@ def _studentT_positive_tests(modelParams, pos_tests):
 
     # Retrieve data from the modelParameters and create a boolean mask
     data = modelParams.pos_tests_data_tensor
-    print(data)
+    log.debug(f"pos_tests_data_tensor:\n{data}")
     mask = ~np.isnan(data)
 
     len_batch_shape = len(pos_tests.shape) - 3

@@ -72,6 +72,9 @@ def _studentT_positive_tests(modelParams, pos_tests):
         |shape| batch, time, country, age_group
     """
 
+    # log.info('pos tests')
+    # log.info(f"\n{pos_tests.shape}")
+
     # Scale of the likelihood sigma
     sigma = yield HalfCauchy(
         name="sigma_likelihood_pos_tests",
@@ -86,6 +89,7 @@ def _studentT_positive_tests(modelParams, pos_tests):
 
     # Retrieve data from the modelParameters and create a boolean mask
     data = modelParams.pos_tests_data_tensor
+    log.debug(f"pos_tests_data_tensor:\n{data}")
     mask = ~np.isnan(data)
 
     len_batch_shape = len(pos_tests.shape) - 3
@@ -128,8 +132,10 @@ def _studentT_total_tests(modelParams, total_tests):
     # Sadly we do not have age strata for the total performed test. We sum over the
     # age groups to get a value for all ages. We can add an exception later if we find
     # data for that.
+    # log.info('total tests')
+    # log.info(f"\n{total_tests.shape}")
     total_tests_without_age = tf.reduce_sum(total_tests, axis=-1)
-
+    # log.info(f"\n{total_tests_without_age.shape}")
     # Scale of the likelihood sigma for each country
     sigma = yield HalfCauchy(
         name="sigma_likelihood_total_tests",

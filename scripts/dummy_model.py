@@ -1,28 +1,25 @@
 import sys
 import logging
-
-
 import time
 import itertools
 import os
 
 """
+SM: I dont know what this is doing, please explain :)
+
 os.environ["KMP_BLOCKTIME"] = "1"
 os.environ["KMP_SETTINGS"] = "1"
 os.environ["KMP_AFFINITY"] = "granularity=fine,verbose,compact,1,0"
 """
-
 import pymc4 as pm
 import tensorflow as tf
-
-# Mute Tensorflow warnings ...
-logging.getLogger("tensorflow").setLevel(logging.ERROR)
-
 import numpy as np
 import time
 import os
 
 """
+SM: I dont know what this is doing, please explain :)
+
 old_opts = tf.config.optimizer.get_experimental_options()
 print(old_opts)
 tf.config.optimizer.set_experimental_options(
@@ -39,10 +36,7 @@ tf.config.optimizer.set_experimental_options(
 print(tf.config.optimizer.get_experimental_options())
 """
 sys.path.append("../")
-
-
 import covid19_npis
-from covid19_npis.model import main_model
 
 
 """ # Debugging and other snippets
@@ -51,17 +45,22 @@ from covid19_npis.model import main_model
 # Logs setup
 log = logging.getLogger()
 # Needed to set logging level before importing other modules
-# log.setLevel(logging.DEBUG)
+log.setLevel(logging.DEBUG)
 covid19_npis.utils.setup_colored_logs()
 logging.getLogger("parso.python.diff").disabled = True
+# Mute Tensorflow warnings ...
+# logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
 # For eventual debugging:
-# tf.config.run_functions_eagerly(True)
+tf.config.run_functions_eagerly(True)
 # tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
 
+if tf.executing_eagerly():
+    log.warning("Running in eager mode!")
+
 # Force CPU
-covid19_npis.utils.force_cpu_for_tensorflow()
-covid19_npis.utils.split_cpu_in_logical_devices(4)
+# covid19_npis.utils.force_cpu_for_tensorflow()
+# covid19_npis.utils.split_cpu_in_logical_devices(32)
 
 
 """ # 1. Data Retrieval
@@ -72,14 +71,7 @@ covid19_npis.utils.split_cpu_in_logical_devices(4)
 """
 
 # Load our data from csv files into our own custom data classes
-"""
-c1 = covid19_npis.data.Country(
-    "../data/Germany",
-)  # name
-c2 = covid19_npis.data.Country(
-    "../data/France",
-)
-"""
+
 countries = [
     "Germany",
     "Belgium",
@@ -96,40 +88,45 @@ countries = [
     "Switzerland",
 ]
 c = [
-    covid19_npis.data.Country(f"../data/coverage_db/{country}",)
+    covid19_npis.data.Country(
+        f"../data/coverage_db/{country}",
+    )
     for country in countries
 ]
 
 # Construct our modelParams from the data.
-modelParams = covid19_npis.ModelParams(countries=c)
+modelParams = covid19_npis.ModelParams(countries=c, minimal_daily_deaths=1)
+
+
+# Define our model
+this_model = covid19_npis.model.main_model(modelParams)
 
 # Test shapes, should be all 3:
 def print_dist_shapes(st):
     for name, dist in itertools.chain(
-        st.discrete_distributions.items(), st.continuous_distributions.items(),
+        st.discrete_distributions.items(),
+        st.continuous_distributions.items(),
     ):
         print(dist.log_prob(st.all_values[name]).shape, name)
     for p in st.potentials:
         print(p.value.shape, p.name)
 
 
-_, sample_state = pm.evaluate_model_transformed(
-    main_model(modelParams), sample_shape=(3,)
-)
+_, sample_state = pm.evaluate_model_transformed(this_model, sample_shape=(3,))
 print_dist_shapes(sample_state)
 
 """ # 2. MCMC Sampling
 """
 
 begin_time = time.time()
-
+log.info("start")
 trace = pm.sample(
-    main_model(modelParams),
-    num_samples=100,
-    burn_in=200,
+    this_model,
+    num_samples=20,
+    burn_in=10,
     use_auto_batching=False,
     num_chains=2,
-    xla=True,
+    xla=False,
     # sampler_type="nuts",
 )
 
@@ -138,13 +135,15 @@ log.info("running time: {:.1f}s".format(end_time - begin_time))
 
 # Save trace
 import pickle
+import datetime
 
 today = datetime.datetime.now()
 pickle.dump(
-    [main_model, trace], open(f"./traces/{today.strftime('%y_%m_%d_%H')}", "wb"),
+    trace,
+    open(f"./traces/{today.strftime('%y_%m_%d_%H')}", "wb"),
 )
-"""
 
+"""
 with open(f"./traces/{today.strftime('%y_%m_%d_%H')}", "rb") as f:
     [main_model, trace] = pickle.load(f)
 """
@@ -157,10 +156,11 @@ import pandas as pd
 
 """ ## Sample for prior plots and also covert to nice format
 """
+
 trace_prior = pm.sample_prior_predictive(
-    main_model(modelParams), sample_shape=(1000,), use_auto_batching=False
+    this_model, sample_shape=(1000,), use_auto_batching=False
 )
-_, sample_state = pm.evaluate_model(main_model(modelParams))
+_, sample_state = pm.evaluate_model(this_model)
 
 
 """ ## Plot distributions
@@ -178,6 +178,8 @@ dist_names = [
     "l_i_sign",
     "d_i_c_p",
     "C",
+    "positive_tests_modulation_offset",
+    "positive_tests_modulation_weight",
 ]
 
 dist_fig = {}
@@ -204,7 +206,10 @@ ts_fig = {}
 ts_axes = {}
 for name in ts_names:
     ts_fig[name], ts_axes[name] = covid19_npis.plot.timeseries(
-        trace, sample_state=sample_state, key=name, plot_chain_separated=False,
+        trace,
+        sample_state=sample_state,
+        key=name,
+        plot_chain_separated=False,
     )
     # plot data into new_cases
     if name == "new_E_t" or name == "positive_tests":

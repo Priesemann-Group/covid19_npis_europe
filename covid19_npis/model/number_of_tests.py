@@ -15,9 +15,87 @@ from .distributions import (
     MvStudentT,
     MvNormalCholesky,
     Deterministic,
+    VonMises,
 )
 from .. import transformations
 from . import utils
+
+
+def weekly_modulation(name, modelParams, cases, week_modulation_type="abs_sine"):
+    r"""
+    Adds a weekly modulation of the number of new cases:
+    .. math::
+        \text{cases\_modulated} &= \text{cases} \cdot (1-f(t))\,, \qquad\text{with}\\
+        f(t) &= (1-w) \cdot \left(1 - \left|\sin\left(\frac{\pi}{7} t- \frac{1}{2}\Phi_w\right)\right| \right),
+    if ``week_modulation_type`` is ``"abs_sine"`` (the default).
+    if ``week_modulation_type`` is ``"step"``, the new cases are simply multiplied by the weekend factor on the days set by ``weekend_days`` (currently not implemented)
+
+    The modulation is assumed to be the same for all age-groups within one country and determined by the "weight" and "offset" parameters. The weight follows a sigmoidal distribution with normal prior of "weight_cross". The "offset" follows a VonMises distribution centered around 0 (Mondays) and a wide SD (concentration parameter = 2)
+    Parameters
+    ----------
+    name : str or None,
+        The name of the cases to be modulated (gets added to trace).
+    modelParams: :py:class:`covid19_npis.ModelParams`
+        Instance of modelParams, mainly used for number of age groups and
+        number of countries.
+    cases : tf.tensor
+        The input array of daily new cases for countries and age groups
+    week_modulation_type : str
+        The type of modulation, accepts ``"step"`` (not implemented) or  ``"abs_sine`` (the default).
+    Returns
+    -------
+    cases_modulated : tf.tensor
+    """
+
+    log.debug("Week modulation")
+
+    """
+    # TODO: - which shape does the modulation have to be? i guess time,country,age?
+            - check prior parameters
+            - different modulations across: age, country?
+            - check: are (cumulative) case numbers same as in unmodulated case? need some kind of normalization?
+            - store and plot parameters at end
+    """
+    # offset-distribution of weekly modulation minimum
+    offset = yield VonMises(
+        name=name + "_modulation_offset",
+        loc=0,
+        concentration=2,
+        conditionally_independent=True,
+        event_stack=(1, modelParams.num_countries, 1),
+        shape_label=(None, "country", None),
+    )
+
+    # amplitude of weekly modulation
+    weight_cross = yield Normal(
+        name=name + "_modulation_weight",
+        loc=0,
+        scale=2,
+        conditionally_independent=True,
+        event_stack=(1, modelParams.num_countries, 1),
+        shape_label=(None, "country", None),
+        # transform=transformations.SoftPlus(scale=0.5),
+    )
+    weight = tf.math.sigmoid(weight_cross)
+
+    t = modelParams.get_weekdays()  # get array with weekdays
+    f = (1 - weight) * (
+        1
+        - tf.math.abs(
+            tf.math.sin(
+                tf.reshape(t, (1, -1, 1, 1)) / 7 * tf.constant(np.pi) + offset / 2
+            )
+        )
+    )
+    # modulation factor
+    cases_modulated = cases * (1 - f)  # total modulation
+
+    yield Deterministic(
+        name=name + "_modulated",
+        value=cases_modulated,
+        shape_label=("time", "country", "age_group"),
+    )
+    return cases_modulated
 
 
 def generate_testing(name_total, name_positive, modelParams, new_E_t):
@@ -101,8 +179,8 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
         filter_axes_data=filter_axes_data,
     )
     new_E_t_delayed = yield Deterministic(
-        f"new_E_t_delayed",
-        new_E_t_delayed,
+        name=f"new_E_t_delayed",
+        value=new_E_t_delayed,
         shape_label=("time", "country", "age_group"),
     )
     log.debug(f"new_E_t_delayed\n{new_E_t_delayed}")
@@ -113,11 +191,17 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
     phi_age = tf.debugging.check_numerics(phi_age, f"phi_age:\n{phi_age}")
 
     positive_tests = _calc_positive_tests(
-        new_E_t_delayed=new_E_t_delayed, phi_plus=phi_t, phi_age=phi_age,
+        new_E_t_delayed=new_E_t_delayed,
+        phi_plus=phi_t,
+        phi_age=phi_age,
     )
-    positive_tests = yield Deterministic(
-        name_positive, positive_tests, shape_label=("time", "country", "age_group")
+
+    positive_tests = yield weekly_modulation(
+        name=name_positive,
+        modelParams=modelParams,
+        cases=positive_tests,
     )
+
     log.debug(f"positive_tests\n{positive_tests}")
 
     """ # Total tests
@@ -133,11 +217,11 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
         xi=xi_t,
     )
     total_tests = yield Deterministic(
-        name_total, total_tests, shape_label=("time", "country", "age_group")
+        name=name_total, value=total_tests, shape_label=("time", "country", "age_group")
     )
     total_tests_compact = yield Deterministic(
-        f"{name_total}_compact",
-        tf.reduce_sum(total_tests, axis=-1),
+        name=f"{name_total}_compact",
+        value=tf.reduce_sum(total_tests, axis=-1),
         shape_label=("time", "country"),
     )
     log.debug(f"total_tests\n{total_tests}")
@@ -283,10 +367,15 @@ def _construct_phi_tests_reported(
     """
 
     sigma = yield HalfCauchy(
-        name=f"{name}_sigma", scale=sigma_scale, conditionally_independent=True,
+        name=f"{name}_sigma",
+        scale=sigma_scale,
+        conditionally_independent=True,
     )
     mu = yield Normal(
-        name=f"{name}_mu", loc=mu_loc, scale=mu_scale, conditionally_independent=True,
+        name=f"{name}_mu",
+        loc=mu_loc,
+        scale=mu_scale,
+        conditionally_independent=True,
     )
     phi_dagger = yield Normal(
         name=f"{name}_dagger",
@@ -429,7 +518,10 @@ def _construct_reporting_delay(
         conditionally_independent=True,
     )
     mu = yield Normal(
-        name=f"{name}_mu", loc=0.0, scale=mu_scale, conditionally_independent=True,
+        name=f"{name}_mu",
+        loc=0.0,
+        scale=mu_scale,
+        conditionally_independent=True,
     )
     mu = mu + mu_loc
     log.debug(f"mu delta m:\n{mu}")
@@ -476,7 +568,11 @@ def _construct_reporting_delay(
     theta = tf.clip_by_value(theta, clip_value_min=0.1, clip_value_max=10)
 
     # We need to add the spline dimension at some point i.e. prop. expand delta_m
-    m = yield Deterministic(name=name, value=m, shape_label=("country", "spline"),)
+    m = yield Deterministic(
+        name=name,
+        value=m,
+        shape_label=("country", "spline"),
+    )
     log.debug(f"m_spline:\n{m}")
     return (m, theta)
 
@@ -523,11 +619,15 @@ def _calc_reporting_delay_kernel(name, m, theta, length_kernel=14):
     log.debug(f"theta\n{theta}")
 
     # Calculate pdf
-    kernel = utils.gamma(t, m / theta + 1.0, 1.0 / theta,)
+    kernel = utils.gamma(
+        t,
+        m / theta + 1.0,
+        1.0 / theta,
+    )
     kernel = tf.einsum("...ctk->...ckt", kernel)
 
     kernel = yield Deterministic(
-        name, kernel, shape_label=("country", "kernel", "time")
+        name=name, value=kernel, shape_label=("country", "kernel", "time")
     )
     log.debug(f"reportin delay kernel\n{kernel}")  # batch, country, kernel, time
 
@@ -724,7 +824,9 @@ def construct_testing_state(
         tf.stack([phi_sigma, eta_sigma, xi_sigma, m_sigma], axis=-1),
     )
     Sigma = yield Deterministic(
-        f"Sigma", Sigma, shape_label=("testing_state_vars", "testing_state_vars"),
+        name=f"Sigma",
+        value=Sigma,
+        shape_label=("testing_state_vars", "testing_state_vars"),
     )
     log.debug(f"Sigma state:\n{Sigma}")
 
@@ -759,10 +861,22 @@ def construct_testing_state(
     )
 
     # Add all vars to the trace
-    phi_det = yield Deterministic(name=name_phi, value=Sigma,)
-    eta_det = yield Deterministic(name=name_eta, value=Sigma,)
-    xi_det = yield Deterministic(name=name_xi, value=Sigma,)
-    m_ast_det = yield Deterministic(name=name_m_ast, value=Sigma,)
+    phi_det = yield Deterministic(
+        name=name_phi,
+        value=phi,
+    )
+    eta_det = yield Deterministic(
+        name=name_eta,
+        value=eta,
+    )
+    xi_det = yield Deterministic(
+        name=name_xi,
+        value=xi,
+    )
+    m_ast_det = yield Deterministic(
+        name=name_m_ast,
+        value=m_ast,
+    )
 
     return (phi, eta, xi, m_ast)
 

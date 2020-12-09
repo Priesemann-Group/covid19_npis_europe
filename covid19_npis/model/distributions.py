@@ -31,6 +31,7 @@ dists_to_modify = [
     "HalfNormal",
     "Deterministic",
     "MvNormalCholesky",
+    "VonMises",
 ]
 
 
@@ -138,7 +139,7 @@ class MvStudentT(pm.distributions.distribution.ContinuousDistribution):
         The degrees of freedom :math:`\nu.`
     loc : array_like
         Vector of means :math:`\mu.`
-    scale : 
+    scale :
         Lower triangular matrix, such that scale @ scale.T is positive
         semi-definite :math:`\Sigma.`
 

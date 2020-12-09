@@ -116,7 +116,7 @@ def main_model(modelParams):
     N = modelParams.N_data_tensor
     log.debug(f"N:\n{N}")
 
-    """ # Create new cases new_I(t):
+    """ # Create new cases new_E(t):
     This is done via Infection dynamics in InfectionModel, see describtion
     The returned tensor has the |shape| batch, time,country, age_group.
     """

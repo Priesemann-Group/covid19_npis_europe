@@ -115,9 +115,7 @@ def population(country):
     data = data["PopTotal"]
     data = data * 1000
     data.index.name = "age"
-    data.astype("int64").to_csv(
-        path + country + "/population.csv",
-    )
+    data.astype("int64").to_csv(path + country + "/population.csv",)
     log.info(f"Successfully created population file for {country}!")
 
 
@@ -191,10 +189,7 @@ def interventions(country):
     interventions = pd.DataFrame()
     for policy in policies:
         interventions[policy] = ox.get_time_data(
-            policy=policy,
-            country=country,
-            data_begin=data_begin,
-            data_end=data_begin,
+            policy=policy, country=country, data_begin=data_begin, data_end=data_begin,
         )
     interventions.index = interventions.index.rename("date")
     interventions = interventions.ffill()  # Pad missing values with previous values
@@ -333,8 +328,7 @@ for country in countries:
         os.mkdir(path + country)
 
     get_data(country, "Cases", data_begin, data_end).to_csv(
-        path + country + "/new_cases.csv",
-        date_format="%d.%m.%y",
+        path + country + "/new_cases.csv", date_format="%d.%m.%y",
     )
     log.info(f"Successfully created new cases file for {country}!")
 
@@ -342,15 +336,13 @@ for country in countries:
         owd.get_new(
             "deaths", country="Czech Republic", data_begin=data_begin, data_end=data_end
         ).to_csv(
-            path + country + "/deaths.csv",
-            date_format="%d.%m.%y",
+            path + country + "/deaths.csv", date_format="%d.%m.%y",
         )
     else:
         owd.get_new(
             "deaths", country=country, data_begin=data_begin, data_end=data_end
         ).to_csv(
-            path + country + "/deaths.csv",
-            date_format="%d.%m.%y",
+            path + country + "/deaths.csv", date_format="%d.%m.%y",
         )
     log.info(f"Successfully created deaths file for {country}!")
 

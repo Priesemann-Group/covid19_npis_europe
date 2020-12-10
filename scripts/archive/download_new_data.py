@@ -39,7 +39,7 @@ import datetime
 import pandas as pd
 import json
 
-sys.path.append("../covid19_inference/")
+sys.path.append("../../covid19_inference/")
 
 from covid19_inference import data_retrieval
 
@@ -49,7 +49,7 @@ log = logging.getLogger(__name__)
 # Config/Globals
 # ------------------------------------------------------------------------------ #
 countries = ["France", "Germany", "Belgium", "Portugal"]
-path = "../data"
+path = "../../data"
 begin = datetime.datetime(2020, 5, 17)
 end = datetime.datetime.now() - datetime.timedelta(days=1)
 _age_groups = ["age_group_0", "age_group_1", "age_group_2", "age_group_3"]

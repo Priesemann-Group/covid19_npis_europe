@@ -384,7 +384,7 @@ def slice_of_axis(tensor, axis, begin, end):
     begin_axis = begin % tensor.shape[axis]
     size_axis = (end - begin - 1) % tensor.shape[axis] + 1
 
-    begin_arr = np.zeros(len(tensor.shape), dtype="int")
+    begin_arr = np.zeros(len(tensor.shape), dtype="int32")
     size_arr = np.array(tensor.shape)
 
     begin_arr[axis] = begin_axis

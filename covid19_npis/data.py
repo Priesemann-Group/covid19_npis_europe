@@ -143,7 +143,13 @@ def convert_trace_to_dataframe(trace, sample_state, key, data_type=None):
     # Rename dimensions if shape labels are present
     if hasattr(dist, "shape_label"):
         for i in range(ndim):
-            if isinstance(dist.shape_label, (list, tuple,),):
+            if isinstance(
+                dist.shape_label,
+                (
+                    list,
+                    tuple,
+                ),
+            ):
                 label = dist.shape_label[i]
             else:
                 label = dist.shape_label
@@ -152,7 +158,9 @@ def convert_trace_to_dataframe(trace, sample_state, key, data_type=None):
                 df.index = df.index.droplevel(i)
             else:
                 df.index.rename(
-                    label, level=i - ndim, inplace=True,
+                    label,
+                    level=i - ndim,
+                    inplace=True,
                 )
 
     # Rename country index to country names
@@ -184,7 +192,8 @@ def convert_trace_to_dataframe(trace, sample_state, key, data_type=None):
     if r"time" in df.index.names:
         df.index = df.index.set_levels(
             pd.date_range(
-                modelParams.modelParams.data_begin, modelParams.modelParams.data_end,
+                modelParams.modelParams.data_begin,
+                modelParams.modelParams.data_end,
             ),
             level="time",
         )
@@ -381,7 +390,17 @@ class Country(object):
             if len(df.columns) != 1:
                 log.warning(f"Multiple columns found in {df.name}! Using first one!")
             df.columns = pd.MultiIndex(
-                levels=[[self.name,],], codes=[[0,],], names=["country"],
+                levels=[
+                    [
+                        self.name,
+                    ],
+                ],
+                codes=[
+                    [
+                        0,
+                    ],
+                ],
+                names=["country"],
             )
             return df
 
@@ -422,12 +441,14 @@ class Country(object):
         for row in range(1, len(df)):
             # Calc delta:
             delta = df[row] - previous_value
+            if delta != delta:
+                log.error(f"Found nan in intervetions! {self.name}")
             if delta != 0:
                 change_points.append(
                     Change_point(
                         date_data=df.index[row],
                         gamma_max=delta
-                        / interv.num_stages,  # +1 because it starts at 0
+                        / (interv.num_stages),  # +1 because it starts at 0
                     )
                 )
             # Set new previous value

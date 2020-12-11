@@ -155,6 +155,7 @@ def tests(country):
         tests = tests["total_tests"] / tests["delta"].apply(lambda x: x.days)
         dates = pd.date_range(data_begin - datetime.timedelta(days=14), data_end)
         tests = tests.reindex(dates)[data_begin:data_end].ffill()
+        tests = tests.fillna(0.0)
         tests.index.name = "date"
     if country == "Belgium":
         tests = bel_data.get_new("tests", data_begin=data_begin, data_end=data_end)
@@ -171,7 +172,10 @@ def interventions(country):
     Gets interventions from oxford interventions tracker and saves to
     interventions.csv
     """
-    c_name_dl = country
+    if country == "Czechia":
+        c_name_dl = "Czech Republic"
+    else:
+        c_name_dl = country
 
     interventions = pd.DataFrame()
     for policy in policies:
@@ -303,6 +307,26 @@ def download_and_save_file(
     return path + f_name
 
 
+def validate(country):
+    """
+    Read csv files and check for nans
+    """
+    files = [
+        "/tests.csv",
+        "/interventions.csv",
+        "/deaths.csv",
+        # "/new_cases.csv", we expect nans here
+        "/population.csv",
+    ]
+
+    for file in files:
+        df = pd.read_csv(path + country + file)
+        if df.isnull().sum().sum() > 0:
+            log.error(
+                f"Found {df.isnull().sum().sum()} NaNs in '{path + country + file}'"
+            )
+
+
 # ------------------------------------------------------------------------------ #
 # Download and open used files
 # ------------------------------------------------------------------------------ #
@@ -409,3 +433,10 @@ for country in countries_bar:
 
     # Config
     config(country)
+
+
+# Short validation of created data i.e. check for nans
+countries_bar = tqdm(countries, desc="Validation")
+for country in countries_bar:
+    countries_bar.set_description(f"Validation [{country[0:3]}]")
+    validate(country)

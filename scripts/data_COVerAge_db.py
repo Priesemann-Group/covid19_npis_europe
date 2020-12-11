@@ -79,9 +79,12 @@ def get_data(country, measure, data_begin, data_end):
     # Create new dataframe with agestrings as columns and date as index
     ret_measure = pd.DataFrame()
     for age_str in measure.index.get_level_values(level="age_str").unique():
-        ret_measure[age_str] = measure.xs(age_str, level="age_str").reindex(
-            pd.date_range(data_begin, data_end)
-        )["Value"]
+        ret_measure[age_str] = (
+            measure.xs(age_str, level="age_str")
+            .groupby("Date")
+            .sum()
+            .reindex(pd.date_range(data_begin, data_end))["Value"]
+        )
 
     # Calculate daily cases
     ret_measure = ret_measure.diff()
@@ -137,9 +140,6 @@ def config(country):
 def tests(country):
     # Tests
     name = country
-    if country == "Czechia":
-        country = "Czech Republic"
-
     tests = owd.get_new(
         "tests", country=country, data_begin=data_begin, data_end=data_end
     )
@@ -171,10 +171,7 @@ def interventions(country):
     Gets interventions from oxford interventions tracker and saves to
     interventions.csv
     """
-    if country == "Czechia":
-        c_name_dl = "Czech Republic"
-    else:
-        c_name_dl = country
+    c_name_dl = country
 
     interventions = pd.DataFrame()
     for policy in policies:
@@ -307,9 +304,8 @@ def download_and_save_file(
 
 
 # ------------------------------------------------------------------------------ #
-# Download and open files
+# Download and open used files
 # ------------------------------------------------------------------------------ #
-
 # Download new coverAgeDB file
 f_path = download_and_save_file(
     url="https://osf.io/9dsfk/download/",
@@ -394,20 +390,12 @@ for country in countries_bar:
     )
     log.debug(f"Successfully created new cases file for {country}!")
 
-    if country == "Czechia":
-        owd.get_new(
-            "deaths", country="Czech Republic", data_begin=data_begin, data_end=data_end
-        ).to_csv(
-            path + country + "/deaths.csv",
-            date_format="%d.%m.%y",
-        )
-    else:
-        owd.get_new(
-            "deaths", country=country, data_begin=data_begin, data_end=data_end
-        ).to_csv(
-            path + country + "/deaths.csv",
-            date_format="%d.%m.%y",
-        )
+    owd.get_new(
+        "deaths", country=country, data_begin=data_begin, data_end=data_end
+    ).to_csv(
+        path + country + "/deaths.csv",
+        date_format="%d.%m.%y",
+    )
     log.debug(f"Successfully created deaths file for {country}!")
 
     align_age_groups(country)

@@ -31,7 +31,7 @@ def gamma(x, alpha, beta):
             tf.reduce_sum(pdf, axis=-1) + 1e-5, axis=-1
         )  # Adding 1e5 to prevent nans i.e. x/0
     else:
-        pdf = pdf / tf.reduce_sum(pdf)
+        pdf = pdf / (tf.reduce_sum(pdf) + 1e-5)
     return pdf
 
 

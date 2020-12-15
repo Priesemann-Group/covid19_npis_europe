@@ -143,13 +143,7 @@ def convert_trace_to_dataframe(trace, sample_state, key, data_type=None):
     # Rename dimensions if shape labels are present
     if hasattr(dist, "shape_label"):
         for i in range(ndim):
-            if isinstance(
-                dist.shape_label,
-                (
-                    list,
-                    tuple,
-                ),
-            ):
+            if isinstance(dist.shape_label, (list, tuple,),):
                 label = dist.shape_label[i]
             else:
                 label = dist.shape_label
@@ -158,9 +152,7 @@ def convert_trace_to_dataframe(trace, sample_state, key, data_type=None):
                 df.index = df.index.droplevel(i)
             else:
                 df.index.rename(
-                    label,
-                    level=i - ndim,
-                    inplace=True,
+                    label, level=i - ndim, inplace=True,
                 )
 
     # Rename country index to country names
@@ -192,8 +184,8 @@ def convert_trace_to_dataframe(trace, sample_state, key, data_type=None):
     if r"time" in df.index.names:
         df.index = df.index.set_levels(
             pd.date_range(
-                modelParams.modelParams.data_begin,
-                modelParams.modelParams.data_end,
+                modelParams.modelParams.date_sim_begin,
+                modelParams.modelParams.date_data_end,
             ),
             level="time",
         )
@@ -390,17 +382,7 @@ class Country(object):
             if len(df.columns) != 1:
                 log.warning(f"Multiple columns found in {df.name}! Using first one!")
             df.columns = pd.MultiIndex(
-                levels=[
-                    [
-                        self.name,
-                    ],
-                ],
-                codes=[
-                    [
-                        0,
-                    ],
-                ],
-                names=["country"],
+                levels=[[self.name,],], codes=[[0,],], names=["country"],
             )
             return df
 

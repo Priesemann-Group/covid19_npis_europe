@@ -27,7 +27,7 @@ class ModelParams:
     def __init__(
         self,
         countries,
-        min_offset_sim_data=20,
+        offset_sim_data=20,
         minimal_daily_cases=40,
         min_offset_sim_death_data=40,
         minimal_daily_deaths=10,
@@ -37,7 +37,7 @@ class ModelParams:
     ):
 
         self._dtype = dtype
-        self._min_offset_sim_data = min_offset_sim_data
+        self._offset_sim_data = offset_sim_data
         self._minimal_daily_cases = minimal_daily_cases
         self._min_offset_sim_death_data = min_offset_sim_death_data
         self._minimal_daily_deaths = minimal_daily_deaths
@@ -146,17 +146,43 @@ class ModelParams:
             .astype(self.dtype)
             .reshape((-1, len(self.countries), len(self.age_groups)))
         )
+        data_tensor = np.concatenate(
+            [
+                np.empty(
+                    (self._offset_sim_data, len(self.countries), len(self.age_groups))
+                ),
+                data_tensor,
+            ]
+        )
         i_data_begin_list = []
         for c in range(data_tensor.shape[1]):
             mask = np.sum(data_tensor[:, c, :], axis=-1) > self._minimal_daily_cases
             i_data_begin = np.min(np.nonzero(mask)[0])
             i_data_begin_list.append(i_data_begin)
         i_data_begin_list = np.array(i_data_begin_list)
-        i_data_begin_list = np.maximum(i_data_begin_list, self._min_offset_sim_data)
+        i_data_begin_list = np.maximum(i_data_begin_list, self._offset_sim_data)
         self._indices_begin_data = i_data_begin_list
         for c, i in enumerate(self._indices_begin_data):
             data_tensor[:i, c, :] = np.nan
         self._pos_tests_data_tensor = data_tensor
+
+        """ # Update total test data tensor/df
+                set data tensor, replaces values smaller than 40 by nans.
+                """
+        total_tests_tensor = (
+            self._dataframe_total_tests.to_numpy()
+            .astype(self.dtype)
+            .reshape((-1, len(self.countries)))
+        )
+        total_tests_tensor = np.concatenate(
+            [
+                np.empty((self._offset_sim_data, len(self.countries))),
+                total_tests_tensor,
+            ]
+        )
+        for c, i in enumerate(self._indices_begin_data):
+            total_tests_tensor[:i, c] = np.nan
+        self._total_tests_data_tensor = total_tests_tensor
 
         """ # Update deaths data tensor/df
         set data tensor, replaces values smaller than 10 by nans.
@@ -165,6 +191,9 @@ class ModelParams:
             self._dataframe_deaths.to_numpy()
             .astype(self.dtype)
             .reshape((-1, len(self.countries)))  ## assumes non-age-stratified data
+        )
+        deaths_tensor = np.concatenate(
+            [np.empty((self._offset_sim_data, len(self.countries))), deaths_tensor,]
         )
         i_data_begin_list = []
         for c in range(deaths_tensor.shape[1]):
@@ -175,18 +204,20 @@ class ModelParams:
         i_data_begin_list = np.maximum(
             i_data_begin_list, self._min_offset_sim_death_data
         )
-        self._indices_begin_data = np.maximum(
+        self._indices_begin_data_deaths = np.maximum(
             i_data_begin_list, self._indices_begin_data
         )
-        for c, i in enumerate(i_data_begin_list):
+        for c, i in enumerate(self._indices_begin_data_deaths):
             deaths_tensor[:i, c] = np.nan
         self._deaths_data_tensor = deaths_tensor
 
     def _update_data_summary(self):
         """# Update Data summary"""
         data = {  # Is set on init
-            "begin": self.data_begin,
-            "end": self.data_end,
+            "begin": self.date_data_begin,
+            "begin sim": self.date_data_begin
+            - datetime.timedelta(days=self._offset_sim_data),
+            "end": self.date_data_end,
             "age_groups": [],
             "countries": [],
             "interventions": [],
@@ -315,7 +346,7 @@ class ModelParams:
         """
         |shape| time, country
         """
-        return self._dataframe_total_tests.to_numpy().astype(self.dtype)
+        return self._total_tests_data_tensor
 
     # ------------------------------------------------------------------------------ #
     # Number of deaths
@@ -387,6 +418,10 @@ class ModelParams:
         return self._dtype
 
     @property
+    def offset_sim_data(self):
+        return self._offset_sim_data
+
+    @property
     def age_groups(self):
         return self.data_summary["age_groups"]
 
@@ -407,16 +442,16 @@ class ModelParams:
         return self.spline_basis.shape[1]
 
     @property
-    def indices_begin_sim(self):
+    def indices_begin_data(self):
+        """
+        Returns the index of every country when the first case is reported. It could
+        be that for some countries, the index is later than self.offset_sim_data.
+        """
         return self._indices_begin_data
 
     @property
-    def min_offset_sim_data(self):
-        return self._min_offset_sim_data
-
-    @property
     def length(self):
-        return len(self._dataframe)
+        return len(self._pos_tests_data_tensor)
 
     @property
     def max_num_cp(self):
@@ -433,11 +468,17 @@ class ModelParams:
         return max(data)
 
     @property
-    def data_begin(self):
+    def date_data_begin(self):
         return self.pos_tests_dataframe.index.min()
 
     @property
-    def data_end(self):
+    def date_sim_begin(self):
+        return self.pos_tests_dataframe.index.min() - datetime.timedelta(
+            days=self._offset_sim_data
+        )
+
+    @property
+    def date_data_end(self):
         return self.pos_tests_dataframe.index.max()
 
     # ------------------------------------------------------------------------------ #
@@ -445,13 +486,11 @@ class ModelParams:
     # ------------------------------------------------------------------------------ #
 
     def date_to_index(self, date):
-        return (date - self._data_summary["begin"]).days
+        return (date - self.date_data_begin).days + self.offset_sim_data
 
     def get_weekdays(self):
         self._weekdays_data_tensor = tf.constant(
-            pd.date_range(
-                start=modelParams.data_begin, end=modelParams.data_end
-            ).weekday,
+            pd.date_range(start=self.date_data_begin, end=self.date_data_begin).weekday,
             tf.float32,
         )
         return self._weekdays_data_tensor

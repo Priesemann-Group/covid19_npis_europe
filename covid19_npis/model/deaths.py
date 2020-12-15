@@ -263,7 +263,9 @@ def _calc_Phi_IFR(
 
     Phi_IFR = tf.einsum("ca,...ca->...ca", 1.0 / N_agegroups, phi)
     log.debug(f"Phi_IFR\n{Phi_IFR.shape}")
-
+    Phi_IFR = yield Deterministic(
+        name="Phi_IFR", value=Phi_IFR, shape_label=("country", "age_group")
+    )
     return Phi_IFR
 
 

@@ -12,7 +12,6 @@ from covid19_npis import transformations
 
 #  from covid19_npis.benchmarking import benchmark
 
-
 from covid19_npis.model import *
 
 from covid19_npis.model.distributions import (

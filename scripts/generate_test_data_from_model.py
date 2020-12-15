@@ -8,8 +8,27 @@ import numpy as np
 
 
 # Load our data from csv files into our own custom data classes
-c1 = covid19_npis.data.Country("test-country-1", "../data/test_country_1")  # name
-c2 = covid19_npis.data.Country("test-country-2", "../data/test_country_2",)
+# c1 = covid19_npis.data.Country("test-country-1", "../data/test_country_1")  # name
+# c2 = covid19_npis.data.Country("test-country-2", "../data/test_country_2",)
+countries = [
+    "Germany",
+    # "Belgium",
+    # "Czechia",
+    # "Denmark",
+    # "Finland",
+    # "Greece",
+    # "Italy",
+    # "Netherlands",
+    # "Portugal",
+    # "Romania",
+    # "Spain",
+    # "Sweden",
+    "Switzerland",
+]
+c1, c2 = [
+    covid19_npis.data.Country(f"../data/coverage_db/{country}",)
+    for country in countries
+]
 
 # Construct our modelParams from the data.
 modelParams = covid19_npis.ModelParams(countries=[c1, c2])
@@ -20,7 +39,7 @@ params = {
     # population size per country and age group
     "N": np.array([[1e15, 1e15, 1e15, 1e15], [1e15, 1e15, 1e15, 1e15]]),
     # Reproduction number at t=0 per country and age group
-    "R_0": np.array([2.3, 2.4]),
+    "R_0": np.array([3.3, 3.4]),
     # Initial infected
     "I_0_diff_base": 5 * np.array([[[1, 1, 1, 1], [1, 1, 1, 1]]]),
     "I_0_diff_add": np.zeros(
@@ -38,7 +57,11 @@ params = {
     # Length of the change point
     "l_i_sign": 4 * np.ones((modelParams.num_interventions,)),
     # Alpha value of the change point
-    "alpha_i_c_a": np.array([[[0.73, 0.72, 0.74, 0.75], [0.73, 0.72, 0.74, 0.75]],]),
+    "alpha_i_c_a": np.stack(
+        [[[0.73, 0.72, 0.74, 0.75], [0.73, 0.72, 0.74, 0.75]]]
+        * modelParams.num_interventions
+    )
+    * 0.7,
     "C": np.stack(
         np.array(
             [
@@ -79,27 +102,34 @@ params = {
         ),
         np.array([0.1, 0.1, 0.1, 0.1]),
     ),
+    "Phi_IFR": np.array([[0.1, 0.01, 0.001, 0.0001], [0.1, 0.01, 0.001, 0.0001]]),
+    "death_m": np.array([14.0, 14.0]),
+    "death_theta": np.array([1.0, 1.0]),
 }
 
 (
-    new_cases_inferred,
+    positive_tests,
+    total_tests,
+    new_E_t,
+    reporting_delay_kernel,
     R_t,
-    interv,
-    (delay, positive_tests, new_cases_delayed, total_tests, new_I_t, delay_kernel),
+    h_0_t,
+    cases_delayed_deaths,
 ) = covid19_npis.test_data.data_generators.test_data_from_model(
     main_model,
     modelParams,
     params,
     [
-        "delay",
         "positive_tests",
-        "new_cases_delayed",
         "total_tests",
-        "new_I_t",
-        "delay_kernel",
+        "new_E_t",
+        "reporting_delay_kernel",
+        "R_t",
+        "h_0_t",
+        "cases_delayed_deaths",
     ],
 )
 
-covid19_npis.test_data.data_generators.save_data(
-    "../data/test_data_from_model", new_cases_inferred, R_t, interv
-)
+# covid19_npis.test_data.data_generators.save_data(
+#    "../data/test_data_from_model", new_cases_inferred, R_t, interv
+# )

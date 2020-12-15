@@ -20,9 +20,7 @@ def download_url(name, url, save_path, chunk_size=1024):
     pbar = tqdm(
         desc=f"{name} download",
         unit="B",
-        total=int(
-            r.headers["Content-Length"],
-        ),
+        total=int(r.headers["Content-Length"],),
         unit_scale=True,
     )
 
@@ -104,9 +102,7 @@ def population(country):
     data = data["PopTotal"]
     data = data * 1000
     data.index.name = "age"
-    data.astype("int64").to_csv(
-        path + country + "/population.csv",
-    )
+    data.astype("int64").to_csv(path + country + "/population.csv",)
     log.debug(f"Successfully created population file for {country}!")
 
 
@@ -180,10 +176,7 @@ def interventions(country):
     interventions = pd.DataFrame()
     for policy in policies:
         interventions[policy] = ox.get_time_data(
-            policy=policy,
-            country=c_name_dl,
-            data_begin=data_begin,
-            data_end=data_end,
+            policy=policy, country=c_name_dl, data_begin=data_begin, data_end=data_end,
         )
     interventions.index = interventions.index.rename("date")
     interventions = interventions.ffill()  # Pad missing values with previous values
@@ -283,11 +276,7 @@ def align_age_groups(country):
 
 
 def download_and_save_file(
-    url,
-    f_name,
-    path="../data/download/",
-    timestamp=False,
-    overwrite=False,
+    url, f_name, path="../data/download/", timestamp=False, overwrite=False,
 ):
     """
     Downloads a file and saves it to a path
@@ -409,16 +398,14 @@ for country in countries_bar:
         os.mkdir(path + country)
 
     get_data(country, "Cases", data_begin, data_end).to_csv(
-        path + country + "/new_cases.csv",
-        date_format="%d.%m.%y",
+        path + country + "/new_cases.csv", date_format="%d.%m.%y",
     )
     log.debug(f"Successfully created new cases file for {country}!")
 
     owd.get_new(
         "deaths", country=country, data_begin=data_begin, data_end=data_end
     ).to_csv(
-        path + country + "/deaths.csv",
-        date_format="%d.%m.%y",
+        path + country + "/deaths.csv", date_format="%d.%m.%y",
     )
     log.debug(f"Successfully created deaths file for {country}!")
 

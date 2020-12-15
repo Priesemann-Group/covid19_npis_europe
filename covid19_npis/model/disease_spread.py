@@ -53,12 +53,12 @@ def construct_h_0_t(
     """
     batch_dims = tuple(R_t.shape)[:-3]
     data = modelParams.pos_tests_data_tensor
-    diff_sim_data = modelParams.min_offset_sim_data
+    diff_sim_data = modelParams.offset_sim_data
     assert data.ndim == 3
     assert (
         diff_sim_data > len_gen_interv_kernel + mean_test_delay
     ), "min_offset_sim_data is to small"
-    i_data_begin_list = modelParams.indices_begin_sim
+    i_data_begin_list = modelParams.indices_begin_data
 
     # eigvals, _ = tf.linalg.eigh(R_t[..., i_data_begin, :, :])
     # largest_eigval = eigvals[-1]

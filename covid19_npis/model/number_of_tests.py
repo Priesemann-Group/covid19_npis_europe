@@ -199,6 +199,11 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
     )
 
     log.debug(f"positive_tests\n{positive_tests}")
+    positive_tests = yield Deterministic(
+        name=name_positive,
+        value=positive_tests,
+        shape_label=("time", "country", "age_group"),
+    )
 
     """ # Total tests
     """

@@ -48,7 +48,6 @@ def studentT_likelihood(modelParams, pos_tests, total_tests, deaths):
 
     # if modelParams.data_summary["files"]["/deaths.csv"]:
     # likelihood_deaths = yield _studentT_deaths(modelParams, deaths)
-    # likelihood = tf.stack([likelihood, likelihood_deaths], axis=-1)
     log.debug(f"likelihood:\n{likelihood}")
     return likelihood
 
@@ -202,7 +201,7 @@ def _studentT_deaths(modelParams, deaths):
         scale=50.0,
         event_stack=modelParams.num_countries,
         conditionally_independent=True,
-        transform=transformations.SoftPlus(),
+        transform=transformations.SoftPlus(scale=50),
         shape_label="country",
     )
     log.debug(f"likelihood_deaths sigma:\n{sigma}")
@@ -215,12 +214,13 @@ def _studentT_deaths(modelParams, deaths):
     len_batch_shape = len(deaths_without_age.shape) - 2
     likelihood = yield StudentT(
         name="likelihood_deaths",
-        loc=tf.boolean_mask(deaths_without_age, mask, axis=len_batch_shape),
+        loc=tf.boolean_mask(deaths_without_age, mask, axis=len_batch_shape) + 10,
         scale=tf.boolean_mask(
-            sigma * tf.sqrt(deaths_without_age) + 1, mask, axis=len_batch_shape
-        ),
+            sigma * tf.sqrt(deaths_without_age), mask, axis=len_batch_shape
+        )
+        + 1e5,
         df=4,
-        observed=tf.boolean_mask(data, mask),
+        observed=tf.boolean_mask(data, mask) + 10,
         reinterpreted_batch_ndims=1,
     )
     log.debug(f"likelihood_deaths:\n{likelihood}")

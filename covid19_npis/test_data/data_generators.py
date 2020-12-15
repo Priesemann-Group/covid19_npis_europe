@@ -222,12 +222,13 @@ def test_data_from_model(model, modelParams, params_dict, to_return=None):
     trace = az.from_dict(posterior=dict_with_model_name,)
 
     var_names = []
-    variables = list(
-        set(
-            ["R_0", "new_cases_inferred", "R_t", "g", "d_i_c_p", "new_I_t", "h_0_t",]
-            + to_return
-        )
-    )
+    # variables = list(
+    #    set(
+    #    #    ["R_0", "new_cases_inferred", "R_t", "g", "d_i_c_p", "new_I_t", "h_0_t",]
+    #        to_return
+    #    )
+    # )
+    variables = to_return
 
     for var in variables:
         var_names.append(f"{model_name}/{var}")
@@ -251,6 +252,7 @@ def test_data_from_model(model, modelParams, params_dict, to_return=None):
             df.index = df.index.rename("date")
         return df
 
+    """
     new_cases_inferred = convert_to_pandas("new_cases_inferred")
     R_t = convert_to_pandas("R_t")
     d = data.convert_trace_to_dataframe(
@@ -270,8 +272,10 @@ def test_data_from_model(model, modelParams, params_dict, to_return=None):
     extra = []
     for var in to_return:
         extra.append(convert_to_pandas(var))
+    """
+    dfs = [convert_to_pandas(var) for var in variables]
 
-    return new_cases_inferred, R_t, interv, extra
+    return dfs
 
 
 def save_data(path, new_cases, R_t, interv):

@@ -43,7 +43,7 @@ class ModelParams:
         self._minimal_daily_deaths = minimal_daily_deaths
         self._spline_degree = spline_degree
         self._spline_stride = spline_stride
-
+        self._indices_begin_data = None
         # Save data objects and calculate all other variables
         self.countries = countries
 
@@ -291,7 +291,7 @@ class ModelParams:
         )
         new_cases_tensor = np.concatenate(
             [
-                np.empty(
+                np.zeros(
                     (self._offset_sim_data, len(self.countries), len(self.age_groups))
                 ),
                 new_cases_tensor,
@@ -306,10 +306,10 @@ class ModelParams:
             i_data_begin_list.append(i_data_begin)
 
         i_data_begin_list = np.array(i_data_begin_list)
-        i_data_begin_list = np.maximum(i_data_begin_list, self._offset_sim_data)
+        # i_data_begin_list = np.maximum(i_data_begin_list, self._offset_sim_data)
         self._indices_begin_data = i_data_begin_list
 
-        for c, i in enumerate(self._indices_begin_data):
+        for c, i in enumerate(self.indices_begin_data):
             new_cases_tensor[:i, c, :] = np.nan
 
         self._tensor_pos_tests = tf.constant(new_cases_tensor, dtype=self.dtype)
@@ -352,11 +352,11 @@ class ModelParams:
         )
         total_tests_tensor = np.concatenate(
             [
-                np.empty((self._offset_sim_data, len(self.countries))),
+                np.zeros((self._offset_sim_data, len(self.countries))),
                 total_tests_tensor,
             ]
         )
-        for c, i in enumerate(self._indices_begin_data):
+        for c, i in enumerate(self.indices_begin_data):
             total_tests_tensor[:i, c] = np.nan
         self._tensor_total_tests = tf.constant(total_tests_tensor, dtype=self.dtype)
 
@@ -397,7 +397,7 @@ class ModelParams:
             .reshape((-1, len(self.countries)))  ## assumes non-age-stratified data
         )
         deaths_tensor = np.concatenate(
-            [np.empty((self._offset_sim_data, len(self.countries))), deaths_tensor,]
+            [np.zeros((self._offset_sim_data, len(self.countries))), deaths_tensor,]
         )
         i_data_begin_list = []
         for c in range(deaths_tensor.shape[1]):
@@ -409,7 +409,7 @@ class ModelParams:
             i_data_begin_list, self._min_offset_sim_death_data
         )
         self._indices_begin_data_deaths = np.maximum(
-            i_data_begin_list, self._indices_begin_data
+            i_data_begin_list, self.indices_begin_data
         )
         for c, i in enumerate(self._indices_begin_data_deaths):
             deaths_tensor[:i, c] = np.nan
@@ -496,6 +496,8 @@ class ModelParams:
         Returns the index of every country when the first case is reported. It could
         be that for some countries, the index is later than self.offset_sim_data.
         """
+        if self._indices_begin_data is None:
+            self.pos_tests_data_tensor = self.pos_tests_dataframe
         return self._indices_begin_data
 
     @property

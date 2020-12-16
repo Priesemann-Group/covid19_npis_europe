@@ -393,9 +393,7 @@ def slice_of_axis(tensor, axis, begin, end):
     return tf.slice(tensor, begin=begin_arr, size=size_arr)
 
 
-def convolution_with_fixed_kernel(
-    data, kernel, data_time_axis, filter_axes_data=(), padding=None
-):
+def convolution_with_fixed_kernel(data, kernel, data_time_axis, filter_axes_data=()):
     """
     Convolve data with a time independent kernel. The returned shape is equal to the shape
     of data. In order avoid constructing a time_length x time_length kernel, the data
@@ -414,67 +412,18 @@ def convolution_with_fixed_kernel(
     filter_axes_data : tuple
         the axes of `data`, to which the `filter_axes` of `kernel` should be mapped to.
         Each of this dimension is therefore subject to a different filter
-    padding : int
-        By default, the padding is set to length of data_time_axis divided by 4.
 
     Returns
     -------
     A convolved tensor with the same shape as data.
     """
-    len_kernel = kernel.shape[-1]
-    len_time = data.shape[data_time_axis]
-
-    data_time_axis = positive_axes(data_time_axis, ndim=len(data.shape))
-
-    if padding is None:
-        padding = np.ceil(len_time / 4).astype("int32")
-
-    kernel_for_frame = tf.repeat(
-        tf.reverse(kernel, axis=(-1,))[..., tf.newaxis], repeats=padding, axis=-1
+    kernel = tf.repeat(
+        kernel[..., tf.newaxis], repeats=data.shape[data_time_axis], axis=-1
     )
 
-    kernel_for_frame = tf.linalg.diag(
-        kernel_for_frame, k=(0, len_kernel - 1), num_rows=len_kernel + padding - 1
-    )  # dimensions: conv_axes x copies for frame (padding) x time
-
-    # if a filter_axis is larger then the data_time_axis, it has to be increased by one, as
-    # the kernel gained a dimension:
-    if filter_axes_data:
-        filter_axes_data = positive_axes(filter_axes_data, len(data.shape))
-        filter_axes_data_for_frame = filter_axes_data
-        filter_axes_data_for_frame[filter_axes_data_for_frame > data_time_axis] += 1
-    else:
-        filter_axes_data_for_frame = ()
-
-    kernel_for_frame = match_axes(
-        kernel_for_frame,
-        target_axes=list(filter_axes_data_for_frame)
-        + [data_time_axis, data_time_axis + 1],
-        ndim=len(data.shape) + 1,
+    return convolution_with_varying_kernel(
+        data, kernel, data_time_axis, filter_axes_data
     )
-
-    data_framed = tf.signal.frame(
-        data,
-        frame_length=tf.cast(len_kernel + padding - 1, "int32"),
-        frame_step=tf.cast(padding, "int32"),
-        pad_end=True,
-        axis=tf.cast(data_time_axis, "int32"),
-    )
-
-    result = einsum_indexed(
-        data_framed,
-        kernel_for_frame,
-        inner1=data_time_axis + 1,
-        inner2=data_time_axis,
-        outer1=data_time_axis,
-        outer2=data_time_axis + 1,
-    )
-
-    result = concatenate_axes(result, data_time_axis, data_time_axis + 1)
-
-    result = slice_of_axis(result, data_time_axis, begin=0, end=len_time)
-
-    return result
 
 
 def convolution_with_varying_kernel(data, kernel, data_time_axis, filter_axes_data=()):

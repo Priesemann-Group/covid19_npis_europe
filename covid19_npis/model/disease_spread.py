@@ -59,6 +59,7 @@ def construct_h_0_t(
         diff_sim_data > len_gen_interv_kernel + mean_test_delay
     ), "min_offset_sim_data is to small"
     i_data_begin_list = modelParams.indices_begin_data
+    i_sim_begin_list = i_data_begin_list - modelParams.offset_sim_data
 
     # eigvals, _ = tf.linalg.eigh(R_t[..., i_data_begin, :, :])
     # largest_eigval = eigvals[-1]
@@ -77,7 +78,6 @@ def construct_h_0_t(
     log.debug(f"R_eff_inv for h_0_t construction:\n{R_eff_inv}")
     """
 
-    i_sim_begin_list = i_data_begin_list - diff_sim_data
     avg_cases_begin = []
     for c in range(data.shape[1]):
         avg_cases_begin.append(

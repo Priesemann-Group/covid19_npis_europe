@@ -144,9 +144,10 @@ t = np.arange(0, modelParams.length_sim)
 
 # Plotting dict
 plots = {
-    "Positive tests": positive_tests,
+    "new_E_t": new_E_t,
     "Total tests": total_tests,
     "Deaths": cases_delayed_deaths,
+    "R_t": R_t,
 }
 # For now dirty plot does not differentiate between countries!
 for key, item in plots.items():

@@ -147,7 +147,7 @@ class ModelParams:
         """ # Update deaths data tensor
         set data tensor, replaces values smaller than 10 by nans.
         """
-        self.death_data_tensor = self._dataframe_total_tests  # Uses setter below!
+        self.deaths_data_tensor = self._dataframe_total_tests  # Uses setter below!
 
     # ------------------------------------------------------------------------------ #
     # Data Summary
@@ -223,7 +223,7 @@ class ModelParams:
                         d_cp.append(0.0)
                 d_c.append(d_cp)
             data.append(d_c)
-        return tf.constant(data, dtype="float32")
+        return tf.constant(data, dtype=self.dtype)
 
     @property
     def gamma_data_tensor(self):
@@ -246,7 +246,7 @@ class ModelParams:
                         d_cp.append(0.0)
                 d_c.append(d_cp)
             data.append(d_c)
-        return tf.constant(data, dtype="float32")
+        return tf.constant(data, dtype=self.dtype)
 
     # ------------------------------------------------------------------------------ #
     # Positive tests
@@ -357,7 +357,7 @@ class ModelParams:
         )
         for c, i in enumerate(self._indices_begin_data):
             total_tests_tensor[:i, c] = np.nan
-        self._tensor_total_tests = total_tests_tensor
+        self._tensor_total_tests = tf.constant(total_tests_tensor, dtype=self.dtype)
 
     # ------------------------------------------------------------------------------ #
     # Number of deaths
@@ -550,16 +550,23 @@ class ModelParams:
 
     @property
     def spline_basis(self):
+        """
+        Calculates B-spline basis.
+
+        Return
+        ------
+        |shape| modelParams.length_sim, modelParams.num_splines
+        """
         stride = self._spline_stride
         degree = self._spline_degree
         knots = np.arange(
-            self.length + degree * stride, 0 - (degree + 1) * stride, -stride
+            self.length_sim + degree * stride, 0 - (degree + 1) * stride, -stride
         )
         knots = knots[::-1]
         num_splines = len(knots) - 2 * (degree - 1)
         spl = BSpline(knots, np.eye(num_splines), degree, extrapolate=False)
-        spline_basis = spl(np.arange(0, self.length))
-        return spline_basis  # shape : modelParams.length x modelParams.num_splines
+        spline_basis = spl(np.arange(0, self.length_sim))
+        return spline_basis
 
     # ------------------------------------------------------------------------------ #
     # Other Methods

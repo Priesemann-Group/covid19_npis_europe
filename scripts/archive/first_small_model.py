@@ -66,9 +66,9 @@ import tensorflow_probability as tfp
 
 @pm.model
 def model(df):
-    """ Create I_0 with
-        shape:
-            number_of_countries*number_of_age_groups
+    """Create I_0 with
+    shape:
+        number_of_countries*number_of_age_groups
     """
     batch_shape = len(countries) * len(age_groups)
     I_0 = yield pm.HalfCauchy(loc=[10] * batch_shape, name="I_0")

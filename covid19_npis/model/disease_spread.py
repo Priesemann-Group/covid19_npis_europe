@@ -20,7 +20,11 @@ log = logging.getLogger(__name__)
 
 
 def construct_h_0_t(
-    modelParams, len_gen_interv_kernel, R_t, mean_gen_interv, mean_test_delay=10,
+    modelParams,
+    len_gen_interv_kernel,
+    R_t,
+    mean_gen_interv,
+    mean_test_delay=10,
 ):
     r"""
     Generates a prior for E_0_t, based on the observed number of cases during the first
@@ -141,7 +145,14 @@ def construct_h_0_t(
     log.debug(f"R_t:\n{R_t.shape}")
 
     h_0_t_rand = tf.math.cumsum(
-        tf.concat([h_0_base, h_0_base_add,], axis=-3,), axis=-3,
+        tf.concat(
+            [
+                h_0_base,
+                h_0_base_add,
+            ],
+            axis=-3,
+        ),
+        axis=-3,
     )  # shape:  batch_dims x len_gen_interv_kernel x countries x age_groups
 
     h_0_t_rand = tf.einsum(
@@ -406,7 +417,11 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
 
         log.debug(f"new:\n{new}")  # kernel_time,batch,country,age_group
         E_nextv = tf.concat(
-            [new[tf.newaxis, ...], E_lastv[:-1, ...],], axis=0,
+            [
+                new[tf.newaxis, ...],
+                E_lastv[:-1, ...],
+            ],
+            axis=0,
         )  # Create new infected population for new step, insert latest at front
 
         S_t = S_t - new
@@ -544,7 +559,10 @@ def InfectionModel_unrolled(N, E_0, R_t, C, g_p):
         # Calculate new infections
         new_E = tf.einsum("...ci,...cij,...cj->...cj", infectious, R_eff, f)
         # log.debug(f"new_E:\n{new_E}")
-        E_t = tf.concat([E_t, new_E[..., tf.newaxis, :, :]], axis=-3,)
+        E_t = tf.concat(
+            [E_t, new_E[..., tf.newaxis, :, :]],
+            axis=-3,
+        )
 
         S_t = S_t - new_E
 

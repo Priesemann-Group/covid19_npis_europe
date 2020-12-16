@@ -578,7 +578,11 @@ def convolution_with_map(data, kernel, modelParams):
         data_conv.append(data_shift[..., tau - kernel_len : tau])
 
     convolution = tf.map_fn(
-        fn=lambda data_conv: tf.einsum("...cat,...cat->...ca", data_conv, kernel,),
+        fn=lambda data_conv: tf.einsum(
+            "...cat,...cat->...ca",
+            data_conv,
+            kernel,
+        ),
         elems=tf.convert_to_tensor(data_conv),
         dtype="float32",
         fn_output_signature=tf.TensorSpec(shape=output_shape, dtype="float32"),

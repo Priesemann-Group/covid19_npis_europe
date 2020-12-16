@@ -26,7 +26,9 @@ countries = [
     "Switzerland",
 ]
 c1, c2 = [
-    covid19_npis.data.Country(f"../data/coverage_db/{country}",)
+    covid19_npis.data.Country(
+        f"../data/coverage_db/{country}",
+    )
     for country in countries
 ]
 

@@ -191,11 +191,15 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
     phi_age = tf.debugging.check_numerics(phi_age, f"phi_age:\n{phi_age}")
 
     positive_tests = _calc_positive_tests(
-        new_E_t_delayed=new_E_t_delayed, phi_plus=phi_t, phi_age=phi_age,
+        new_E_t_delayed=new_E_t_delayed,
+        phi_plus=phi_t,
+        phi_age=phi_age,
     )
 
     positive_tests = yield weekly_modulation(
-        name=name_positive, modelParams=modelParams, cases=positive_tests,
+        name=name_positive,
+        modelParams=modelParams,
+        cases=positive_tests,
     )
 
     log.debug(f"positive_tests\n{positive_tests}")
@@ -368,10 +372,15 @@ def _construct_phi_tests_reported(
     """
 
     sigma = yield HalfCauchy(
-        name=f"{name}_sigma", scale=sigma_scale, conditionally_independent=True,
+        name=f"{name}_sigma",
+        scale=sigma_scale,
+        conditionally_independent=True,
     )
     mu = yield Normal(
-        name=f"{name}_mu", loc=mu_loc, scale=mu_scale, conditionally_independent=True,
+        name=f"{name}_mu",
+        loc=mu_loc,
+        scale=mu_scale,
+        conditionally_independent=True,
     )
     phi_dagger = yield Normal(
         name=f"{name}_dagger",
@@ -514,7 +523,10 @@ def _construct_reporting_delay(
         conditionally_independent=True,
     )
     mu = yield Normal(
-        name=f"{name}_mu", loc=0.0, scale=mu_scale, conditionally_independent=True,
+        name=f"{name}_mu",
+        loc=0.0,
+        scale=mu_scale,
+        conditionally_independent=True,
     )
     mu = mu + mu_loc
     log.debug(f"mu delta m:\n{mu}")
@@ -561,7 +573,11 @@ def _construct_reporting_delay(
     theta = tf.clip_by_value(theta, clip_value_min=0.1, clip_value_max=10)
 
     # We need to add the spline dimension at some point i.e. prop. expand delta_m
-    m = yield Deterministic(name=name, value=m, shape_label=("country", "spline"),)
+    m = yield Deterministic(
+        name=name,
+        value=m,
+        shape_label=("country", "spline"),
+    )
     log.debug(f"m_spline:\n{m}")
     return (m, theta)
 
@@ -608,7 +624,11 @@ def _calc_reporting_delay_kernel(name, m, theta, length_kernel=14):
     log.debug(f"theta\n{theta}")
 
     # Calculate pdf
-    kernel = utils.gamma(t, m / theta + 1.0, 1.0 / theta,)
+    kernel = utils.gamma(
+        t,
+        m / theta + 1.0,
+        1.0 / theta,
+    )
     kernel = tf.einsum("...ctk->...ckt", kernel)
 
     kernel = yield Deterministic(
@@ -846,10 +866,22 @@ def construct_testing_state(
     )
 
     # Add all vars to the trace
-    phi_det = yield Deterministic(name=name_phi, value=phi,)
-    eta_det = yield Deterministic(name=name_eta, value=eta,)
-    xi_det = yield Deterministic(name=name_xi, value=xi,)
-    m_ast_det = yield Deterministic(name=name_m_ast, value=m_ast,)
+    phi_det = yield Deterministic(
+        name=name_phi,
+        value=phi,
+    )
+    eta_det = yield Deterministic(
+        name=name_eta,
+        value=eta,
+    )
+    xi_det = yield Deterministic(
+        name=name_xi,
+        value=xi,
+    )
+    m_ast_det = yield Deterministic(
+        name=name_m_ast,
+        value=m_ast,
+    )
 
     return (phi, eta, xi, m_ast)
 

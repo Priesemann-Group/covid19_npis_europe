@@ -69,7 +69,7 @@ policies = [
 
 def interventions():
     """
-    Gets interventions from oxford interventions tracker and saves to 
+    Gets interventions from oxford interventions tracker and saves to
     interventions.csv
     """
     ox = data_retrieval.OxCGRT(True)  # interv
@@ -78,7 +78,10 @@ def interventions():
         interventions = pd.DataFrame()
         for policy in policies:
             interventions[policy] = ox.get_time_data(
-                policy=policy, country=country, data_begin=begin, data_end=end,
+                policy=policy,
+                country=country,
+                data_begin=begin,
+                data_end=end,
             )
         interventions.index = interventions.index.rename("date")
         interventions = interventions.ffill()  # Pad missing values with previous values
@@ -280,7 +283,7 @@ def new_cases():
 
 def deaths():
     """
-    Get and save number of covid deaths. 
+    Get and save number of covid deaths.
     """
     owd = data_retrieval.OWD(True)
     for country in countries:
@@ -319,7 +322,9 @@ def population():
         data = data["PopTotal"]
         data = data * 1000
         data.index.name = "age"
-        data.astype("int64").to_csv(path + f"/{country}/population.csv",)
+        data.astype("int64").to_csv(
+            path + f"/{country}/population.csv",
+        )
     log.info("Successfully created population files!")
 
 

@@ -96,7 +96,10 @@ def timeseries(
         rows = 1  # not time
 
         fig, axes = plt.subplots(
-            rows, cols, figsize=(6 * cols, 3 * rows), constrained_layout=True,
+            rows,
+            cols,
+            figsize=(6 * cols, 3 * rows),
+            constrained_layout=True,
         )
         for i, value in enumerate(df.index.get_level_values(label1).unique()):
             df_t = df.xs(value, level=label1)
@@ -137,7 +140,10 @@ def timeseries(
 
         # Create figure
         fig, axes = plt.subplots(
-            rows, cols, figsize=(6 * cols, 3 * rows), constrained_layout=True,
+            rows,
+            cols,
+            figsize=(6 * cols, 3 * rows),
+            constrained_layout=True,
         )
 
         # Loop threw all dimensions of variable
@@ -196,7 +202,9 @@ def timeseries(
     # Title and other
     # ------------------------------------------------------------------------------ #
     fig.suptitle(
-        key, verticalalignment="top", fontweight="bold",
+        key,
+        verticalalignment="top",
+        fontweight="bold",
     )
 
     return [fig], axes
@@ -213,34 +221,34 @@ def _timeseries(
     **kwargs,
 ):
     """
-        low-level function to plot anything that has a date on the x-axis.
+    low-level function to plot anything that has a date on the x-axis.
 
-        Parameters
-        ----------
-        x : array of datetime.datetime
-            times for the x axis
+    Parameters
+    ----------
+    x : array of datetime.datetime
+        times for the x axis
 
-        y : array, 1d or 2d
-            data to plot. if 2d, we plot the CI as fill_between (if CI enabled in rc
-            params)
-            if 2d, then first dim is realization and second dim is time matching `x`
-            if 1d then first tim is time matching `x`
+    y : array, 1d or 2d
+        data to plot. if 2d, we plot the CI as fill_between (if CI enabled in rc
+        params)
+        if 2d, then first dim is realization and second dim is time matching `x`
+        if 1d then first tim is time matching `x`
 
-        ax : mpl axes element, optional
-            plot into an existing axes element. default: None
+    ax : mpl axes element, optional
+        plot into an existing axes element. default: None
 
-        what : str, optional
-            what type of data is provided in x. sets the style used for plotting:
-            * `data` for data points
-            * `fcast` for model forecast (prediction)
-            * `model` for model reproduction of data (past)
+    what : str, optional
+        what type of data is provided in x. sets the style used for plotting:
+        * `data` for data points
+        * `fcast` for model forecast (prediction)
+        * `model` for model reproduction of data (past)
 
-        kwargs : dict, optional
-            directly passed to plotting mpl.
+    kwargs : dict, optional
+        directly passed to plotting mpl.
 
-        Returns
-        -------
-            ax
+    Returns
+    -------
+        ax
     """
 
     # ------------------------------------------------------------------------------ #

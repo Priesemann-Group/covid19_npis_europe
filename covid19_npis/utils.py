@@ -7,7 +7,7 @@ log = logging.getLogger(__name__)
 
 def force_cpu_for_tensorflow():
     """
-        Sets the used device for tensorflow to the cpu.
+    Sets the used device for tensorflow to the cpu.
     """
     my_devices = tf.config.experimental.list_physical_devices(device_type="CPU")
     tf.config.experimental.set_visible_devices(devices=my_devices, device_type="CPU")
@@ -16,7 +16,7 @@ def force_cpu_for_tensorflow():
 
 def split_cpu_in_logical_devices(n):
     """
-        Splits into multiple logical devices i.e. virtual CPUs
+    Splits into multiple logical devices i.e. virtual CPUs
     """
 
     # Retrieve list of cpus in system
@@ -25,7 +25,11 @@ def split_cpu_in_logical_devices(n):
 
     # Specify 2 virtual CPUs. Note currently memory limit is not supported.
     tf.config.set_logical_device_configuration(
-        physical_devices[0], [tf.config.LogicalDeviceConfiguration(),] * n,
+        physical_devices[0],
+        [
+            tf.config.LogicalDeviceConfiguration(),
+        ]
+        * n,
     )
     logical_devices = tf.config.list_logical_devices("CPU")
 

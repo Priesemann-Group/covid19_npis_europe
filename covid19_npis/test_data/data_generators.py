@@ -219,7 +219,9 @@ def test_data_from_model(model, modelParams, params_dict, to_return=None):
         f"{model_name}/{key}": tf.cast(value, "float32")[tf.newaxis, tf.newaxis]
         for key, value in params_dict.items()
     }
-    trace = az.from_dict(posterior=dict_with_model_name,)
+    trace = az.from_dict(
+        posterior=dict_with_model_name,
+    )
 
     var_names = []
     # variables = list(
@@ -235,7 +237,10 @@ def test_data_from_model(model, modelParams, params_dict, to_return=None):
 
     # Sample
     trace = pm.sample_posterior_predictive(
-        model(modelParams), trace, var_names=var_names, use_auto_batching=False,
+        model(modelParams),
+        trace,
+        var_names=var_names,
+        use_auto_batching=False,
     )
 
     # Convert to pandas
@@ -243,7 +248,10 @@ def test_data_from_model(model, modelParams, params_dict, to_return=None):
 
     def convert_to_pandas(key):
         df = data.convert_trace_to_dataframe(
-            trace, sample_state=sample_state, key=key, data_type="posterior_predictive",
+            trace,
+            sample_state=sample_state,
+            key=key,
+            data_type="posterior_predictive",
         )
         df.index = df.index.droplevel(["chain", "draw"])
         if "time" in df.index.names:
@@ -280,11 +288,11 @@ def test_data_from_model(model, modelParams, params_dict, to_return=None):
 
 def save_data(path, new_cases, R_t, interv):
     """
-        Main entry point to generate test data. Passes params to generate function
-        and adds random noise to new cases.
+    Main entry point to generate test data. Passes params to generate function
+    and adds random noise to new cases.
 
-        Creates folder structure for two test countries and saves the generated
-        data to csv files.
+    Creates folder structure for two test countries and saves the generated
+    data to csv files.
     """
     # Generate folders if they do not exist:
     for country_name in new_cases.columns.get_level_values("country").unique():
@@ -295,19 +303,22 @@ def save_data(path, new_cases, R_t, interv):
     # Save new_Cases
     for country_name in new_cases.columns.get_level_values("country").unique():
         new_cases.xs(country_name, axis=1, level="country").to_csv(
-            path + f"/{country_name}/new_cases.csv", date_format="%d.%m.%y",
+            path + f"/{country_name}/new_cases.csv",
+            date_format="%d.%m.%y",
         )
 
     # Save interventions
     for country_name in interv.columns.get_level_values("country").unique():
         interv.xs(country_name, axis=1, level="country").to_csv(
-            path + f"/{country_name}/interventions.csv", date_format="%d.%m.%y",
+            path + f"/{country_name}/interventions.csv",
+            date_format="%d.%m.%y",
         )
 
     # Save R_t
     for country_name in R_t.columns.get_level_values("country").unique():
         R_t.xs(country_name, axis=1, level="country").to_csv(
-            path + f"/{country_name}/reproduction_number.csv", date_format="%d.%m.%y",
+            path + f"/{country_name}/reproduction_number.csv",
+            date_format="%d.%m.%y",
         )
 
     log.info(f"Saved data in {os.path.abspath(path)}.")
@@ -321,7 +332,7 @@ def _random_noise(df, noise_factor):
 
     .. math::
         O &\sim NB(\mu=datapoint,\alpha)
-    
+
     We keep the alpha parameter low to obtain a small variance which should than always be approximately the size of the mean.
 
     Parameters

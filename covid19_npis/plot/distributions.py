@@ -28,12 +28,12 @@ def _plot_prior(x, ax=None, **kwargs):
     """
     Low level plotting function, plots the prior as line for sampling data by using kernel density estimation.
     For more references see `scipy documentation <https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.gaussian_kde.html>`_.
-    
-    It is highly recommended to pass an axis otherwise the xlim may be a bit wonky. 
+
+    It is highly recommended to pass an axis otherwise the xlim may be a bit wonky.
 
     Parameters
     ----------
-    x : 
+    x :
         Input values, from sampling
 
     ax : mpl axes element, optional
@@ -79,10 +79,10 @@ def _plot_posterior(x, bins=50, ax=None, **kwargs):
 
     Parameters
     ----------
-    x: 
+    x:
         Input values, from sampling
 
-    bins: int, optional 
+    bins: int, optional
         Defines the number of equal-width bins in the range.
         |default| 50
 
@@ -118,7 +118,7 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
     TODO
     ----
     - ndim=3
-    
+
 
     Parameters
     ----------
@@ -202,7 +202,9 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
                 ax[i].set_title(posterior.index.get_level_values(label1).unique()[i])
 
             fig.suptitle(
-                f"{key}", verticalalignment="top", fontweight="bold",
+                f"{key}",
+                verticalalignment="top",
+                fontweight="bold",
             )
             return [fig], ax
 
@@ -263,7 +265,9 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
             ax[i][0].set_ylabel(posterior.index.get_level_values(label2).unique()[i])
 
         fig.suptitle(
-            f"{key}", verticalalignment="top", fontweight="bold",
+            f"{key}",
+            verticalalignment="top",
+            fontweight="bold",
         )
         return [fig], ax
 
@@ -352,7 +356,9 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
                             suffix=f"{i},{j}",
                         )
             fig.suptitle(
-                f"{key} {value1}", verticalalignment="top", fontweight="bold",
+                f"{key} {value1}",
+                verticalalignment="top",
+                fontweight="bold",
             )
             figs.append(fig)
             axes.append(ax)
@@ -438,7 +444,11 @@ def _distribution(
             zorder=101,
         )
         _add_mpl_rect_around_text(
-            [tel_md, tel_ci], ax, facecolor="white", alpha=0.5, zorder=99,
+            [tel_md, tel_ci],
+            ax,
+            facecolor="white",
+            alpha=0.5,
+            zorder=99,
         )
     except Exception as e:
         log.info(f"Unable to create inset with {dist_name} value: {e}")
@@ -479,12 +489,12 @@ def _truncate_number(number, precision):
 
 def _get_mpl_text_coordinates(text, ax):
     """
-        helper to get coordinates of a text object in the coordinates of the
-        axes element [0,1].
-        used for the rectangle backdrop.
+    helper to get coordinates of a text object in the coordinates of the
+    axes element [0,1].
+    used for the rectangle backdrop.
 
-        Returns:
-        x_min, x_max, y_min, y_max
+    Returns:
+    x_min, x_max, y_min, y_max
     """
     fig = ax.get_figure()
 
@@ -517,14 +527,14 @@ def _get_mpl_text_coordinates(text, ax):
 
 def _add_mpl_rect_around_text(text_list, ax, x_padding=0.05, y_padding=0.05, **kwargs):
     """
-        add a rectangle to the axes (behind the text)
+    add a rectangle to the axes (behind the text)
 
-        provide a list of text elements and possible options passed to
-        mpl.patches.Rectangle
-        e.g.
-        facecolor="grey",
-        alpha=0.2,
-        zorder=99,
+    provide a list of text elements and possible options passed to
+    mpl.patches.Rectangle
+    e.g.
+    facecolor="grey",
+    alpha=0.2,
+    zorder=99,
     """
 
     x_gmin = 1

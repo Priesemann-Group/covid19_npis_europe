@@ -522,26 +522,26 @@ def construct_R_0_old(name, modelParams, mean, beta):
     r"""
     Old constructor of :math:`R_0` using a gamma distribution:
 
-        .. math::
+    .. math::
 
-            R_0 &\sim Gamma\left(\mu=2.5,\beta=2.0\right)
+        R_0 &\sim Gamma\left(\mu=2.5,\beta=2.0\right)
 
-        Parameters
-        ----------
-        name: string
-            Name of the distribution for trace and debugging.
-        modelParams: :py:class:`covid19_npis.ModelParams`
-            Instance of modelParams, mainly used for number of age groups and
-            number of countries.
-        mean:
-            Mean :math:`\mu` of the gamma distribution.
-        beta:
-            Rate :math:`\beta` of the gamma distribution.
+    Parameters
+    ----------
+    name: string
+        Name of the distribution for trace and debugging.
+    modelParams: :py:class:`covid19_npis.ModelParams`
+        Instance of modelParams, mainly used for number of age groups and
+        number of countries.
+    mean:
+        Mean :math:`\mu` of the gamma distribution.
+    beta:
+        Rate :math:`\beta` of the gamma distribution.
 
-        Returns
-        -------
-        :
-            R_0 tensor |shape| batch, country, age_group
+    Returns
+    -------
+    :
+        R_0 tensor |shape| batch, country, age_group
 
     """
     event_shape = (modelParams.num_countries, modelParams.num_age_groups)

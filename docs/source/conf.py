@@ -34,6 +34,7 @@ else:
         verstr = mo.group(1)
     else:
         raise RuntimeError("unable to find version in covid19_npis/_version.py")
+
 print("sphinx found version: {}".format(verstr))
 # The short X.Y version
 version = verstr
@@ -73,8 +74,6 @@ autodoc_mock_imports = [
     "pymc4",
     "mpl_toolkits",
     "scipy",
-    "pymc3",
-    "theano",
     "pandas",
     "arviz",
     "splipy",
@@ -122,13 +121,16 @@ def setup(app):
 # -- Extension configuration -------------------------------------------------
 
 intersphinx_mapping = {
-    "python": ("http://docs.python.org/3", None),
-    "numpy": ("http://docs.scipy.org/doc/numpy", None),
-    "scipy": ("http://docs.scipy.org/doc/scipy/reference", None),
-    "matplotlib": ("http://matplotlib.sourceforge.net", None),
-    "pymc3": ("https://docs.pymc.io", None),
-    "theano": ("http://deeplearning.net/software/theano/", None),
+    "python": ("https://docs.python.org/3/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/reference/", None),
+    "matplotlib": ("https://matplotlib.org/", None),
+    "pymc3": ("https://docs.pymc.io/", None),
     "pandas": ("https://pandas.pydata.org/docs/", None),
+    "tensorflow": (
+        "https://www.tensorflow.org/api_docs/python",
+        "https://github.com/mr-ubik/tensorflow-intersphinx/raw/master/tf2_py_objects.inv",
+    ),
 }
 
 imgmath_image_format = "svg"

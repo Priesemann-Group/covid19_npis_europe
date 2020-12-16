@@ -21,16 +21,21 @@ from .. import transformations
 from . import utils
 
 
-def weekly_modulation(name, modelParams, cases, week_modulation_type="abs_sine"):
+def weekly_modulation(name, modelParams, cases):
     r"""
     Adds a weekly modulation of the number of new cases:
-    .. math::
-        \text{cases\_modulated} &= \text{cases} \cdot (1-f(t))\,, \qquad\text{with}\\
-        f(t) &= (1-w) \cdot \left(1 - \left|\sin\left(\frac{\pi}{7} t- \frac{1}{2}\Phi_w\right)\right| \right),
-    if ``week_modulation_type`` is ``"abs_sine"`` (the default).
-    if ``week_modulation_type`` is ``"step"``, the new cases are simply multiplied by the weekend factor on the days set by ``weekend_days`` (currently not implemented)
 
-    The modulation is assumed to be the same for all age-groups within one country and determined by the "weight" and "offset" parameters. The weight follows a sigmoidal distribution with normal prior of "weight_cross". The "offset" follows a VonMises distribution centered around 0 (Mondays) and a wide SD (concentration parameter = 2)
+    .. math::
+
+        \text{cases\_modulated} &= \text{cases} \cdot (1-f(t))\,, \qquad\text{with}\\
+        f(t) &= (1-w) \cdot \left(1 - \left|\sin\left(\frac{\pi}{7} t- \frac{1}{2}\Phi_w\right)\right| \right)
+
+
+    The modulation is assumed to be the same for all age-groups within one country and determined by
+    the "weight" and "offset" parameters. The weight follows a sigmoidal distribution with normal prior
+    of "weight_cross". The "offset" follows a VonMises distribution centered
+    around 0 (Mondays) and a wide SD (concentration parameter = 2).
+    
     Parameters
     ----------
     name : str or None,
@@ -40,22 +45,21 @@ def weekly_modulation(name, modelParams, cases, week_modulation_type="abs_sine")
         number of countries.
     cases : tf.tensor
         The input array of daily new cases for countries and age groups
-    week_modulation_type : str
-        The type of modulation, accepts ``"step"`` (not implemented) or  ``"abs_sine`` (the default).
+
     Returns
     -------
     cases_modulated : tf.tensor
+
+    TODO
+    ----
+        - check prior parameters
+        - different modulations across: age, country?
+        - check: are (cumulative) case numbers same as in unmodulated case? need some kind of normalization?
+        - store and plot parameters at end
     """
 
     log.debug("Week modulation")
 
-    """
-    # TODO: - which shape does the modulation have to be? i guess time,country,age?
-            - check prior parameters
-            - different modulations across: age, country?
-            - check: are (cumulative) case numbers same as in unmodulated case? need some kind of normalization?
-            - store and plot parameters at end
-    """
     # offset-distribution of weekly modulation minimum
     offset = yield VonMises(
         name=name + "_modulation_offset",
@@ -105,10 +109,6 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
     Constructs B splines
     Delay cases
 
-    ToDo
-    -----
-    - more documenation here
-
     Parameters
     ----------
     name_total: str,
@@ -131,6 +131,10 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
         (:math:`n_{\Sigma, c,a}(t)`, :math:`n_{{+}, {c,a}}(t)`
         Total and positive tests by age group and country
         |shape| (batch, time, country, age_group) x 2
+
+    ToDo
+    -----
+    - Add more documenation for this function
     """
 
     # Get basic functions for b-splines (used later)

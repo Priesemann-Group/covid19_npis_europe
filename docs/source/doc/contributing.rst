@@ -40,10 +40,18 @@ Documentation
 ^^^^^^^^^^^^^
 
 The documentation is built using Sphinx from the docstrings. To test it before
-submitting, navigate with a terminal to the docs/ directory. Install if necessary
-the packages listed in ``piprequirements.txt`` run ``make html``. The documentation
-can then be accessed in ``docs/_build/html/index.html``. As an example you can
-look at the documentation of :func:`covid19_npis.model.disease_spread`
+submitting, navigate with a terminal to the docs/ directory.
+Install (if necessary) the required python packages for the documentation and compile the
+documentation.
+
+.. code-block:: bash
+
+		cd docs
+		pip install -r piprequirements.txt
+		make html
+..
+
+The documentation can now be be accessed locally in ``docs/_build/html/index.html``. As an example for the docstring formatting you can look at the documentation of :func:`covid19_npis.model.disease_spread`. We try to use the `numpydoc <https://numpydoc.readthedocs.io/en/latest/format.html>`_ style.
 
 
 

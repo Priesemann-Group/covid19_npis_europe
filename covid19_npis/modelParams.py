@@ -21,7 +21,7 @@ class ModelParams:
 
     Parameters
     ----------
-    countries: list of covid19_npis.data.Country objects
+    countries:  list, :py:class:`covid19_npis.data.Country`
         Data objects for multiple countries
     """
 
@@ -53,11 +53,12 @@ class ModelParams:
     @property
     def countries(self):
         """
+        Data objectes for each country.
+
         Return
         ------
         :
-            List of all country objects.
-            See :py:class:`covid19_npis.data.Country`.
+           List of all country object
         """
         return self._countries
 
@@ -186,7 +187,7 @@ class ModelParams:
     @property
     def data_summary(self):
         """
-        Data summary for all countries
+        Data summary for modelParams object.
         """
         return self._data_summary
 
@@ -268,7 +269,7 @@ class ModelParams:
 
         Returns
         -------
-        tf.Tensor:
+        tf.Tensor
             |shape| time, country, agegroup
         """
         return self._tensor_pos_tests

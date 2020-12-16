@@ -1,5 +1,6 @@
 import sys
 
+
 sys.path.append("../")
 
 import covid19_npis
@@ -131,6 +132,35 @@ params = {
         "cases_delayed_deaths",
     ],
 )
+
+
+# ------------------------------------------------------------------------------ #
+# Plotting
+# ------------------------------------------------------------------------------ #
+
+import matplotlib.pyplot as plt
+
+t = np.arange(0, modelParams.length_sim)
+
+# Plotting dict
+plots = {
+    "Positive tests": positive_tests,
+    "Total tests": total_tests,
+    "Deaths": cases_delayed_deaths,
+}
+# For now dirty plot does not differentiate between countries!
+for key, item in plots.items():
+    ax = covid19_npis.plot.time_series._timeseries(
+        x=t,
+        y=item,
+        ls="-",
+        what="fcast",
+    )
+    ax.set_title(key)
+    plt.tight_layout()
+    fig = plt.gcf()
+    fig.show()
+
 
 # covid19_npis.test_data.data_generators.save_data(
 #    "../data/test_data_from_model", new_cases_inferred, R_t, interv

@@ -339,7 +339,6 @@ def calc_delayed_deaths(name, new_cases, Phi_IFR, m, theta, length_kernel=40):
         filter_axes_data = [-4, -2]
     else:
         filter_axes_data = [-2]
-    log.warning(kernel[0, 0, ...])
     dd = convolution_with_fixed_kernel(
         data=new_cases,
         kernel=kernel,

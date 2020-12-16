@@ -92,13 +92,13 @@ def convert_trace_to_dataframe(trace, sample_state, key, data_type=None):
             data_type = "prior_predictive"
 
     if data_type == "posterior":
-        log.info("Found posterior in trace.")
+        log.info(f"{key} Found posterior in trace.")
         data = trace.posterior.data_vars
     elif data_type == "prior_predictive":
-        log.info("Found prior_predictive in trace.")
+        log.info(f"{key} Found prior_predictive in trace.")
         data = trace.prior_predictive.data_vars
     elif data_type == "posterior_predictive":
-        log.info("Using posterior_predictive from trace as data!")
+        log.info(f"{key} Using posterior_predictive from trace as data!")
         data = trace.posterior_predictive.data_vars
 
     # Get model and var names a bit hacky but works

@@ -202,9 +202,7 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
                 ax[i].set_title(posterior.index.get_level_values(label1).unique()[i])
 
             fig.suptitle(
-                f"{key}",
-                verticalalignment="top",
-                fontweight="bold",
+                f"{key}", verticalalignment="top", fontweight="bold",
             )
             return [fig], ax
 
@@ -265,9 +263,7 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
             ax[i][0].set_ylabel(posterior.index.get_level_values(label2).unique()[i])
 
         fig.suptitle(
-            f"{key}",
-            verticalalignment="top",
-            fontweight="bold",
+            f"{key}", verticalalignment="top", fontweight="bold",
         )
         return [fig], ax
 
@@ -356,9 +352,7 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
                             suffix=f"{i},{j}",
                         )
             fig.suptitle(
-                f"{key} {value1}",
-                verticalalignment="top",
-                fontweight="bold",
+                f"{key} {value1}", verticalalignment="top", fontweight="bold",
             )
             figs.append(fig)
             axes.append(ax)
@@ -444,11 +438,7 @@ def _distribution(
             zorder=101,
         )
         _add_mpl_rect_around_text(
-            [tel_md, tel_ci],
-            ax,
-            facecolor="white",
-            alpha=0.5,
-            zorder=99,
+            [tel_md, tel_ci], ax, facecolor="white", alpha=0.5, zorder=99,
         )
     except Exception as e:
         log.info(f"Unable to create inset with {dist_name} value: {e}")

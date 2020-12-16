@@ -129,9 +129,7 @@ def main_model(modelParams):
 
     # Add new_E_t to trace
     new_E_t = yield Deterministic(
-        name="new_E_t",
-        value=new_E_t,
-        shape_label=("time", "country", "age_group"),
+        name="new_E_t", value=new_E_t, shape_label=("time", "country", "age_group"),
     )
     log.debug(f"new_E_t\n{new_E_t.shape}")
 

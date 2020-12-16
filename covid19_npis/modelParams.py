@@ -397,10 +397,7 @@ class ModelParams:
             .reshape((-1, len(self.countries)))  ## assumes non-age-stratified data
         )
         deaths_tensor = np.concatenate(
-            [
-                np.empty((self._offset_sim_data, len(self.countries))),
-                deaths_tensor,
-            ]
+            [np.empty((self._offset_sim_data, len(self.countries))), deaths_tensor,]
         )
         i_data_begin_list = []
         for c in range(deaths_tensor.shape[1]):

@@ -29,9 +29,7 @@ def benchmark(
             deterministic_names,
             state_,
         ) = build_logp_and_deterministic_functions(
-            model,
-            num_chains=nchains,
-            collect_reduced_log_prob=use_auto_batching,
+            model, num_chains=nchains, collect_reduced_log_prob=use_auto_batching,
         )
 
         init_state = list(init.values())

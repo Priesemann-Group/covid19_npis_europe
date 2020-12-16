@@ -25,11 +25,7 @@ def split_cpu_in_logical_devices(n):
 
     # Specify 2 virtual CPUs. Note currently memory limit is not supported.
     tf.config.set_logical_device_configuration(
-        physical_devices[0],
-        [
-            tf.config.LogicalDeviceConfiguration(),
-        ]
-        * n,
+        physical_devices[0], [tf.config.LogicalDeviceConfiguration(),] * n,
     )
     logical_devices = tf.config.list_logical_devices("CPU")
 

@@ -122,9 +122,7 @@ def _construct_reporting_delay(
     """ # Mean m
     """
     m_sigma = yield HalfNormal(
-        name=f"{name}_m_sigma",
-        scale=m_sigma_scale,
-        conditionally_independent=True,
+        name=f"{name}_m_sigma", scale=m_sigma_scale, conditionally_independent=True,
     )
     mu_m = (
         yield Normal(
@@ -323,11 +321,7 @@ def calc_delayed_deaths(name, new_cases, Phi_IFR, m, theta, length_kernel=40):
     m = m[..., :, tf.newaxis]  # |shape| batch, country, time
     theta = theta[..., :, tf.newaxis]  # |shape| batch, country, time
     # Calculate pdf
-    kernel = gamma(
-        tau,
-        m / theta + 1.0,
-        1.0 / theta,
-    )  # add age group dimension
+    kernel = gamma(tau, m / theta + 1.0, 1.0 / theta,)  # add age group dimension
     log.debug(f"kernel deaths\n{kernel}")
     log.debug(f"new_cases deaths\n{new_cases}")
 

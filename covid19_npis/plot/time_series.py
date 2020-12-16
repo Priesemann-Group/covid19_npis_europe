@@ -96,10 +96,7 @@ def timeseries(
         rows = 1  # not time
 
         fig, axes = plt.subplots(
-            rows,
-            cols,
-            figsize=(6 * cols, 3 * rows),
-            constrained_layout=True,
+            rows, cols, figsize=(6 * cols, 3 * rows), constrained_layout=True,
         )
         for i, value in enumerate(df.index.get_level_values(label1).unique()):
             df_t = df.xs(value, level=label1)
@@ -140,10 +137,7 @@ def timeseries(
 
         # Create figure
         fig, axes = plt.subplots(
-            rows,
-            cols,
-            figsize=(6 * cols, 3 * rows),
-            constrained_layout=True,
+            rows, cols, figsize=(6 * cols, 3 * rows), constrained_layout=True,
         )
 
         # Loop threw all dimensions of variable
@@ -202,9 +196,7 @@ def timeseries(
     # Title and other
     # ------------------------------------------------------------------------------ #
     fig.suptitle(
-        key,
-        verticalalignment="top",
-        fontweight="bold",
+        key, verticalalignment="top", fontweight="bold",
     )
 
     return [fig], axes

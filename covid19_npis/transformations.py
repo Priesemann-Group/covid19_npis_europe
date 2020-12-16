@@ -42,14 +42,7 @@ class SoftPlus_SinhArcsinh(BackwardTransform):
         else:
             scaling = tfb.Scale(scale)
         transform = tfb.Chain(
-            [
-                scaling,
-                tfb.Softplus(),
-                tfb.SinhArcsinh(
-                    skewness,
-                    tailweight,
-                ),
-            ]
+            [scaling, tfb.Softplus(), tfb.SinhArcsinh(skewness, tailweight,),]
         )
         super().__init__(transform, **kwargs)
 

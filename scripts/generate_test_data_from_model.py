@@ -27,9 +27,7 @@ countries = [
     "Switzerland",
 ]
 c1, c2 = [
-    covid19_npis.data.Country(
-        f"../data/coverage_db/{country}",
-    )
+    covid19_npis.data.Country(f"../data/coverage_db/{country}",)
     for country in countries
 ]
 
@@ -150,12 +148,7 @@ plots = {
 }
 # For now dirty plot does not differentiate between countries!
 for key, item in plots.items():
-    ax = covid19_npis.plot.time_series._timeseries(
-        x=t,
-        y=item,
-        ls="-",
-        what="fcast",
-    )
+    ax = covid19_npis.plot.time_series._timeseries(x=t, y=item, ls="-", what="fcast",)
     ax.set_title(key)
     plt.tight_layout()
     fig = plt.gcf()

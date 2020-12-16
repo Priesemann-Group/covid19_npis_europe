@@ -78,10 +78,7 @@ def interventions():
         interventions = pd.DataFrame()
         for policy in policies:
             interventions[policy] = ox.get_time_data(
-                policy=policy,
-                country=country,
-                data_begin=begin,
-                data_end=end,
+                policy=policy, country=country, data_begin=begin, data_end=end,
             )
         interventions.index = interventions.index.rename("date")
         interventions = interventions.ffill()  # Pad missing values with previous values
@@ -322,9 +319,7 @@ def population():
         data = data["PopTotal"]
         data = data * 1000
         data.index.name = "age"
-        data.astype("int64").to_csv(
-            path + f"/{country}/population.csv",
-        )
+        data.astype("int64").to_csv(path + f"/{country}/population.csv",)
     log.info("Successfully created population files!")
 
 

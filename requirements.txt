@@ -6,3 +6,4 @@ pandas
 timerit
 coloredlogs
 tqdm
+pprint

@@ -4,6 +4,7 @@ import pandas as pd
 import tensorflow as tf
 import logging
 from scipy.interpolate import BSpline
+import pprint
 
 log = logging.getLogger(__name__)
 
@@ -35,7 +36,6 @@ class ModelParams:
         spline_stride=7,
         dtype="float32",
     ):
-
         self._dtype = dtype
         self._offset_sim_data = offset_sim_data
         self._minimal_daily_cases = minimal_daily_cases
@@ -68,156 +68,98 @@ class ModelParams:
         data variable i.e. dataframe, data summary and data_tensor.
         This is done here!
         """
+
+        def join_dataframes(key, check_dict, attribute_name):
+            """Joins the dataframes for each country
+            if the key exists in a given dictionary.
+
+            Parameters
+            ----------
+            key: str
+            check_dict: dict
+            attribute_name: str
+
+            Returns
+            -------
+            df (joined)
+            """
+            if not check_dict[key]:
+                return None
+            for i, country in enumerate(self._countries):
+                if i > 0:
+                    df = df.join(getattr(country, attribute_name))
+                else:
+                    df = getattr(country, attribute_name)
+            return df
+
         self._countries = countries
 
-        """ # Update dataframe
-        Join all dataframes from the country objects
-        """
-        # Get if csv exits:
-        check = self.countries[0].exist
-        for i, country in enumerate(self.countries):
+        # Create dictionary and add existing csv files
+        check = self._countries[0].exist
+        for i, country in enumerate(self._countries):
             for key in country.exist:
                 check[key] &= country.exist[key]
+        self._check = check  # Save for data summary
 
-        # Join positive tests
-        if check["/new_cases.csv"]:
-            for i, country in enumerate(self.countries):
-                if i > 0:
-                    _df = _df.join(country.data_new_cases)
-                else:
-                    _df = country.data_new_cases
-            self._dataframe = _df
-        else:
-            log.error("Supply /new_cases.csv!")
+        """ Update dataframes
+        """
+        # Positive tests
+        self._dataframe_new_cases = join_dataframes(
+            key="/new_cases.csv", check_dict=check, attribute_name="data_new_cases"
+        )
 
-        # Join total tests
-        if check["/tests.csv"]:
-            for i, country in enumerate(self.countries):
-                if i > 0:
-                    _df_t = _df_t.join(country.data_total_tests)
-                else:
-                    _df_t = country.data_total_tests
-            self._dataframe_total_tests = _df_t
-        else:
-            self._dataframe_total_tests = None
+        # Total tests
+        self._dataframe_total_tests = join_dataframes(
+            key="/tests.csv", check_dict=check, attribute_name="data_total_tests"
+        )
 
-        # Join deaths
-        if check["/deaths.csv"]:
-            for i, country in enumerate(self.countries):
-                if i > 0:
-                    _df_d = _df_d.join(country.data_deaths)
-                else:
-                    _df_d = country.data_deaths
-            self._dataframe_deaths = _df_d
-        else:
-            self._dataframe_deaths = None
+        # Deaths
+        self._dataframe_deaths = join_dataframes(
+            key="/deaths.csv", check_dict=check, attribute_name="data_deaths"
+        )
 
-        # Join population
-        if check["/population.csv"]:
-            for i, country in enumerate(self.countries):
-                if i > 0:
-                    _df_p = _df_p.join(country.data_population)
-                else:
-                    _df_p = country.data_population
-            self._dataframe_population = _df_p
-        else:
-            self._dataframe_population = None
+        # Population
+        self._dataframe_population = join_dataframes(
+            key="/population.csv", check_dict=check, attribute_name="data_population"
+        )
 
-        # Join all interventions dataframes
-        if check["/interventions.csv"]:
-            for i, country in enumerate(self.countries):
-                if i > 0:
-                    _int = _int.join(country.data_interventions)
-                else:
-                    _int = country.data_interventions
-            self._interventions = _int
-        else:
-            log.error("Supply /interventions.csv!")
-        self._check = check  # For data summary
-        """ # Update data tensor
+        # Interventions
+        self._dataframe_interventions = join_dataframes(
+            key="/interventions.csv",
+            check_dict=check,
+            attribute_name="data_interventions",
+        )
+
+        """ Update data summary
         """
         self._update_data_summary()
 
-        """ # Update positive test data tensor/df
-        set data tensor, replaces values smaller than 40 by nans.
+        """ Calculate positive tests data tensor (tensorflow)
+        Set data tensor, replaces values smaller than 40 by nans.
         """
-        data_tensor = (
-            self._dataframe.to_numpy()
-            .astype(self.dtype)
-            .reshape((-1, len(self.countries), len(self.age_groups)))
-        )
-        data_tensor = np.concatenate(
-            [
-                np.empty(
-                    (self._offset_sim_data, len(self.countries), len(self.age_groups))
-                ),
-                data_tensor,
-            ]
-        )
-        i_data_begin_list = []
-        for c in range(data_tensor.shape[1]):
-            mask = np.sum(data_tensor[:, c, :], axis=-1) > self._minimal_daily_cases
-            i_data_begin = np.min(np.nonzero(mask)[0])
-            i_data_begin_list.append(i_data_begin)
-        i_data_begin_list = np.array(i_data_begin_list)
-        i_data_begin_list = np.maximum(i_data_begin_list, self._offset_sim_data)
-        self._indices_begin_data = i_data_begin_list
-        for c, i in enumerate(self._indices_begin_data):
-            data_tensor[:i, c, :] = np.nan
-        self._pos_tests_data_tensor = data_tensor
+        self.pos_tests_data_tensor = self._dataframe_new_cases  # Uses setter below!
 
-        """ # Update total test data tensor/df
-                set data tensor, replaces values smaller than 40 by nans.
-                """
-        total_tests_tensor = (
-            self._dataframe_total_tests.to_numpy()
-            .astype(self.dtype)
-            .reshape((-1, len(self.countries)))
-        )
-        total_tests_tensor = np.concatenate(
-            [
-                np.empty((self._offset_sim_data, len(self.countries))),
-                total_tests_tensor,
-            ]
-        )
-        for c, i in enumerate(self._indices_begin_data):
-            total_tests_tensor[:i, c] = np.nan
-        self._total_tests_data_tensor = total_tests_tensor
+        """ # Calculate total tests data tensor (tensorflow)
+        Set data tensor, replaces values smaller than 40 by nans.
+        """
+        self.total_tests_data_tensor = self._dataframe_total_tests  # Uses setter below!
 
-        """ # Update deaths data tensor/df
+        """ # Update deaths data tensor
         set data tensor, replaces values smaller than 10 by nans.
         """
-        deaths_tensor = (
-            self._dataframe_deaths.to_numpy()
-            .astype(self.dtype)
-            .reshape((-1, len(self.countries)))  ## assumes non-age-stratified data
-        )
-        deaths_tensor = np.concatenate(
-            [np.empty((self._offset_sim_data, len(self.countries))), deaths_tensor,]
-        )
-        i_data_begin_list = []
-        for c in range(deaths_tensor.shape[1]):
-            mask = deaths_tensor[:, c] > self._minimal_daily_deaths
-            i_data_begin = np.min(np.nonzero(mask)[0])
-            i_data_begin_list.append(i_data_begin)
-        i_data_begin_list = np.array(i_data_begin_list)
-        i_data_begin_list = np.maximum(
-            i_data_begin_list, self._min_offset_sim_death_data
-        )
-        self._indices_begin_data_deaths = np.maximum(
-            i_data_begin_list, self._indices_begin_data
-        )
-        for c, i in enumerate(self._indices_begin_data_deaths):
-            deaths_tensor[:i, c] = np.nan
-        self._deaths_data_tensor = deaths_tensor
+        self.death_data_tensor = self._dataframe_total_tests  # Uses setter below!
 
+    # ------------------------------------------------------------------------------ #
+    # Data Summary
+    # ------------------------------------------------------------------------------ #
     def _update_data_summary(self):
         """# Update Data summary"""
         data = {  # Is set on init
-            "begin": self.date_data_begin,
-            "begin sim": self.date_data_begin
+            "data begin": self.date_data_begin,
+            "data end": self.date_data_end,
+            "sim begin": self.date_data_begin
             - datetime.timedelta(days=self._offset_sim_data),
-            "end": self.date_data_end,
+            "sim end": self.date_data_end,
             "age_groups": [],
             "countries": [],
             "interventions": [],
@@ -234,7 +176,7 @@ class ModelParams:
         ).unique():
             data["age_groups"].append(age_group_name)
         # Create interventions list dynamic from interventions dataframe
-        for i in self._interventions.columns.get_level_values(
+        for i in self._dataframe_interventions.columns.get_level_values(
             level="intervention"
         ).unique():
             data["interventions"].append(i)
@@ -242,24 +184,20 @@ class ModelParams:
         self._data_summary = data
 
     @property
-    def spline_basis(self):
-        stride = self._spline_stride
-        degree = self._spline_degree
-        knots = np.arange(
-            self.length + degree * stride, 0 - (degree + 1) * stride, -stride
-        )
-        knots = knots[::-1]
-        num_splines = len(knots) - 2 * (degree - 1)
-        spl = BSpline(knots, np.eye(num_splines), degree, extrapolate=False)
-        spline_basis = spl(np.arange(0, self.length))
-        return spline_basis  # shape : modelParams.length x modelParams.num_splines
-
-    @property
     def data_summary(self):
         """
         Data summary for all countries
         """
         return self._data_summary
+
+    def __str__(self):
+        """
+        Nicely converted string of the data summary if the object is printed.
+        """
+        return pprint.pformat(self.data_summary)
+
+    def __repr__(self):
+        return self.__str__()
 
     # ------------------------------------------------------------------------------ #
     # Interventions
@@ -313,22 +251,67 @@ class ModelParams:
     # ------------------------------------------------------------------------------ #
     # Positive tests
     # ------------------------------------------------------------------------------ #
+
     @property
     def pos_tests_dataframe(self):
         """
         New cases as multiColumn dataframe level 0 = country/region and
         level 1 = age group.
         """
-        return self._dataframe
+        return self._dataframe_new_cases
 
     @property
     def pos_tests_data_tensor(self):
         """
         Tensor of daily new cases / positive tests for countries/regions
         and age groups.
-        |shape| time, country, agegroup
+
+        Returns
+        -------
+        tf.Tensor:
+            |shape| time, country, agegroup
         """
-        return self._pos_tests_data_tensor.astype(self.dtype)
+        return self._tensor_pos_tests
+
+    @pos_tests_data_tensor.setter
+    def pos_tests_data_tensor(self, df):
+        """
+        Setter for the data tensor
+
+        Parameters
+        ----------
+        df: pd.DataFrame
+            Positive tests dataframe
+        """
+        new_cases_tensor = (
+            df.to_numpy()
+            .astype(self.dtype)
+            .reshape((-1, len(self.countries), len(self.age_groups)))
+        )
+        new_cases_tensor = np.concatenate(
+            [
+                np.empty(
+                    (self._offset_sim_data, len(self.countries), len(self.age_groups))
+                ),
+                new_cases_tensor,
+            ]
+        )
+        i_data_begin_list = []
+        for c in range(new_cases_tensor.shape[1]):
+            mask = (
+                np.sum(new_cases_tensor[:, c, :], axis=-1) > self._minimal_daily_cases
+            )
+            i_data_begin = np.min(np.nonzero(mask)[0])
+            i_data_begin_list.append(i_data_begin)
+
+        i_data_begin_list = np.array(i_data_begin_list)
+        i_data_begin_list = np.maximum(i_data_begin_list, self._offset_sim_data)
+        self._indices_begin_data = i_data_begin_list
+
+        for c, i in enumerate(self._indices_begin_data):
+            new_cases_tensor[:i, c, :] = np.nan
+
+        self._tensor_pos_tests = tf.constant(new_cases_tensor, dtype=self.dtype)
 
     # ------------------------------------------------------------------------------ #
     # Total tests
@@ -344,9 +327,37 @@ class ModelParams:
     @property
     def total_tests_data_tensor(self):
         """
-        |shape| time, country
+        Returns
+        -------
+        tf.Tensor:
+            |shape| time, country
         """
-        return self._total_tests_data_tensor
+        return self._tensor_total_tests
+
+    @total_tests_data_tensor.setter
+    def total_tests_data_tensor(self, df):
+        """
+        Setter for the total tests data tensor
+
+        Parameters
+        ----------
+        df: pd.DataFrame
+            Total tests dataframe
+        """
+        total_tests_tensor = (
+            self._dataframe_total_tests.to_numpy()
+            .astype(self.dtype)
+            .reshape((-1, len(self.countries)))
+        )
+        total_tests_tensor = np.concatenate(
+            [
+                np.empty((self._offset_sim_data, len(self.countries))),
+                total_tests_tensor,
+            ]
+        )
+        for c, i in enumerate(self._indices_begin_data):
+            total_tests_tensor[:i, c] = np.nan
+        self._tensor_total_tests = total_tests_tensor
 
     # ------------------------------------------------------------------------------ #
     # Number of deaths
@@ -362,10 +373,50 @@ class ModelParams:
     @property
     def deaths_data_tensor(self):
         """
-
-        |shape| time, country
+        Returns
+        -------
+        tf.Tensor:
+            |shape| time, country
         """
-        return self._deaths_data_tensor.astype(self.dtype)
+        return self._tensor_deaths
+
+    @deaths_data_tensor.setter
+    def deaths_data_tensor(self, df):
+        """
+        Setter for the deaths data tensor
+
+        Parameters
+        ----------
+        df: pd.DataFrame
+            Deaths tests dataframe
+        """
+        deaths_tensor = (
+            df.to_numpy()
+            .astype(self.dtype)
+            .reshape((-1, len(self.countries)))  ## assumes non-age-stratified data
+        )
+        deaths_tensor = np.concatenate(
+            [
+                np.empty((self._offset_sim_data, len(self.countries))),
+                deaths_tensor,
+            ]
+        )
+        i_data_begin_list = []
+        for c in range(deaths_tensor.shape[1]):
+            mask = deaths_tensor[:, c] > self._minimal_daily_deaths
+            i_data_begin = np.min(np.nonzero(mask)[0])
+            i_data_begin_list.append(i_data_begin)
+        i_data_begin_list = np.array(i_data_begin_list)
+        i_data_begin_list = np.maximum(
+            i_data_begin_list, self._min_offset_sim_death_data
+        )
+        self._indices_begin_data_deaths = np.maximum(
+            i_data_begin_list, self._indices_begin_data
+        )
+        for c, i in enumerate(self._indices_begin_data_deaths):
+            deaths_tensor[:i, c] = np.nan
+
+        self._tensor_deaths = tf.constant(deaths_tensor, dtype=self.dtype)
 
     # ------------------------------------------------------------------------------ #
     # Population
@@ -450,8 +501,24 @@ class ModelParams:
         return self._indices_begin_data
 
     @property
-    def length(self):
-        return len(self._pos_tests_data_tensor)
+    def length_data(self):
+        """
+        Returns
+        -------
+        :number
+            Length of the inserted/loaded data in days
+        """
+        return len(self._dataframe_new_cases)
+
+    @property
+    def length_sim(self):
+        """
+        Returns
+        -------
+        :number
+            Length of the simulation in days.
+        """
+        return len(self._tensor_pos_tests)
 
     @property
     def max_num_cp(self):
@@ -481,8 +548,21 @@ class ModelParams:
     def date_data_end(self):
         return self.pos_tests_dataframe.index.max()
 
+    @property
+    def spline_basis(self):
+        stride = self._spline_stride
+        degree = self._spline_degree
+        knots = np.arange(
+            self.length + degree * stride, 0 - (degree + 1) * stride, -stride
+        )
+        knots = knots[::-1]
+        num_splines = len(knots) - 2 * (degree - 1)
+        spl = BSpline(knots, np.eye(num_splines), degree, extrapolate=False)
+        spline_basis = spl(np.arange(0, self.length))
+        return spline_basis  # shape : modelParams.length x modelParams.num_splines
+
     # ------------------------------------------------------------------------------ #
-    # Methods
+    # Other Methods
     # ------------------------------------------------------------------------------ #
 
     def date_to_index(self, date):

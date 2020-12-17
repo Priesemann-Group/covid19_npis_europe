@@ -346,5 +346,9 @@ def calc_delayed_deaths(name, new_cases, Phi_IFR, m, theta, length_kernel=40):
         value=tf.einsum("...ca,...tca->...tca", Phi_IFR, dd),
         shape_label=("time", "country", "age_group"),
     )
-
+    delayed_deaths_compact = yield Deterministic(
+        name=f"{name}_compact",
+        value=tf.reduce_sum(delayed_deaths, axis=-1),
+        shape_label=("time", "country"),
+    )
     return delayed_deaths

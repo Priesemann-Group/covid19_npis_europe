@@ -52,7 +52,7 @@ def construct_h_0_t(
             |shape| time, batch, country, age_group
     """
     batch_dims = tuple(R_t.shape)[:-3]
-    data = modelParams.pos_tests_data_tensor
+    data = modelParams.pos_tests_data_array
     diff_sim_data = modelParams.offset_sim_data
     assert data.ndim == 3
     assert (
@@ -85,7 +85,7 @@ def construct_h_0_t(
         )
     avg_cases_begin = np.array(avg_cases_begin)
     h_0_t_mean = []
-    E_t = avg_cases_begin
+    E_t = tf.convert_to_tensor(avg_cases_begin)
     log.debug(f"avg_cases_begin:\n{avg_cases_begin}")
 
     for i in range(diff_sim_data - len_gen_interv_kernel - mean_test_delay):

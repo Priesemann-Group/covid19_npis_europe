@@ -155,7 +155,7 @@ def main_model(modelParams):
     )
     # Calculate new deaths delayed
     deaths_delayed = yield deaths.calc_delayed_deaths(
-        name="cases_delayed_deaths",
+        name="deaths",
         new_cases=new_E_t,
         Phi_IFR=death_Phi,
         m=death_m,

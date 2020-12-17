@@ -274,6 +274,19 @@ class ModelParams:
         """
         return self._tensor_pos_tests
 
+    @property
+    def pos_tests_data_array(self):
+        """
+        Numpy Array of daily new cases / positive tests for countries/regions
+        and age groups.
+
+        Returns
+        -------
+        tf.Tensor
+            |shape| time, country, agegroup
+        """
+        return self._array_pos_tests.astype(self.dtype)
+
     @pos_tests_data_tensor.setter
     def pos_tests_data_tensor(self, df):
         """
@@ -312,6 +325,7 @@ class ModelParams:
         for c, i in enumerate(self.indices_begin_data):
             new_cases_tensor[:i, c, :] = np.nan
 
+        self._array_pos_tests = new_cases_tensor
         self._tensor_pos_tests = tf.constant(new_cases_tensor, dtype=self.dtype)
 
     # ------------------------------------------------------------------------------ #

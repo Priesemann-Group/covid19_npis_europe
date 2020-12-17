@@ -4,6 +4,19 @@ import time
 import itertools
 import os
 
+
+"""
+Some runtime optimizations for CPU (using tur nodes)
+os.environ["OMP_NUM_THREADS"] = 32
+tf.config.threading.set_inter_op_parallelism_threads(32)
+tf.config.threading.set_intra_op_parallelism_threads(16)
+tf.config.set_soft_device_placement(enabled)
+tf.config.optimizer.set_jit(
+    True
+)
+"""
+
+
 """
 SM: I dont know what this is doing, please explain :)
 
@@ -122,7 +135,7 @@ trace = pm.sample(
     num_samples=100,
     burn_in=200,
     use_auto_batching=False,
-    num_chains=2,
+    num_chains=4,
     xla=False,
     # sampler_type="nuts",
 )
@@ -197,7 +210,7 @@ for name in dist_names:
 
 """ ## Plot time series
 """
-ts_names = ["positive_tests", "R_t", "h_0_t", "total_tests_compact"]
+ts_names = ["positive_tests", "R_t", "h_0_t", "total_tests_compact", "deaths_compact"]
 ts_fig = {}
 ts_axes = {}
 for name in ts_names:

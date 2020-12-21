@@ -392,7 +392,7 @@ def construct_R_t(name, modelParams, R_0):
         """
         gamma_list_i_c = []
         for i, intervention in enumerate(
-            modelParams.countries[0].interventions
+            modelParams.data_summary["interventions"]
         ):  # Should be same across all countries -> 0
             gamma_list_c = []
             gamma_c_p = tf.gather(gamma_i_c_p, i, axis=-4)
@@ -401,7 +401,7 @@ def construct_R_t(name, modelParams, R_0):
 
                 # Cut gamma_p to get only the used change points values
                 # i.e remove padding!
-                num_change_points = len(country.change_points[intervention.name])
+                num_change_points = len(country.change_points[intervention])
                 gamma_p = gamma_p[..., 0:num_change_points, :]
 
                 # Calculate the sum over all change points

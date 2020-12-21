@@ -150,6 +150,11 @@ class ModelParams:
         """
         self.deaths_data_tensor = self._dataframe_total_tests  # Uses setter below!
 
+        """ # Update intervetions data tensor
+        """
+        self.date_data_tensor = self._dataframe_interventions  # Uses setter below!
+        self.gamma_data_tensor = self._dataframe_interventions
+
     # ------------------------------------------------------------------------------ #
     # Data Summary
     # ------------------------------------------------------------------------------ #
@@ -203,28 +208,14 @@ class ModelParams:
     # ------------------------------------------------------------------------------ #
     # Interventions
     # ------------------------------------------------------------------------------ #
+
     @property
     def date_data_tensor(self):
         """
         Creates a tensor with dimension intervention, country, change_points
         Padded with 0.0 for none existing change points
         """
-        max_num_cp = self.max_num_cp
-        data = []
-        for i, intervention in enumerate(
-            self.countries[0].interventions
-        ):  # Should be same across all countries -> 0
-            d_c = []
-            for c, country in enumerate(self.countries):
-                d_cp = []
-                for p, cp in enumerate(country.change_points[intervention.name]):
-                    d_cp.append(self.date_to_index(cp.date_data))
-                if len(d_cp) < max_num_cp:
-                    for x in range(max_num_cp - len(d_cp)):
-                        d_cp.append(0.0)
-                d_c.append(d_cp)
-            data.append(d_c)
-        return tf.constant(data, dtype=self.dtype)
+        return self._date_data_tensor
 
     @property
     def gamma_data_tensor(self):
@@ -232,6 +223,10 @@ class ModelParams:
         Creates a ragged tensor with dimension intervention, country, change_points
         The change points dimension can have different sizes.
         """
+        return self._gamma_data_tensor
+
+    @gamma_data_tensor.setter
+    def gamma_data_tensor(self, df):
         max_num_cp = self.max_num_cp
         data = []
         for i, intervention in enumerate(
@@ -247,7 +242,26 @@ class ModelParams:
                         d_cp.append(0.0)
                 d_c.append(d_cp)
             data.append(d_c)
-        return tf.constant(data, dtype=self.dtype)
+        self._gamma_data_tensor = tf.constant(data, dtype=self.dtype)
+
+    @date_data_tensor.setter
+    def date_data_tensor(self, df):
+        max_num_cp = self.max_num_cp
+        data = []
+        for i, intervention in enumerate(
+            self.countries[0].interventions
+        ):  # Should be same across all countries -> 0
+            d_c = []
+            for c, country in enumerate(self.countries):
+                d_cp = []
+                for p, cp in enumerate(country.change_points[intervention.name]):
+                    d_cp.append(self.date_to_index(cp.date_data))
+                if len(d_cp) < max_num_cp:
+                    for x in range(max_num_cp - len(d_cp)):
+                        d_cp.append(0.0)
+                d_c.append(d_cp)
+            data.append(d_c)
+        self._date_data_tensor = tf.constant(data, dtype=self.dtype)
 
     # ------------------------------------------------------------------------------ #
     # Positive tests
@@ -595,3 +609,9 @@ class ModelParams:
             tf.float32,
         )
         return self._weekdays_data_tensor
+
+    def _make_global(self):
+        """
+        Run once if you want to make the modelParams global. Used in plotting
+        """
+        globals()["modelParams"] = self

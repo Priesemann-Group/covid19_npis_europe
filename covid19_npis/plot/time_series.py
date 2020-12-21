@@ -42,7 +42,7 @@ def timeseries(
         Do you want to plot the new cases? May not work for 1 and 2 dim case.
     """
 
-    log.info(f"Creating timeseries plot for {key}")
+    log.debug(f"Creating timeseries plot for {key}")
 
     # Convert trace to dataframe
     df = data.convert_trace_to_dataframe(trace, sample_state, key)

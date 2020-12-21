@@ -9,3 +9,5 @@ timerit
 coloredlogs
 tqdm
 pprint
+arviz>=0.10.0
+xarray

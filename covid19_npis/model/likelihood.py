@@ -4,9 +4,9 @@ import tensorflow as tf
 import pymc4 as pm
 import numpy as np
 
-from covid19_npis import transformations
+from .. import transformations
 
-from covid19_npis.model.distributions import HalfCauchy, StudentT
+from .distributions import HalfCauchy, StudentT
 
 log = logging.getLogger(__name__)
 

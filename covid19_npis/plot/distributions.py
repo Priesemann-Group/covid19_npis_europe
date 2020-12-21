@@ -110,7 +110,7 @@ def _plot_posterior(x, bins=50, ax=None, **kwargs):
     return ax
 
 
-def distribution(trace_posterior, trace_prior, sample_state, key):
+def distribution(trace, sample_state, key):
     """
     High level function for creating plot overview for a variable. Works for
     one and two dimensional variable at the moment.
@@ -122,14 +122,13 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
 
     Parameters
     ----------
-    trace_posterior,trace_prior : arivz InferenceData
-        Raw data from pymc4 sampling
-
+    trace: arivz.InferenceData
+        Raw data from pymc4 sampling, can contain both posterior data
+        and prior data. Or only one of both!
     sample_state : pymc4 sample state
 
     key : str
         Name of the variable to plot
-
 
     Returns
     -------
@@ -137,11 +136,26 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
         one figure for each country
 
     """
-    log.info(f"Creating distibution plot for {key}")
+    log.debug(f"Creating distibution plot for {key}")
 
-    # Get prior and posterior data for key
-    posterior = data.convert_trace_to_dataframe(trace_posterior, sample_state, key)
-    prior = data.convert_trace_to_dataframe(trace_prior, sample_state, key)
+    # Check which data we have in the trace
+    if "posterior" in trace.groups():
+        posterior = data.convert_trace_to_dataframe(
+            trace, sample_state, key, data_type="posterior"
+        )
+        plt_posterior = True
+    else:
+        posterior = None
+        plt_posterior = False
+
+    if "prior_predictive" in trace.groups():
+        prior = data.convert_trace_to_dataframe(
+            trace, sample_state, key, data_type="prior_predictive"
+        )
+        plt_prior = True
+    else:
+        prior = None
+        plt_prior = False
 
     # Get other model parameters which we need
     model_name = get_model_name_from_sample_state(sample_state)
@@ -169,8 +183,8 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
         )
         if rows == 1:
             # Flatten chains and other sampling dimensions of df into one array
-            array_posterior = posterior.to_numpy().flatten()
-            array_prior = prior.to_numpy().flatten()
+            array_posterior = posterior.to_numpy().flatten() if plt_posterior else None
+            array_prior = prior.to_numpy().flatten() if plt_prior else None
             return (
                 [fig],
                 _distribution(
@@ -186,8 +200,16 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
                 posterior.index.get_level_values(label1).unique()
             ):
                 # Flatten chains and other sampling dimensions of df into one array
-                array_posterior = posterior.xs(value, level=label1).to_numpy().flatten()
-                array_prior = prior.xs(value, level=label1).to_numpy().flatten()
+                array_posterior = (
+                    posterior.xs(value, level=label1).to_numpy().flatten()
+                    if plt_posterior
+                    else None
+                )
+                array_prior = (
+                    prior.xs(value, level=label1).to_numpy().flatten()
+                    if plt_prior
+                    else None
+                )
                 ax[i] = _distribution(
                     array_posterior=array_posterior,
                     array_prior=array_prior,
@@ -231,19 +253,27 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
             ):
                 # Select values from datafram
                 arry_posterior = (
-                    data.select_from_dataframe(
-                        posterior, **{label1: value1, label2: value2}
+                    (
+                        data.select_from_dataframe(
+                            posterior, **{label1: value1, label2: value2}
+                        )
+                        .to_numpy()
+                        .flatten()
                     )
-                    .to_numpy()
-                    .flatten()
+                    if plt_posterior
+                    else None
                 )
 
                 array_prior = (
-                    data.select_from_dataframe(
-                        prior, **{label1: value1, label2: value2}
+                    (
+                        data.select_from_dataframe(
+                            prior, **{label1: value1, label2: value2}
+                        )
+                        .to_numpy()
+                        .flatten()
                     )
-                    .to_numpy()
-                    .flatten()
+                    if plt_prior
+                    else None
                 )
 
                 ax[j][i] = _distribution(
@@ -299,20 +329,29 @@ def distribution(trace_posterior, trace_prior, sample_state, key):
                 ):
                     # Select values from datafram
                     arry_posterior = (
-                        data.select_from_dataframe(
-                            posterior,
-                            **{label1: value1, label2: value2, label3: value3},
+                        (
+                            data.select_from_dataframe(
+                                posterior,
+                                **{label1: value1, label2: value2, label3: value3},
+                            )
+                            .to_numpy()
+                            .flatten()
                         )
-                        .to_numpy()
-                        .flatten()
+                        if plt_posterior
+                        else None
                     )
 
                     array_prior = (
-                        data.select_from_dataframe(
-                            prior, **{label1: value1, label2: value2, label3: value3}
+                        (
+                            data.select_from_dataframe(
+                                prior,
+                                **{label1: value1, label2: value2, label3: value3},
+                            )
+                            .to_numpy()
+                            .flatten()
                         )
-                        .to_numpy()
-                        .flatten()
+                        if plt_prior
+                        else None
                     )
 
                     if (cols == 1) and (rows == 1):
@@ -380,8 +419,9 @@ def _distribution(
 
     Parameters
     ----------
-    array_posterior,array_prior : array
-        Sampling data as array, should be filtered beforehand.
+    array_posterior, array_prior : array or None
+        Sampling data as array, should be filtered beforehand. If none
+        it does not get plotted!
 
     dist_name: str
         name of distribution for plotting
@@ -404,8 +444,10 @@ def _distribution(
     # ------------------------------------------------------------------------------ #
     # Plot
     # ------------------------------------------------------------------------------ #
-    ax = _plot_posterior(x=array_posterior, ax=ax)
-    ax = _plot_prior(x=array_prior, ax=ax)
+    if array_posterior is not None:
+        ax = _plot_posterior(x=array_posterior, ax=ax)
+    if array_prior is not None:
+        ax = _plot_prior(x=array_prior, ax=ax)
 
     # ------------------------------------------------------------------------------ #
     # Annotations
@@ -441,7 +483,7 @@ def _distribution(
             [tel_md, tel_ci], ax, facecolor="white", alpha=0.5, zorder=99,
         )
     except Exception as e:
-        log.info(f"Unable to create inset with {dist_name} value: {e}")
+        log.debug(f"Unable to create inset with {dist_name} value: {e}")
 
     # ------------------------------------------------------------------------------ #
     # Additional plotting settings

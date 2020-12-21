@@ -7,14 +7,13 @@ import numpy as np
 # Needed to set logging level before importing other modules
 # logging.basicConfig(level=logging.DEBUG)
 
-import covid19_npis
-from covid19_npis import transformations
+from . import *
+
+from .. import transformations
 
 #  from covid19_npis.benchmarking import benchmark
 
-from covid19_npis.model import *
-
-from covid19_npis.model.distributions import (
+from .distributions import (
     LKJCholesky,
     Deterministic,
     Gamma,
@@ -22,7 +21,7 @@ from covid19_npis.model.distributions import (
     Normal,
     LogNormal,
 )
-from covid19_npis.model.utils import convolution_with_varying_kernel, gamma
+from .utils import convolution_with_varying_kernel, gamma
 
 log = logging.getLogger(__name__)
 

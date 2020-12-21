@@ -34,10 +34,10 @@ def convert_trace_to_dataframe_list(trace, sample_state):
     # Try to get posterior and prior data
     data = []
     if hasattr(trace, "posterior"):
-        log.info("Found posterior in trace.")
+        log.debug("Found posterior in trace.")
         data.append(trace.posterior.data_vars)
     if hasattr(trace, "prior_predictive"):
-        log.info("Found prior_predictive in trace.")
+        log.debug("Found prior_predictive in trace.")
         data.append(trace.prior_predictive.data_vars)
 
     # Get list of all distributions
@@ -92,13 +92,13 @@ def convert_trace_to_dataframe(trace, sample_state, key, data_type=None):
             data_type = "prior_predictive"
 
     if data_type == "posterior":
-        log.info(f"{key} Found posterior in trace.")
+        log.debug(f"{key} Found posterior in trace.")
         data = trace.posterior.data_vars
     elif data_type == "prior_predictive":
-        log.info(f"{key} Found prior_predictive in trace.")
+        log.debug(f"{key} Found prior_predictive in trace.")
         data = trace.prior_predictive.data_vars
     elif data_type == "posterior_predictive":
-        log.info(f"{key} Using posterior_predictive from trace as data!")
+        log.debug(f"{key} Using posterior_predictive from trace as data!")
         data = trace.posterior_predictive.data_vars
 
     # Get model and var names a bit hacky but works

@@ -20,6 +20,7 @@ import tensorflow_probability as tfp
 from tensorflow_probability import distributions as tfd
 import tensorflow as tf
 
+
 dists_to_modify = [
     "Deterministic",
     "LogNormal",

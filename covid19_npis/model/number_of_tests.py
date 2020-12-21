@@ -821,6 +821,9 @@ def construct_testing_state(
 
     # Stack all means for multivariant distribution
     mu = tf.stack([phi_mu_cross, eta_mu_cross, xi_mu_cross, m_mu], axis=-1)
+    mu = yield Deterministic(
+        name=f"mu_testing_state", value=mu, shape_label=("variable"),
+    )
     state = yield MvNormalCholesky(
         name="testing_MvNormalCholesky",
         loc=mu,
@@ -850,10 +853,10 @@ def construct_testing_state(
     )
 
     # Add all vars to the trace
-    phi_det = yield Deterministic(name=name_phi, value=phi,)
-    eta_det = yield Deterministic(name=name_eta, value=eta,)
-    xi_det = yield Deterministic(name=name_xi, value=xi,)
-    m_ast_det = yield Deterministic(name=name_m_ast, value=m_ast,)
+    phi = yield Deterministic(name=name_phi, value=phi,)
+    eta = yield Deterministic(name=name_eta, value=eta,)
+    xi = yield Deterministic(name=name_xi, value=xi,)
+    m_ast = yield Deterministic(name=name_m_ast, value=m_ast,)
 
     return (phi, eta, xi, m_ast)
 

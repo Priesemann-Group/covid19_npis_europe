@@ -36,6 +36,7 @@ modelParams = covid19_npis.ModelParams(countries=[c1, c2])
 
 len_gen_interv_kernel = 12
 
+
 params = {
     # population size per country and age group
     "N": np.array([[1e15, 1e15, 1e15, 1e15], [1e15, 1e15, 1e15, 1e15]]),
@@ -62,7 +63,7 @@ params = {
         [[[0.73, 0.72, 0.74, 0.75], [0.73, 0.72, 0.74, 0.75]]]
         * modelParams.num_interventions
     )
-    * 0.7,
+    * 0.6,
     "C": np.stack(
         np.array(
             [
@@ -105,7 +106,7 @@ params = {
     ),
     "Phi_IFR": np.array([[0.1, 0.01, 0.001, 0.0001], [0.1, 0.01, 0.001, 0.0001]]),
     "death_m": np.array([14.0, 14.0]),
-    "death_theta": np.array([1.0, 1.0]),
+    "death_theta": np.array([1, 1]),
 }
 
 (
@@ -115,7 +116,11 @@ params = {
     reporting_delay_kernel,
     R_t,
     h_0_t,
-    cases_delayed_deaths,
+    deaths,
+    g,
+    new_E_t_delayed,
+    phi_plus,
+    phi_age,
 ) = covid19_npis.test_data.data_generators.test_data_from_model(
     main_model,
     modelParams,
@@ -127,7 +132,11 @@ params = {
         "reporting_delay_kernel",
         "R_t",
         "h_0_t",
-        "cases_delayed_deaths",
+        "deaths",
+        "g",
+        "new_E_t_delayed",
+        "phi_plus",
+        "phi_age",
     ],
 )
 
@@ -140,6 +149,7 @@ import matplotlib.pyplot as plt
 
 t = np.arange(0, modelParams.length_sim)
 
+"""
 # Plotting dict
 plots = {
     "new_E_t": new_E_t,
@@ -154,7 +164,7 @@ for key, item in plots.items():
     plt.tight_layout()
     fig = plt.gcf()
     fig.show()
-
+"""
 
 # covid19_npis.test_data.data_generators.save_data(
 #    "../data/test_data_from_model", new_cases_inferred, R_t, interv

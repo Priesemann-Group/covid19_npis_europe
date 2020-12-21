@@ -53,19 +53,16 @@ def construct_h_0_t(
     """
     batch_dims = tuple(R_t.shape)[:-3]
     data = modelParams.pos_tests_data_array
-    diff_sim_data = modelParams.offset_sim_data
     assert data.ndim == 3
     assert (
-        diff_sim_data > len_gen_interv_kernel + mean_test_delay
+        modelParams.offset_sim_data >= len_gen_interv_kernel + mean_test_delay
     ), "min_offset_sim_data is to small"
     i_data_begin_list = modelParams.indices_begin_data
-    i_sim_begin_list = i_data_begin_list - modelParams.offset_sim_data
+    i_sim_begin_list = i_data_begin_list - len_gen_interv_kernel - mean_test_delay
 
     # eigvals, _ = tf.linalg.eigh(R_t[..., i_data_begin, :, :])
     # largest_eigval = eigvals[-1]
-    R_t_rescaled = (
-        R_t - tf.ones(R_t.shape, dtype=R_t.dtype)
-    ) / mean_gen_interv + tf.ones(R_t.shape, dtype=R_t.dtype)
+    R_t_rescaled = R_t ** (1 / 5.0)
     R_inv = 1 / R_t_rescaled
     R_inv = tf.clip_by_value(R_inv, clip_value_min=0.7, clip_value_max=1.2)
     """
@@ -88,28 +85,56 @@ def construct_h_0_t(
     E_t = tf.convert_to_tensor(avg_cases_begin)
     log.debug(f"avg_cases_begin:\n{avg_cases_begin}")
 
+    if len(R_t.shape) == 5:
+        perm_forw = (3, 0, 1, 2, 4)
+        perm_back = (1, 2, 3, 0, 4)
+    elif len(R_t.shape) == 4:
+        perm_forw = (2, 0, 1, 3)
+        perm_back = (1, 2, 0, 3)
+    elif len(R_t.shape) == 3:
+        perm_forw = (1, 0, 2)
+        perm_back = (1, 0, 2)
+    else:
+        raise RuntimeError("Unknown rank")
+    """
     for i in range(diff_sim_data - len_gen_interv_kernel - mean_test_delay):
-        """
-        R = tf.gather(
-            R_t_rescaled,
-            i_sim_begin_list + diff_sim_data - mean_test_delay - i,
-            axis=-3,
-            batch_dims=1,
-        )
-        """
-        # E_t = tf.linalg.matvec(R_eff_inv, E_t)
-        E_t = R_inv[0] * E_t
+        R_current = tf.transpose(
+            tf.gather(
+                tf.transpose(R_inv, perm=perm_forw),
+                tf.constant(i_data_begin_list - i)[:, tf.newaxis],
+                axis=1,
+                batch_dims=1,
+            ),
+            perm=perm_back,
+        )[
+            0
+        ]  # A little complicated expression, because tensorflow doesn't allow advanced numpy indexing
+        E_t = R_current * E_t
 
         log.debug(f"i, E_t:{i}\n{E_t}")
-
+    """
     h_0_t_mean = [None for _ in range(len_gen_interv_kernel - 1, -1, -1)]
+    R_inv_transposed = tf.transpose(R_inv, perm=perm_forw)
     for i in range(len_gen_interv_kernel - 1, -1, -1):
         # R = tf.gather(R_t_rescaled, i_sim_begin_list + i, axis=-3, batch_dims=1,))
         # E_t = tf.linalg.matvec(R_eff_inv, E_t)
-        E_t = R_inv[0] * E_t
+
+        R_current = tf.transpose(
+            tf.gather(
+                R_inv_transposed,
+                tf.constant(i_data_begin_list - i - mean_test_delay)[:, tf.newaxis],
+                axis=1,
+                batch_dims=1,
+            ),
+            perm=perm_back,
+        )[
+            0
+        ]  # A little complicated expression, because tensorflow doesn't allow advanced numpy indexing
+
+        E_t = R_current * E_t
         log.debug(f"i, E_t:{i}\n{E_t}")
         h_0_t_mean[i] = E_t
-    h_0_t_mean = tf.stack(h_0_t_mean, axis=-3) / len_gen_interv_kernel
+    h_0_t_mean = tf.stack(h_0_t_mean, axis=-3)
     h_0_t_mean = tf.clip_by_value(h_0_t_mean, 1e-5, 1e6)
     log.debug(f"h_0_t_mean:\n{h_0_t_mean.shape}")
 
@@ -263,14 +288,9 @@ def construct_generation_interval(
         Normalized generation interval pdf
     """
 
-    g = {}
-
     """ The Shape parameter k of generation interval distribution is
         a gamma distribution with:
     """
-    g["mu"] = {}
-    g["mu"]["k"] = mu_k
-    g["mu"]["θ"] = mu_theta
 
     # Pymc4 and tf use alpha and beta as parameters so we need to take 1/θ as rate.
     # See https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Gamma
@@ -278,8 +298,8 @@ def construct_generation_interval(
 
     g_mu = yield Gamma(
         name=f"{name}_mu",
-        concentration=g["mu"]["k"],
-        rate=1.0 / g["mu"]["θ"],
+        concentration=mu_k,
+        rate=mu_theta,
         conditionally_independent=True,
         validate_args=True,
     )
@@ -290,14 +310,11 @@ def construct_generation_interval(
     """ Shape parameter k of generation interval distribution is
         a gamma distribution with:
     """
-    g["θ"] = {}
-    g["θ"]["k"] = theta_k
-    g["θ"]["θ"] = theta_theta
 
     g_theta = yield Gamma(
         name=f"{name}_theta",
-        concentration=g["θ"]["k"],
-        rate=1.0 / g["θ"]["θ"],
+        concentration=theta_k,
+        rate=1.0 / theta_theta,
         conditionally_independent=True,
         validate_args=True,
     )
@@ -361,7 +378,7 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
     C:
         inter-age-group Contact-Matrix (see 8)
         |shape| country, age_group, age_group
-    g_p:
+    gen_kernel:
         Normalized PDF of the generation interval
         |shape| batch_dims(?), l
 
@@ -416,8 +433,6 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
     # Number of days that we look into the past for our convolution
     len_gen_interv_kernel = gen_kernel.shape[-1]
 
-    E_0_initial = tf.zeros((len_gen_interv_kernel,) + R_t.shape[1:], dtype=R_t.dtype)
-    E_0_initial = E_0_initial + h_0_t[:len_gen_interv_kernel]
     S_initial = N - tf.reduce_sum(h_0_t, axis=0)
 
     R_t_for_loop = R_t[len_gen_interv_kernel:]
@@ -429,7 +444,11 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
         as lists
     """
 
-    initial = (tf.zeros(S_initial.shape, dtype=S_initial.dtype), E_0_initial, S_initial)
+    initial = (
+        tf.zeros(S_initial.shape, dtype=S_initial.dtype),
+        h_0_t[:len_gen_interv_kernel],
+        S_initial,
+    )
     out = tf.scan(fn=loop_body, elems=(R_t_for_loop, h_t_for_loop), initializer=initial)
     daily_infections_final = out[0]
     daily_infections_final = tf.concat(

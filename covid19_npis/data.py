@@ -317,9 +317,11 @@ class Country(object):
             self.data_total_tests = None
 
         if exist["/deaths.csv"]:
-            self.data_deaths = self._to_iso(
-                self._load_csv_with_date_index(self.path_to_folder + "/deaths.csv"),
-            )
+            temp = self._load_csv_with_date_index(self.path_to_folder + "/deaths.csv")
+            if len(temp.columns) > 2:
+                self.data_deaths = self._to_iso(temp, "age_group",)
+            else:
+                self.data_deaths = self._to_iso(temp,)
         else:
             self.data_deaths = None
 
@@ -380,7 +382,7 @@ class Country(object):
 
         if name is None:
             if len(df.columns) != 1:
-                log.warning(f"Multiple columns found in {df.name}! Using first one!")
+                log.warning(f"Multiple columns found in {self.name}! Using first one!")
             df.columns = pd.MultiIndex(
                 levels=[[self.name,],], codes=[[0,],], names=["country"],
             )

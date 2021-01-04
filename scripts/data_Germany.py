@@ -180,7 +180,8 @@ def deaths(ID, data_begin, data_end, path):
     )
     deaths = deaths.drop(columns=["A00-A04", "A05-A14", "A15-A34",])
     deaths = deaths.sort_index(axis=1)
-
+    deaths.index.name = "date"
+    deaths.name = ID
     deaths.to_csv(
         path + ID + "/deaths.csv", date_format="%d.%m.%y",
     )
@@ -228,8 +229,10 @@ def cases(ID, data_begin, data_end, rki):
     )
     data = data.drop(columns=["A00-A04", "A05-A14", "A15-A34", "unbekannt"])
     data = data.sort_index(axis=1)
+    data.index.name = "date"
+    data.name = ID
     data.to_csv(
-        path + ID + "/cases.csv", date_format="%d.%m.%y",
+        path + ID + "/new_cases.csv", date_format="%d.%m.%y",
     )
     log.debug(f"Successfully created data file for {ID}!")
 

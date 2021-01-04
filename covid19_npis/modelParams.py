@@ -50,6 +50,21 @@ class ModelParams:
         # Make global accessible since only one instance should be active at any time
         globals()["modelParams"] = self
 
+    @classmethod
+    def from_folder(cls, fpath):
+        """
+        Create modelParams class from folder containing differet regions or countrys
+        """
+        import os
+        from .data import Country
+
+        c = []
+        for entry in os.scandir(fpath):
+            if os.path.isdir(entry):
+                c.append(Country(entry.path))
+        return c
+        return cls(countries=c, minimal_daily_deaths=1)
+
     @property
     def countries(self):
         """

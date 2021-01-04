@@ -51,7 +51,7 @@ class ModelParams:
         globals()["modelParams"] = self
 
     @classmethod
-    def from_folder(cls, fpath):
+    def from_folder(cls, fpath, **kwargs):
         """
         Create modelParams class from folder containing differet regions or countrys
         """
@@ -62,8 +62,7 @@ class ModelParams:
         for entry in os.scandir(fpath):
             if os.path.isdir(entry):
                 c.append(Country(entry.path))
-        return c
-        return cls(countries=c, minimal_daily_deaths=1)
+        return cls(countries=c, **kwargs)
 
     @property
     def countries(self):
@@ -163,7 +162,7 @@ class ModelParams:
         """ # Update deaths data tensor
         set data tensor, replaces values smaller than 10 by nans.
         """
-        self.deaths_data_tensor = self._dataframe_total_tests  # Uses setter below!
+        self.deaths_data_tensor = self._dataframe_deaths  # Uses setter below!
 
         """ # Update intervetions data tensor
         """
@@ -344,7 +343,10 @@ class ModelParams:
             mask = (
                 np.sum(new_cases_tensor[:, c, :], axis=-1) > self._minimal_daily_cases
             )
-            i_data_begin = np.min(np.nonzero(mask)[0])
+            if mask.sum() == 0:  # [False,False,False]
+                i_data_begin = len(mask) - 1
+            else:
+                i_data_begin = np.min(np.nonzero(mask)[0])
             i_data_begin_list.append(i_data_begin)
 
         i_data_begin_list = np.array(i_data_begin_list)
@@ -388,6 +390,9 @@ class ModelParams:
         df: pd.DataFrame
             Total tests dataframe
         """
+        if not self.countries[0].exist["/tests.csv"]:
+            self._tensor_total_tests = None
+            return
         total_tests_tensor = (
             self._dataframe_total_tests.to_numpy()
             .astype(self.dtype)
@@ -434,18 +439,47 @@ class ModelParams:
         df: pd.DataFrame
             Deaths tests dataframe
         """
-        deaths_tensor = (
-            df.to_numpy()
-            .astype(self.dtype)
-            .reshape((-1, len(self.countries)))  ## assumes non-age-stratified data
-        )
-        deaths_tensor = np.concatenate(
-            [np.zeros((self._offset_sim_data, len(self.countries))), deaths_tensor,]
-        )
+        if len(df.columns.names) == 1:
+            deaths_tensor = (
+                df.to_numpy()
+                .astype(self.dtype)
+                .reshape((-1, len(self.countries)))  ## assumes non-age-stratified data
+            )
+            deaths_tensor = np.concatenate(
+                [
+                    np.zeros((self._offset_sim_data, len(self.countries),)),
+                    deaths_tensor,
+                ]
+            )
+
+        if len(df.columns.names) == 2:
+            deaths_tensor = (
+                df.to_numpy()
+                .T.astype(self.dtype)
+                .reshape(
+                    (-1, len(self.countries), len(self.age_groups))
+                )  ## assumes non-age-stratified data
+            )
+
+            deaths_tensor = np.concatenate(
+                [
+                    np.zeros(
+                        (
+                            self._offset_sim_data,
+                            len(self.countries),
+                            len(self.age_groups),
+                        )
+                    ),
+                    deaths_tensor,
+                ]
+            )
         i_data_begin_list = []
         for c in range(deaths_tensor.shape[1]):
             mask = deaths_tensor[:, c] > self._minimal_daily_deaths
-            i_data_begin = np.min(np.nonzero(mask)[0])
+            if mask.sum() == 0:  # [False,False,False]
+                i_data_begin = len(mask) - 1
+            else:
+                i_data_begin = np.min(np.nonzero(mask)[0])
             i_data_begin_list.append(i_data_begin)
         i_data_begin_list = np.array(i_data_begin_list)
         i_data_begin_list = np.maximum(

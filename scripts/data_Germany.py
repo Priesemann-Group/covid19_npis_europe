@@ -1,7 +1,7 @@
 # ------------------------------------------------------------------------------ #
 # Generates a dataset for each bundesland in germany, see main for configuration
 #
-# Runtime: ?min
+# Runtime: 3min
 # ------------------------------------------------------------------------------ #
 import requests
 import datetime
@@ -39,7 +39,7 @@ def config(ID, path):
     log.debug(f"Successfully created config file for '{ID}'!")
 
 
-def population(ID, path):
+def population(ID, path, pop_total):
     """
         Download population file if not present and saves, also does some weighting
         for each age group to increase the resolution
@@ -80,20 +80,6 @@ def population(ID, path):
     pop = pop_raw[pop_raw["ID"] == ID]
 
     # Weight with total population distribution from wpp (to get every age)
-    # Download new population file
-    f_path = download_and_save_file(
-        url="https://population.un.org/wpp/Download/Files/1_Indicators%20(Standard)/CSV_FILES/WPP2019_PopulationBySingleAgeSex_1950-2019.csv",
-        f_name="WPP2019_PopulationBySingleAgeSex_1950-2019.csv",
-        path="../data/raw/",
-    )
-    pop_total = pd.read_csv(f_path)
-    pop_total = pop_total.loc[pop_total["Location"] == "Germany"]
-    pop_total = pop_total.loc[pop_total["Time"] == 2019]
-    pop_total = pop_total.set_index("AgeGrp")
-    pop_total = pop_total["PopTotal"]
-    pop_total = pop_total * 1000
-    pop_total.index.name = "age"
-    pop_total = pop_total.astype("float")
 
     # We weight each age_group here
     pop_new = pd.DataFrame()
@@ -149,23 +135,26 @@ def deaths(ID, data_begin, data_end, path):
     deaths = deaths.xs(key=str(ID), level="IdLandkreis", axis=0)
     deaths = deaths.unstack()
 
-    if not deaths.columns.isin(["A00-A04"]).any().any():
+    if "A00-A04" not in deaths.columns:
         deaths["A00-A04"] = 0
 
-    if not deaths.columns.isin(["A05-A14"]).any().any():
+    if "A05-A14" not in deaths.columns:
         deaths["A05-A14"] = 0
 
-    if not deaths.columns.isin(["A15-A34"]).any().any():
+    if "A15-A34" not in deaths.columns:
         deaths["A15-A34"] = 0
 
-    if not deaths.columns.isin(["A35-A59"]).any().any():
+    if "A35-A59" not in deaths.columns:
         deaths["A35-A59"] = 0
 
-    if not deaths.columns.isin(["A60-A79"]).any().any():
+    if "A60-A79" not in deaths.columns:
         deaths["A60-A79"] = 0
 
-    if not deaths.columns.isin(["A80+"]).any().any():
+    if "A80+" not in deaths.columns:
         deaths["A80+"] = 0
+
+    if "unbekannt" not in deaths.columns:
+        deaths["unbekannt"] = 0
 
     dates = pd.date_range(data_begin, data_end)
     deaths = deaths.reindex(dates, fill_value=0)
@@ -178,10 +167,11 @@ def deaths(ID, data_begin, data_end, path):
             "A80+": "age_group_3",
         }
     )
-    deaths = deaths.drop(columns=["A00-A04", "A05-A14", "A15-A34",])
+    deaths = deaths.drop(columns=["A00-A04", "A05-A14", "A15-A34", "unbekannt"])
     deaths = deaths.sort_index(axis=1)
     deaths.index.name = "date"
     deaths.name = ID
+    deaths = deaths[data_begin:data_end]
     deaths.to_csv(
         path + ID + "/deaths.csv", date_format="%d.%m.%y",
     )
@@ -231,6 +221,7 @@ def cases(ID, data_begin, data_end, rki):
     data = data.sort_index(axis=1)
     data.index.name = "date"
     data.name = ID
+    data = data[data_begin:data_end]
     data.to_csv(
         path + ID + "/new_cases.csv", date_format="%d.%m.%y",
     )
@@ -261,7 +252,24 @@ if __name__ == "__main__":
 
     # Download Oxford tracker intervetions
     ox = cov19.data_retrieval.OxCGRT(True)
+    # Download Rki data
     rki = cov19.data_retrieval.RKI(True)
+    # Download new population file and format it
+    f_path = download_and_save_file(
+        url="https://population.un.org/wpp/Download/Files/1_Indicators%20(Standard)/CSV_FILES/WPP2019_PopulationBySingleAgeSex_1950-2019.csv",
+        f_name="WPP2019_PopulationBySingleAgeSex_1950-2019.csv",
+        path="../data/raw/",
+    )
+    pop_total = pd.read_csv(
+        "../data/raw/WPP2019_PopulationBySingleAgeSex_1950-2019.csv"
+    )
+    pop_total = pop_total.loc[pop_total["Location"] == "Germany"]
+    pop_total = pop_total.loc[pop_total["Time"] == 2019]
+    pop_total = pop_total.set_index("AgeGrp")
+    pop_total = pop_total["PopTotal"]
+    pop_total = pop_total * 1000
+    pop_total.index.name = "age"
+    pop_total = pop_total.astype("float")
 
     # Somehow some IDs are not present in some datasets..data_end
     expect_ids = [
@@ -309,7 +317,7 @@ if __name__ == "__main__":
                 path=path,
                 ox=ox,
             )
-            population(ID=ID, path=path)
+            population(ID=ID, path=path, pop_total=pop_total)
             cases(ID=ID, data_begin=data_begin, data_end=data_end, rki=rki)
         except Exception as e:
             print(ID)

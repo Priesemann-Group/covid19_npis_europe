@@ -292,7 +292,7 @@ def download_and_save_file(
     if not os.path.isfile(path + f_name) or overwrite:
         download_url(os.path.splitext(f_name)[0], url, path + f_name)
     else:
-        log.info(f"Found existing {path + f_name}, skipping download.")
+        log.debug(f"Found existing {path + f_name}, skipping download.")
     return path + f_name
 
 
@@ -316,114 +316,125 @@ def validate(country):
             )
 
 
-# ------------------------------------------------------------------------------ #
-# Download and open used files
-# ------------------------------------------------------------------------------ #
-# Download new coverAgeDB file
-f_path = download_and_save_file(
-    url="https://osf.io/9dsfk/download/",
-    f_name="CoverAgeDB.zip",
-    path="../data/raw/coverage_db/",
-    timestamp=True,
-)
-# Unzip file and load it
-with zipfile.ZipFile(f_path, "r") as zip_ref:
-    zip_ref.extractall("../data/raw/coverage_db/")
-
-# Open file csv
-df = pd.read_csv("../data/raw/coverage_db/Data/inputDB.csv", low_memory=False, header=1)
-df["Date"] = pd.to_datetime(df["Date"], format="%d.%m.%Y")
-# Set index of dataframe
-df = df.set_index(
-    ["Country", "Region", "Date", "Age", "AgeInt", "Sex", "Measure", "Metric", "Short"]
-)
-
-# Download new population file
-f_path = download_and_save_file(
-    url="https://population.un.org/wpp/Download/Files/1_Indicators%20(Standard)/CSV_FILES/WPP2019_PopulationBySingleAgeSex_1950-2019.csv",
-    f_name="WPP2019_PopulationBySingleAgeSex_1950-2019.csv",
-    path="../data/raw/",
-)
-pop = pd.read_csv(f_path)
-
-# Download Our world in data cases,deaths and tests
-owd = cov19.data_retrieval.OWD(True)
-# Download Oxford tracker intervetions
-ox = cov19.data_retrieval.OxCGRT(True)
-# Download Belgium data (it is only patially available in the owd dataset)
-bel_data = cov19.data_retrieval.Belgium(True)
-
-# ------------------------------------------------------------------------------ #
-# Preprocess data and save it to path
-# ------------------------------------------------------------------------------ #
-# For each country select data and save it
-path = "../data/coverage_db/"
-data_begin = datetime.datetime(2020, 3, 2)
-data_end = datetime.datetime(2020, 8, 15)
-countries = [
-    "Germany",
-    # "France",
-    "Italy",
-    # "UK",
-    "Belgium",
-    "Denmark",
-    "Spain",
-    "Sweden",
-    "Switzerland",
-    "Romania",
-    "Portugal",
-    # "Norway",
-    "Netherlands",
-    "Greece",
-    "Finland",
-    "Czechia",
-    "Bulgaria",
-]
-policies = [
-    "C1_School closing",
-    "C2_Workplace closing",
-    "C3_Cancel public events",
-    "C4_Restrictions on gatherings",
-    "C6_Stay at home requirements",
-]
-
-if not os.path.isdir(path):
-    os.mkdir(path)
-
-
-countries_bar = tqdm(countries, desc="Creating data files")
-for country in countries_bar:
-    countries_bar.set_description(f"Creating data files [{country[0:3]}]")
-    if not os.path.isdir(path + country):
-        os.mkdir(path + country)
-
-    get_data(country, "Cases", data_begin, data_end).to_csv(
-        path + country + "/new_cases.csv", date_format="%d.%m.%y",
+if __name__ == "__main__":
+    # ------------------------------------------------------------------------------ #
+    # Download and open used files
+    # ------------------------------------------------------------------------------ #
+    # Download new coverAgeDB file
+    f_path = download_and_save_file(
+        url="https://osf.io/9dsfk/download/",
+        f_name="CoverAgeDB.zip",
+        path="../data/raw/coverage_db/",
+        timestamp=True,
     )
-    log.debug(f"Successfully created new cases file for {country}!")
+    # Unzip file and load it
+    with zipfile.ZipFile(f_path, "r") as zip_ref:
+        zip_ref.extractall("../data/raw/coverage_db/")
 
-    owd.get_new(
-        "deaths", country=country, data_begin=data_begin, data_end=data_end
-    ).to_csv(
-        path + country + "/deaths.csv", date_format="%d.%m.%y",
+    # Open file csv
+    df = pd.read_csv(
+        "../data/raw/coverage_db/Data/inputDB.csv", low_memory=False, header=1
     )
-    log.debug(f"Successfully created deaths file for {country}!")
+    df["Date"] = pd.to_datetime(df["Date"], format="%d.%m.%Y")
+    # Set index of dataframe
+    df = df.set_index(
+        [
+            "Country",
+            "Region",
+            "Date",
+            "Age",
+            "AgeInt",
+            "Sex",
+            "Measure",
+            "Metric",
+            "Short",
+        ]
+    )
 
-    align_age_groups(country)
+    # Download new population file
+    f_path = download_and_save_file(
+        url="https://population.un.org/wpp/Download/Files/1_Indicators%20(Standard)/CSV_FILES/WPP2019_PopulationBySingleAgeSex_1950-2019.csv",
+        f_name="WPP2019_PopulationBySingleAgeSex_1950-2019.csv",
+        path="../data/raw/",
+    )
+    pop = pd.read_csv(f_path)
 
-    interventions(country)
+    # Download Our world in data cases,deaths and tests
+    owd = cov19.data_retrieval.OWD(True)
+    # Download Oxford tracker intervetions
+    ox = cov19.data_retrieval.OxCGRT(True)
+    # Download Belgium data (it is only patially available in the owd dataset)
+    bel_data = cov19.data_retrieval.Belgium(True)
 
-    tests(country)
+    # ------------------------------------------------------------------------------ #
+    # Preprocess data and save it to path
+    # ------------------------------------------------------------------------------ #
+    # For each country select data and save it
+    path = "../data/coverage_db/"
+    data_begin = datetime.datetime(2020, 3, 2)
+    data_end = datetime.datetime(2020, 8, 15)
+    countries = [
+        "Germany",
+        # "France",
+        "Italy",
+        # "UK",
+        "Belgium",
+        "Denmark",
+        "Spain",
+        "Sweden",
+        "Switzerland",
+        "Romania",
+        "Portugal",
+        # "Norway",
+        "Netherlands",
+        "Greece",
+        "Finland",
+        "Czechia",
+        "Bulgaria",
+    ]
+    policies = [
+        "C1_School closing",
+        "C2_Workplace closing",
+        "C3_Cancel public events",
+        "C4_Restrictions on gatherings",
+        "C6_Stay at home requirements",
+    ]
 
-    # Population
-    population(country)
+    if not os.path.isdir(path):
+        os.mkdir(path)
 
-    # Config
-    config(country)
+    countries_bar = tqdm(countries, desc="Creating data files")
+    for country in countries_bar:
+        countries_bar.set_description(f"Creating data files [{country[0:3]}]")
+        if not os.path.isdir(path + country):
+            os.mkdir(path + country)
 
+        get_data(country, "Cases", data_begin, data_end).to_csv(
+            path + country + "/new_cases.csv", date_format="%d.%m.%y",
+        )
+        log.debug(f"Successfully created new cases file for {country}!")
 
-# Short validation of created data i.e. check for nans
-countries_bar = tqdm(countries, desc="Validation")
-for country in countries_bar:
-    countries_bar.set_description(f"Validation [{country[0:3]}]")
-    validate(country)
+        owd.get_new(
+            "deaths", country=country, data_begin=data_begin, data_end=data_end
+        ).to_csv(
+            path + country + "/deaths.csv", date_format="%d.%m.%y",
+        )
+        log.debug(f"Successfully created deaths file for {country}!")
+
+        align_age_groups(country)
+
+        interventions(country)
+
+        tests(country)
+
+        # Population
+        population(country)
+
+        # Config
+        config(country)
+
+    # Short validation of created data i.e. check for nans
+    countries_bar = tqdm(countries, desc="Validation")
+    for country in countries_bar:
+        countries_bar.set_description(f"Validation [{country[0:3]}]")
+        validate(country)

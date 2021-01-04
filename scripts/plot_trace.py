@@ -1,11 +1,12 @@
 # ------------------------------------------------------------------------------ #
-# Plot a give trace as command line parameter
+# Plots a give trace
+# Uses command line parameters for more configurations!
 # Use `python ./plot_trace.py -h` for usage!
 # Runtime dependent on number of distributions/timeseries in trace!
 #
 # @Author:        Sebastian B. Mohr
 # @Created:       2020-12-18 14:40:45
-# @Last Modified: 2020-12-21 15:23:31
+# @Last Modified: 2021-01-04 13:17:34
 # ------------------------------------------------------------------------------ #
 
 # Get trace fp
@@ -66,7 +67,7 @@ parser.add_argument(
     dest="chains_seperated",
     type=bool,
     default=False,
-    help="Plot the chains with seperated  colors (only working for ts yet)",
+    help="Plot the chains with separated  colors (only working for ts yet)",
 )
 # Optional distributions list
 parser.add_argument(
@@ -227,3 +228,6 @@ for ts_name in args.timeseries:
     pbar.update(1)
 
 pbar.close()
+
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "1"

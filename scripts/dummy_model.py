@@ -116,9 +116,11 @@ def print_dist_shapes(st):
     for name, dist in itertools.chain(
         st.discrete_distributions.items(), st.continuous_distributions.items(),
     ):
-        print(dist.log_prob(st.all_values[name]).shape, name)
+        if dist.log_prob(st.all_values[name]).shape != (3,):
+            log.warning(dist.log_prob(st.all_values[name]).shape, name)
     for p in st.potentials:
-        print(p.value.shape, p.name)
+        if p.value.shape != (3,):
+            log.warning(p.value.shape, p.name)
 
 
 _, sample_state = pm.evaluate_model_transformed(this_model, sample_shape=(3,))
@@ -149,6 +151,12 @@ trace_prior = pm.sample_prior_predictive(
 )
 
 # Save our traces for the plotting script
-covid19_npis.utils.save_trace(
+name, fpath = covid19_npis.utils.save_trace(
     trace, modelParams, fpath="./traces", trace_prior=trace_prior
 )
+
+
+# Run plotting script
+"""
+os.system(f"plot_trace.py {fpath}/{name}")
+"""

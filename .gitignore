@@ -128,14 +128,16 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Datafile population
+# Datafile population -> too big
 data/WPP2019_PopulationBySingleAgeSex_1950-2019.csv
 
-# Datafile coverage_db
+# Datafiles folders
 data/coverage_db/*
 data/coverage_db*
-data/Germany_regions*
 data/unzip*
+data/Germany_bundesländer*
+data/Germany_landkreise*
+
 # figures
 *.pdf
 

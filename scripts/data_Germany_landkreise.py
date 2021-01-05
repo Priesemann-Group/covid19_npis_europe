@@ -1,7 +1,7 @@
 # ------------------------------------------------------------------------------ #
 # Generates a dataset for each bundesland in germany, see main for configuration
 #
-# Runtime: 3min
+# Runtime: ~3min
 # ------------------------------------------------------------------------------ #
 import requests
 import datetime
@@ -21,12 +21,14 @@ logging.getLogger("numexpr").setLevel(logging.WARNING)
 log = logging.getLogger("Germany DL")
 
 
-def config(ID, path):
+def config(ID, path, name=None):
     """
         Generate config for bundesland and saves it
     """
+    if name is None:
+        name = ID
     config = {
-        "name": ID,
+        "name": name,
         "age_groups": {
             "age_group_0": [0, 34],
             "age_group_1": [35, 59],
@@ -36,7 +38,7 @@ def config(ID, path):
     }
     with open(path + ID + "/config.json", "w") as outfile:
         json.dump(config, outfile, indent=2)
-    log.debug(f"Successfully created config file for '{ID}'!")
+    log.debug(f"Successfully created config file for '{name}'!")
 
 
 def population(ID, path, pop_total):
@@ -74,7 +76,16 @@ def population(ID, path, pop_total):
     pop_raw.columns.values[18] = "65-74"
     pop_raw.columns.values[19] = "75-100"
 
-    pop_raw["ID"] = pop_raw["ID"].astype("str")
+    # Replace '-' with 0
+    pop_raw = pop_raw.replace("-", 0)
+
+    # Bundesland or landkreis
+    if len(ID) <= 2:
+        pop_raw["ID"] = (
+            (pop_raw["ID"].astype("int64") / 1000).astype("int64").astype("str")
+        )
+    else:
+        pop_raw["ID"] = pop_raw["ID"].astype("str")
 
     # Get data by id
     pop = pop_raw[pop_raw["ID"] == ID]
@@ -122,12 +133,27 @@ def interventions(ID, data_begin, data_end, policies, path, ox):
 def deaths(ID, data_begin, data_end, path):
     """
         Datafile by Matthias linden
+
+        Parameters
+        ----------
+        ID: str
+            Landkreis or Bundesland ID if bundesland
+        data_begin: datetime.datetime
+        data_begin: datetime.datetime
+        path :str-like
+
     """
     deaths = pd.read_csv("../data/raw/DeathsRKI.csv")
     deaths["TodesMeldedatum"] = pd.to_datetime(
         deaths["TodesMeldedatum"], format="%Y-%m-%d"
     )
-    deaths["IdLandkreis"] = deaths["IdLandkreis"].astype("int64").astype("str")
+    # Bundesland or Landkreis?
+    if len(ID) <= 2:
+        deaths["IdLandkreis"] = (
+            (deaths["IdLandkreis"].astype("int64") / 1000).astype("int64").astype("str")
+        )
+    else:
+        deaths["IdLandkreis"] = deaths["IdLandkreis"].astype("int64").astype("str")
 
     deaths = deaths.groupby(["IdLandkreis", "TodesMeldedatum", "Altersgruppe"])[
         "AnzahlTodesfall"
@@ -178,11 +204,17 @@ def deaths(ID, data_begin, data_end, path):
     log.debug(f"Successfully created deaths file for {ID}!")
 
 
-def cases(ID, data_begin, data_end, rki):
+def cases(ID, data_begin, data_end, rki, path):
+
+    if len(ID) <= 2:
+        id_str = "IdBundesland"
+    else:
+        id_str = "IdLandkreis"
+
     data = rki.data
-    data["IdLandkreis"] = data["IdLandkreis"].astype("str")
-    data = data.groupby(["IdLandkreis", "date", "Altersgruppe"])["confirmed"].sum()
-    data = data.xs(key=str(ID), level="IdLandkreis", axis=0)
+    data[id_str] = data[id_str].astype("str")
+    data = data.groupby([id_str, "date", "Altersgruppe"])["confirmed"].sum()
+    data = data.xs(key=str(ID), level=id_str, axis=0)
     data = data.unstack()
 
     if "A00-A04" not in data.columns:
@@ -239,7 +271,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------------------ #
     # Configuration
     # ------------------------------------------------------------------------------ #
-    path = "../data/Germany_regions/"
+    path = "../data/Germany_landkreise/"
     data_begin = datetime.datetime(2020, 4, 20)
     data_end = datetime.datetime(2020, 12, 27)
     policies = [
@@ -318,7 +350,7 @@ if __name__ == "__main__":
                 ox=ox,
             )
             population(ID=ID, path=path, pop_total=pop_total)
-            cases(ID=ID, data_begin=data_begin, data_end=data_end, rki=rki)
+            cases(ID=ID, data_begin=data_begin, data_end=data_end, rki=rki, path=path)
         except Exception as e:
             print(ID)
             expect_ids.append(ID)

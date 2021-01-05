@@ -342,6 +342,43 @@ def construct_generation_interval(
     )  # shape g: batch_shape x len_gen_interv, shape g_mu: batch_shape x 1 x 1
 
 
+def _subdiagonal_array_to_matrix(array, size):
+    """
+    Transforms an array containing the subdiagonal elements of a matrix into a symmetric
+    matrix. Keeps prepended batch_dims in the generated matrix
+    Parameters
+    ----------
+    array: array with shape (batch_dims,) + (num_dims * (num_dims - 1) // 2,)
+    size: Size of square matrix
+
+    Returns
+    -------
+    matrix with shape (batch_dims,) + (num_dims, num_dims)
+
+    """
+    assert array.shape[-1] == size * (size - 1) // 2
+    i = 0
+    diag_indices = [0]
+    for _ in range(size // 2 + 2):
+        i += size
+        diag_indices += [i, i + 1]
+        i += 1
+    diag_indices = diag_indices[:size]
+    mask = np.ones(size * (size + 1) // 2, dtype=np.bool)
+    mask[diag_indices] = 0
+    indices = np.arange(len(mask))[mask]
+    matrix = tf.scatter_nd(
+        indices[..., None],
+        tf.transpose(array, perm=(array.ndim - 1,) + tuple(range(array.ndim - 1))),
+        shape=(size * (size + 1) // 2,) + array.shape[:-1],
+    )
+    matrix = tf.transpose(matrix, perm=tuple(range(1, matrix.ndim)) + (0,))
+    matrix = tfp.math.fill_triangular(matrix) + tfp.math.fill_triangular(
+        matrix, upper=True
+    )
+    return matrix
+
+
 def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
     r"""
     This function combines a variety of different steps:

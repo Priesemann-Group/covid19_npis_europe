@@ -35,7 +35,7 @@ def main_model(modelParams):
     R_0 = yield reproduction_number.construct_R_0(
         name="R_0",
         modelParams=modelParams,
-        loc=2.0,
+        loc=3.3,
         scale=0.5,
         hn_scale=0.3,  # Scale parameter of HalfNormal for each country
     )

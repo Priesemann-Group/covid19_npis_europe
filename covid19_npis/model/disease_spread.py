@@ -318,6 +318,8 @@ def construct_generation_interval(
         conditionally_independent=True,
         validate_args=True,
     )
+    g_mu = tf.clip_by_value(g_mu, 2, 8)
+    g_theta = tf.clip_by_value(g_theta, 0.2, 2)
 
     log.debug(f"g_mu:\n{g_mu}")
     log.debug(f"g_theta:\n{g_theta}")

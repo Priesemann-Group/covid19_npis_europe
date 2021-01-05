@@ -215,6 +215,7 @@ def _calc_Phi_IFR(
         name=f"{name}_alpha",
         loc=alpha_loc,
         scale=alpha_scale,
+        transformations=transformations.LogScale(0.01),
         conditionally_independent=True,
     )
 
@@ -222,20 +223,22 @@ def _calc_Phi_IFR(
         name=f"{name}_beta",
         loc=beta_loc,
         scale=beta_scale,
+        transformations=transformations.LogScale(),
         conditionally_independent=True,
         event_stack=modelParams.num_countries,
         shape_label="country",
     )
+    alpha = tf.clip_by_value(alpha, 0.05, 0.2)
 
     ages = tf.range(0.0, 101.0, delta=1.0, dtype="float32")  # [0...100]
-    log.debug(f"ages\n{ages.shape}")
-    log.debug(f"beta\n{beta.shape}")
-    log.debug(f"alpha\n{alpha[..., tf.newaxis].shape}")
+    log.debug(f"ages\n{ages}")
+    log.debug(f"beta\n{beta}")
+    log.debug(f"alpha\n{alpha[..., tf.newaxis]}")
 
     IFR = 0.01 * tf.exp(
         beta[..., tf.newaxis] + tf.einsum("...,a->...a", alpha[..., tf.newaxis], ages)
     )  # |shape| batch,coutry,ages
-    log.debug(f"IFR\n{IFR.shape}")
+    log.debug(f"IFR\n{IFR}")
 
     N_total = modelParams.N_data_tensor_total  # |shape| coutry,ages
     N_agegroups = modelParams.N_data_tensor

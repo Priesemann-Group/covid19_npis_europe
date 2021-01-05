@@ -13,7 +13,7 @@ import logging
 import json
 from tqdm.auto import tqdm
 from data_COVerAge_db import download_and_save_file
-from data_Germany_Landkreise import config, deaths, interventions, population, cases
+from data_Germany_landkreise import config, deaths, interventions, population, cases
 
 sys.path.append("../covid_inference")
 import covid19_inference as cov19

@@ -54,3 +54,16 @@ class CorrelationCholesky(BackwardTransform):
     def __init__(self, **kwargs):
         transform = tfb.CorrelationCholesky()
         super().__init__(transform, **kwargs)
+
+
+class LogScale(BackwardTransform):
+    name = "LogScale"
+    JacobianPreference = JacobianPreference.Backward
+
+    def __init__(self, scale=None, **kwargs):
+        if scale is None:
+            scaling = tfb.Identity()
+        else:
+            scaling = tfb.Scale(scale)
+        transform = tfb.Chain([scaling, tfb.Log()])
+        super().__init__(transform, **kwargs)

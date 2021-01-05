@@ -57,14 +57,14 @@ import covid19_npis
 # Logs setup
 log = logging.getLogger()
 # Needed to set logging level before importing other modules
-# log.setLevel(logging.DEBUG)
+log.setLevel(logging.DEBUG)
 covid19_npis.utils.setup_colored_logs()
 logging.getLogger("parso.python.diff").disabled = True
 # Mute Tensorflow warnings ...
 # logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
 # For eventual debugging:
-# tf.config.run_functions_eagerly(True)
+tf.config.run_functions_eagerly(True)
 # tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
 
 if tf.executing_eagerly():

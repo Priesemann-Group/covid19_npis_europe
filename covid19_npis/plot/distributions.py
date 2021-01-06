@@ -22,6 +22,7 @@ import logging
 
 log = logging.getLogger(__name__)
 plt.rcParams.update({"figure.max_open_warning": 0})
+mpl.use("TkAgg")
 
 
 def _plot_prior(x, ax=None, **kwargs):
@@ -175,12 +176,7 @@ def distribution(trace, sample_state, key):
         else:
             label1 = f"{model_name}/{dist.name}_dim_0"
 
-        fig, ax = plt.subplots(
-            rows,
-            cols,
-            figsize=(4.5 / 3 * cols, rows * 1 + 0.2),
-            constrained_layout=True,
-        )
+        fig, ax = plt.subplots(rows, cols, figsize=(4.5 / 3 * cols, rows * 1 + 0.2),)
         if rows == 1:
             # Flatten chains and other sampling dimensions of df into one array
             array_posterior = posterior.to_numpy().flatten() if plt_posterior else None
@@ -241,12 +237,7 @@ def distribution(trace, sample_state, key):
         # Second label is columns
         cols, rows = shape
 
-        fig, ax = plt.subplots(
-            rows,
-            cols,
-            figsize=(4.5 / 3 * cols, rows * 1 + 0.2),
-            constrained_layout=True,
-        )
+        fig, ax = plt.subplots(rows, cols, figsize=(4.5 / 3 * cols, rows * 1 + 0.2),)
         for i, value1 in enumerate(posterior.index.get_level_values(label1).unique()):
             for j, value2 in enumerate(
                 posterior.index.get_level_values(label2).unique()
@@ -316,10 +307,7 @@ def distribution(trace, sample_state, key):
         axes = []
         for f, value1 in enumerate(posterior.index.get_level_values(label1).unique()):
             fig, ax = plt.subplots(
-                rows,
-                cols,
-                figsize=(4.5 / 3 * cols, rows * 1 + 0.2),
-                constrained_layout=True,
+                rows, cols, figsize=(4.5 / 3 * cols, rows * 1 + 0.2),
             )
             for i, value2 in enumerate(
                 posterior.index.get_level_values(label2).unique()
@@ -439,7 +427,7 @@ def _distribution(
 
     """
     if ax is None:
-        fig, ax = plt.subplots(figsize=(4.5 / 3, 1), constrained_layout=True)
+        fig, ax = plt.subplots(figsize=(4.5 / 3, 1),)
 
     # ------------------------------------------------------------------------------ #
     # Plot

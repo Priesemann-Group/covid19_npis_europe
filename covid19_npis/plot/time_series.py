@@ -16,6 +16,7 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from scipy import stats
 import locale
 
+mpl.use("TkAgg")
 import logging
 
 log = logging.getLogger(__name__)
@@ -65,7 +66,7 @@ def timeseries(
         df = df.unstack(level="time").T
         df.index = df.index.droplevel(0)
         # Plot model once for each chain
-        fig, axes = plt.subplots(1, 1, figsize=(6, 3))
+        fig, axes = plt.subplots(1, 1, figsize=(3, 1.5))
         # Plot each chain
         axes = _timeseries(df.index, df.to_numpy(), ax=axes, what="model")
 
@@ -95,9 +96,7 @@ def timeseries(
         cols = shape[1]
         rows = 1  # not time
 
-        fig, axes = plt.subplots(
-            rows, cols, figsize=(6 * cols, 3 * rows), constrained_layout=True,
-        )
+        fig, axes = plt.subplots(rows, cols, figsize=(3 * cols, 1.5 * rows),)
         for i, value in enumerate(df.index.get_level_values(label1).unique()):
             df_t = df.xs(value, level=label1)
             df_t = df_t.unstack(level="time").T
@@ -136,9 +135,7 @@ def timeseries(
         rows = shape[2]
 
         # Create figure
-        fig, axes = plt.subplots(
-            rows, cols, figsize=(6 * cols, 3 * rows), constrained_layout=True,
-        )
+        fig, axes = plt.subplots(rows, cols, figsize=(3 * cols, 1.5 * rows),)
 
         # Loop threw all dimensions of variable
         for i, value1 in enumerate(df.index.get_level_values(label1).unique()):
@@ -257,7 +254,7 @@ def _timeseries(
         draw_ci_50 = rcParams["draw_ci_50"]
 
     if ax is None:
-        figure, ax = plt.subplots(figsize=(6, 3))
+        figure, ax = plt.subplots(figsize=(3, 1.5))
 
     # still need to fix the last dimension being one
     # if x.shape[0] != y.shape[-1]:

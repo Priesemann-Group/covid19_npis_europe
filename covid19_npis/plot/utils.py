@@ -2,7 +2,7 @@
 # @Author:        Sebastian B. Mohr
 # @Email:
 # @Created:       2020-08-17 10:35:59
-# @Last Modified: 2020-09-15 11:43:38
+# @Last Modified: 2021-01-06 11:48:34
 # ------------------------------------------------------------------------------ #
 
 import logging
@@ -85,6 +85,7 @@ def get_math_from_name(name):
         "alpha_i_c_a": r"\alpha_{i,c,a}",
         "d_i_c_p": r"d_{i,c,p}",
         "l_i_sign": r"l_{i,sign(\Delta\gamma)}",
+        "C": r"C",
     }
 
     if name not in math_keys:

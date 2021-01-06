@@ -6,7 +6,7 @@
 #
 # @Author:        Sebastian B. Mohr
 # @Created:       2020-12-18 14:40:45
-# @Last Modified: 2021-01-04 13:17:34
+# @Last Modified: 2021-01-06 11:44:15
 # ------------------------------------------------------------------------------ #
 
 # Get trace fp
@@ -111,10 +111,23 @@ modelParams._make_global()
 # ------------------------------------------------------------------------------ #
 # Get all distributions/timeseries
 # ------------------------------------------------------------------------------ #
+
+skip_dist_ts = [
+    "h_0_t",
+    "new_E_t",
+    "reporting_delay_kernel",
+    "new_E_t_delayed",
+    "total_tests",
+    "deaths",
+]
+
+
 def check_for_dist_or_ts(this_model, sample_state_dict):
     ts = []
     dists = []
     for key, item in sample_state_dict.items():
+        if key.replace(f"{this_model.name}/", "") in skip_dist_ts:
+            continue
         try:
             if "time" in item.shape_label:
                 ts.append(key.replace(f"{this_model.name}/", ""))
@@ -127,7 +140,8 @@ def check_for_dist_or_ts(this_model, sample_state_dict):
 
 # Get all default distributions and timesries
 all_ts, all_dists = check_for_dist_or_ts(this_model, sample_state.deterministics)
-
+print(all_ts)
+print(all_dists)
 
 if args.distributions is None:
     args.distributions = all_dists
@@ -148,29 +162,6 @@ if args.timeseries == [""]:
 
 # Progress bar
 pbar = tqdm(total=len(args.distributions) + len(args.timeseries), desc="Creating plots")
-
-# Distributions
-dist_fig = {}
-dist_axes = {}
-for dist_name in args.distributions:
-    pbar.set_description(f"Creating plots [{dist_name[0:3]}]")
-    dist_fig[dist_name], dist_axes[dist_name] = covid19_npis.plot.distribution(
-        trace, sample_state=sample_state, key=dist_name
-    )
-    # Save figure
-    for i, fig in enumerate(dist_fig[dist_name]):
-        if len(dist_fig[dist_name]) > 1:
-            subname = f"_{i}"
-        else:
-            subname = ""
-        fig.savefig(
-            f"{args.folder}/dist_{dist_name}" + f"{subname}.pdf",
-            dpi=300,
-            transparent=True,
-        )
-        plt.close(fig)
-    pbar.update(1)
-
 # Timeseries
 ts_fig = {}
 ts_axes = {}
@@ -222,10 +213,32 @@ for ts_name in args.timeseries:
         else:
             subname = ""
         fig.savefig(
-            f"{args.folder}/ts_{ts_name}" + f"{subname}.pdf", dpi=300, transparent=True
+            f"{args.folder}/ts_{ts_name}" + f"{subname}.png", dpi=300, transparent=True
         )
         plt.close(fig)
     pbar.update(1)
+# Distributions
+dist_fig = {}
+dist_axes = {}
+for dist_name in args.distributions:
+    pbar.set_description(f"Creating plots [{dist_name[0:3]}]")
+    dist_fig[dist_name], dist_axes[dist_name] = covid19_npis.plot.distribution(
+        trace, sample_state=sample_state, key=dist_name
+    )
+    # Save figure
+    for i, fig in enumerate(dist_fig[dist_name]):
+        if len(dist_fig[dist_name]) > 1:
+            subname = f"_{i}"
+        else:
+            subname = ""
+        fig.savefig(
+            f"{args.folder}/dist_{dist_name}" + f"{subname}.png",
+            dpi=300,
+            transparent=True,
+        )
+        plt.close(fig)
+    pbar.update(1)
+
 
 pbar.close()
 

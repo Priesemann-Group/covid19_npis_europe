@@ -106,7 +106,7 @@ c = [
 
 # Construct our modelParams from the data.
 modelParams = covid19_npis.ModelParams(countries=c, minimal_daily_deaths=1)
-
+# modelParams = covid19_npis.ModelParams.from_folder("../data/Germany_bundesländer/")
 
 # Define our model
 this_model = covid19_npis.model.model.main_model(modelParams)

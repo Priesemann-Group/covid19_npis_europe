@@ -191,11 +191,7 @@ def _studentT_deaths(modelParams, deaths):
         |shape| batch, time, country, age_group
     """
 
-    # Sadly we do not have age strata for the number of deaths in most countries.
-    # We sum over the age groups to get a value for all ages.
-    # We can add an exception later.
-    deaths_without_age = tf.reduce_sum(deaths, axis=-1)
-
+    data = modelParams.deaths_data_tensor
     # Scale of the likelihood sigma for each country
     sigma = yield HalfCauchy(
         name="sigma_likelihood_deaths",
@@ -205,23 +201,35 @@ def _studentT_deaths(modelParams, deaths):
         transform=transformations.SoftPlus(scale=50),
         shape_label="country",
     )
+
+    # First check if we have age groups in deaths
+    if data.ndim == 3:
+        sigma = sigma[
+            ..., tf.newaxis, :, tf.newaxis
+        ]  # add time and age group dimension
+        len_batch_shape = len(deaths.shape) - 3
+    else:
+        deaths = tf.reduce_sum(deaths, axis=-1)  # Remove age dimension via sum
+        sigma = sigma[..., tf.newaxis, :]  # Add time dimension
+        len_batch_shape = len(deaths.shape) - 2
+
+    # We sum over the age groups to get a value for all ages.
+    # We can add an exception later.
+
     log.debug(f"likelihood_deaths sigma:\n{sigma}")
-    sigma = sigma[..., tf.newaxis, :]  # Add time dimension
+
     # Retrieve data from the modelParameters and create a boolean mask
-    data = modelParams.deaths_data_tensor
+
     mask = ~np.isnan(data)
 
     # Create studentT likelihood
-    len_batch_shape = len(deaths_without_age.shape) - 2
+
     likelihood = yield StudentT(
         name="likelihood_deaths",
-        loc=tf.boolean_mask(deaths_without_age, mask, axis=len_batch_shape) + 10,
-        scale=tf.boolean_mask(
-            sigma * tf.sqrt(deaths_without_age), mask, axis=len_batch_shape
-        )
-        + 1e5,
+        loc=tf.boolean_mask(deaths, mask, axis=len_batch_shape),
+        scale=tf.boolean_mask(sigma * tf.sqrt(deaths), mask, axis=len_batch_shape),
         df=4,
-        observed=tf.boolean_mask(data, mask) + 10,
+        observed=tf.boolean_mask(data, mask),
         reinterpreted_batch_ndims=1,
     )
     log.debug(f"likelihood_deaths:\n{likelihood}")

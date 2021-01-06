@@ -4,6 +4,7 @@ from .disease_spread import (
     InfectionModel_unrolled,
     construct_h_0_t,
     construct_delay_kernel,
+    construct_C,
 )
 
 from .likelihood import studentT_likelihood

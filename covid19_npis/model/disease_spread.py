@@ -13,6 +13,7 @@ from covid19_npis.model.distributions import (
     Gamma,
     LogNormal,
     Deterministic,
+    HalfNormal,
 )
 
 
@@ -369,16 +370,95 @@ def _subdiagonal_array_to_matrix(array, size):
     mask = np.ones(size * (size + 1) // 2, dtype=np.bool)
     mask[diag_indices] = 0
     indices = np.arange(len(mask))[mask]
-    matrix = tf.scatter_nd(
+    array_scattered = tf.scatter_nd(
         indices[..., None],
-        tf.transpose(array, perm=(array.ndim - 1,) + tuple(range(array.ndim - 1))),
+        tf.transpose(
+            array, perm=(len(array.shape) - 1,) + tuple(range(len(array.shape) - 1))
+        ),
         shape=(size * (size + 1) // 2,) + array.shape[:-1],
     )
-    matrix = tf.transpose(matrix, perm=tuple(range(1, matrix.ndim)) + (0,))
-    matrix = tfp.math.fill_triangular(matrix) + tfp.math.fill_triangular(
-        matrix, upper=True
+    array_scattered = tf.transpose(
+        array_scattered, perm=tuple(range(1, len(array_scattered.shape))) + (0,)
     )
+    triangular = tfp.math.fill_triangular(array_scattered, upper=True)
+    matrix = triangular + tf.linalg.matrix_transpose(triangular)
     return matrix
+
+
+def construct_C(
+    name, modelParams, mean_C=-1.5, sigma_C=1, sigma_country=0.5, sigma_age=0.5
+):
+
+    C_country_sigma = yield HalfNormal(
+        name=f"{name}_country_sigma",
+        scale=sigma_country,
+        conditionally_independent=True,
+        event_stack=(1, 1),
+    )
+    C_age_sigma = yield HalfNormal(
+        name=f"{name}_age_sigma",
+        scale=sigma_age,
+        conditionally_independent=True,
+        event_stack=(1, 1),
+    )
+
+    Delta_C_country = (
+        yield Normal(
+            name=f"Delta_{name}_country",
+            loc=0,
+            scale=1,
+            conditionally_independent=True,
+            event_stack=(modelParams.num_countries, 1),
+            shape_label=("country", None),
+        )
+    ) * C_country_sigma
+
+    Delta_C_age = (
+        yield Normal(
+            name=f"Delta_{name}_age",
+            loc=0,
+            scale=1,
+            conditionally_independent=True,
+            event_stack=(
+                1,
+                modelParams.num_age_groups * (modelParams.num_age_groups - 1) // 2,
+            ),
+            shape_label=(None, "age groups cross terms"),
+        )
+    ) * C_age_sigma
+
+    Base_C = (
+        yield Normal(
+            name=f"Base_{name}",
+            loc=0,
+            scale=sigma_C,
+            conditionally_independent=True,
+            event_stack=(1, 1),
+        )
+    ) + mean_C
+    C_array = Base_C + Delta_C_age + Delta_C_country
+    C_array = tf.clip_by_value(
+        C_array, -20, -0.01
+    )  # ensures off diagonal terms are smaller than diagonal terms
+    C_matrix_transformed = _subdiagonal_array_to_matrix(
+        C_array, modelParams.num_age_groups
+    )
+    C_matrix = tf.nn.softmax(C_matrix_transformed)
+    C_matrix = yield Deterministic(
+        name=f"{name}",
+        value=C_matrix,
+        shape_label=("country", "age_group_i", "age_group_j"),
+    )
+    yield Deterministic(
+        name=f"{name}_mean",
+        value=tf.nn.softmax(
+            _subdiagonal_array_to_matrix(
+                Base_C + Delta_C_age, modelParams.num_age_groups
+            )
+        ),
+        shape_label=(None, "age_group_i", "age_group_j"),
+    )
+    return C_matrix
 
 
 def InfectionModel(N, h_0_t, R_t, C, gen_kernel):

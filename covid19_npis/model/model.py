@@ -55,26 +55,8 @@ def main_model(modelParams):
     We use the Cholesky version as the non Cholesky version uses tf.linalg.slogdet which isn't implemented in JAX.
     The returned tensor has the |shape| batch, country, age_group, age_group.
     """
-    C = yield LKJCholesky(
-        name="C_cholesky",
-        dimension=modelParams.num_age_groups,
-        concentration=4,  # eta
-        conditionally_independent=True,
-        event_stack=modelParams.num_countries,
-        validate_args=True,
-        transform=transformations.CorrelationCholesky(),
-        shape_label=("country", "age_group_i", "age_group_j"),
-    )
+    C = yield construct_C(name="C", modelParams=modelParams)
     log.debug(f"C:\n{C}")
-    # We add C to the trace via Deterministics
-    C = yield Deterministic(
-        name="C",
-        value=tf.einsum("...an,...bn->...ab", C, C),
-        shape_label=("country", "age_group_i", "age_group_j"),
-    )
-    # Finally we normalize C
-    C, _ = tf.linalg.normalize(C, ord=1, axis=-1)
-    log.debug(f"C_normalized:\n{C}")
 
     """ # Create generation interval g:
     """

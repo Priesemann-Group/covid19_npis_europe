@@ -815,7 +815,7 @@ def construct_testing_state(
     Sigma = yield Deterministic(
         name=f"Sigma",
         value=Sigma,
-        shape_label=("testing_state_vars", "testing_state_vars"),
+        shape_label=("testing_state_vars_i", "testing_state_vars_j"),
     )
     log.debug(f"Sigma state:\n{Sigma}")
 

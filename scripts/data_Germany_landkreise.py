@@ -91,7 +91,6 @@ def population(ID, path, pop_total):
     pop = pop_raw[pop_raw["ID"] == ID]
 
     # Weight with total population distribution from wpp (to get every age)
-
     # We weight each age_group here
     pop_new = pd.DataFrame()
 
@@ -105,7 +104,7 @@ def population(ID, path, pop_total):
         )  # +1 -> inklusive
 
         for i, val in dist.items():
-            pop_new[i] = [float(val) * float(pop[col].values[0])]
+            pop_new[i] = [float(val) * float(pop[col].astype("int64").sum())]
 
     # Save file
     pop_new = pop_new.T

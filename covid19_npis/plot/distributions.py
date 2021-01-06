@@ -22,7 +22,6 @@ import logging
 
 log = logging.getLogger(__name__)
 plt.rcParams.update({"figure.max_open_warning": 0})
-mpl.use("TkAgg")
 
 
 def _plot_prior(x, ax=None, **kwargs):

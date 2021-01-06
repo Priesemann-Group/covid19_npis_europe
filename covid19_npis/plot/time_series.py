@@ -16,7 +16,6 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from scipy import stats
 import locale
 
-mpl.use("TkAgg")
 import logging
 
 log = logging.getLogger(__name__)

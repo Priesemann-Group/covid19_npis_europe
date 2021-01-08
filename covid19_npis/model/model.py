@@ -28,6 +28,11 @@ log = logging.getLogger(__name__)
 
 @pm.model()
 def main_model(modelParams):
+    """
+    ToDo:
+    -----
+    Create Docstring for this function.
+    """
 
     """# Create initial Reproduction Number R_0:
     The returned R_0 tensor has the |shape| batch, country, age_group.

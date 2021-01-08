@@ -1,6 +1,11 @@
 Model
 -----
 
+Main model
+^^^^^^^^^^
+.. autofunction:: covid19_npis.model.main_model
+
+
 Disease spread
 ^^^^^^^^^^^^^^
 

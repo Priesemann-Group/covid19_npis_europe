@@ -1,3 +1,5 @@
+.. _how-to-data:
+
 How to build a dataset for our model
 ------------------------------------
 

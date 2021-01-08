@@ -20,14 +20,14 @@ from covid19_npis.model.distributions import (
 log = logging.getLogger(__name__)
 
 
-def construct_h_0_t(
+def construct_E_0_t(
     modelParams, len_gen_interv_kernel, R_t, mean_gen_interv, mean_test_delay=10,
 ):
     r"""
     Generates a prior for E_0_t, based on the observed number of cases during the first
     5 days. Currently it is implemented to take the first value of R_t, and multiply the
     inverse of R_t with first observed values until the begin of the simulation is reached.
-    This is then used as a prior for a lognormal distribution which set the h_0_t.
+    This is then used as a prior for a lognormal distribution which set the E_0_t.
 
 
     Parameters
@@ -48,7 +48,7 @@ def construct_h_0_t(
     Returns
     -------
     :
-        h_0_t:
+        E_0_t:
             some description
             |shape| time, batch, country, age_group
     """
@@ -82,7 +82,6 @@ def construct_h_0_t(
             np.nanmean(data[i_data_begin_list[c] : i_data_begin_list[c] + 5, c], axis=0)
         )
     avg_cases_begin = np.array(avg_cases_begin)
-    h_0_t_mean = []
     E_t = tf.convert_to_tensor(avg_cases_begin)
     log.debug(f"avg_cases_begin:\n{avg_cases_begin}")
 
@@ -114,7 +113,7 @@ def construct_h_0_t(
 
         log.debug(f"i, E_t:{i}\n{E_t}")
     """
-    h_0_t_mean = [None for _ in range(len_gen_interv_kernel - 1, -1, -1)]
+    E_0_t_mean = [None for _ in range(len_gen_interv_kernel - 1, -1, -1)]
     R_inv_transposed = tf.transpose(R_inv, perm=perm_forw)
     for i in range(len_gen_interv_kernel - 1, -1, -1):
         # R = tf.gather(R_t_rescaled, i_sim_begin_list + i, axis=-3, batch_dims=1,))
@@ -134,7 +133,7 @@ def construct_h_0_t(
 
         E_t = R_current * E_t
         log.debug(f"i, E_t:{i}\n{E_t}")
-        h_0_t_mean[i] = E_t
+        E_0_t_mean[i] = E_t
     E_0_t_mean = tf.stack(E_0_t_mean, axis=-3)
     E_0_t_mean = tf.clip_by_value(E_0_t_mean, 1e-5, 1e6)
     log.debug(f"E_0_t_mean:\n{E_0_t_mean}")

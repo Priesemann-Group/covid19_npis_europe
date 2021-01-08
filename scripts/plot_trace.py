@@ -113,7 +113,7 @@ modelParams._make_global()
 # ------------------------------------------------------------------------------ #
 
 skip_dist_ts = [
-    "h_0_t",
+    "E_0_t",
     "new_E_t",
     "reporting_delay_kernel",
     "new_E_t_delayed",

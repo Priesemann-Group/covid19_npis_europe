@@ -67,26 +67,26 @@ def main_model(modelParams):
     ) = yield construct_generation_interval(l=len_gen_interv_kernel)
     log.debug(f"gen_interv:\n{gen_kernel}")
 
-    """ # Generate exponential distribution initial infections h_0(t):
+    """ # Generate exponential distribution initial infections E_0(t):
     We need to generate initial infectious before our data starts, because we do a convolution
     in the infectiousmodel loops. This convolution needs start values which we do not want
     to set to 0!
-    The returned h_0(t) tensor has the |shape| time, batch, country, age_group.
+    The returned E_0(t) tensor has the |shape| time, batch, country, age_group.
     """
-    h_0_t = yield construct_h_0_t(
+    E_0_t = yield construct_E_0_t(
         modelParams=modelParams,
         len_gen_interv_kernel=len_gen_interv_kernel,
         R_t=R_t,
         mean_gen_interv=mean_gen_interv,
         mean_test_delay=0,
     )
-    # Add h_0(t) to trace
+    # Add E_0(t) to trace
     yield Deterministic(
-        name="h_0_t",
-        value=tf.einsum("t...ca->...tca", h_0_t),
+        name="E_0_t",
+        value=tf.einsum("t...ca->...tca", E_0_t),
         shape_label=("time", "country", "age_group"),
     )
-    log.debug(f"h_0(t):\n{h_0_t}")
+    log.debug(f"E_0(t):\n{E_0_t}")
 
     """ # Get population size tensor from modelParams:
     Should be done earlier in the real model i.e. in the modelParams
@@ -100,7 +100,7 @@ def main_model(modelParams):
     The returned tensor has the |shape| batch, time,country, age_group.
     """
     new_E_t = InfectionModel(
-        N=N, h_0_t=h_0_t, R_t=R_t, C=C, gen_kernel=gen_kernel  # default valueOp:AddV2
+        N=N, E_0_t=E_0_t, R_t=R_t, C=C, gen_kernel=gen_kernel  # default valueOp:AddV2
     )
     log.debug(f"new_E_t:\n{new_E_t[0,:]}")  # dimensons=t,c,a
 

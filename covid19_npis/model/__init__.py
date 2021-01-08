@@ -2,7 +2,7 @@ from .disease_spread import (
     InfectionModel,
     construct_generation_interval,
     InfectionModel_unrolled,
-    construct_h_0_t,
+    construct_E_0_t,
     construct_delay_kernel,
     construct_C,
 )

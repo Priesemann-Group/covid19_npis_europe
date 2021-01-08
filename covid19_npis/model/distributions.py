@@ -19,6 +19,7 @@ import types
 import tensorflow_probability as tfp
 from tensorflow_probability import distributions as tfd
 import tensorflow as tf
+from .. import transformations
 
 
 dists_to_modify = [
@@ -49,7 +50,6 @@ class DistributionAdditions:
             del kwargs["shape_label"]
 
         super().__init__(*args, **kwargs)
-
         if "loc" in kwargs and tf.is_tensor(kwargs.get("loc")):
             tf.debugging.check_numerics(
                 kwargs.get("loc"), f"loc not finite in {self.name}"
@@ -74,6 +74,10 @@ for dist_name in dists_to_modify:
     # Add our own class to module scope
     vars()[dist_name] = types.new_class(dist_name, (DistributionAdditions, pmdist))
 
+
+# pmdist = getattr(pm, "HalfNormal")
+# vars()["HalfCauchy"] = types.new_class("HalfCauchy", (DistributionAdditions, pmdist))
+
 # ------------------------------------------------------------------------------ #
 # If we want to add some special behaviour
 # for a specific class we can do that here
@@ -81,9 +85,15 @@ for dist_name in dists_to_modify:
 
 # Example:
 def other_init(self, *args, **kwargs):
-    kwargs["validate_args"] = True
+    kwargs["validate_args"] = False
     super(self.__class__, self).__init__(*args, **kwargs)
     # print("This is a modified __init__")
+
+
+def init_with_softplus_transform(self, *args, **kwargs):
+    if "transform" not in kwargs.keys():
+        kwargs["transform"] = transformations.SoftPlus()
+    super(self.__class__, self).__init__(*args, **kwargs)
 
 
 """
@@ -107,14 +117,15 @@ __all__ = dists_to_modify + ["Deterministic"]
 LogNormal.__init__ = other_init
 Normal.__init__ = other_init
 LKJCholesky.__init__ = other_init
-HalfCauchy.__init__ = other_init
+HalfCauchy.__init__ = init_with_softplus_transform
 StudentT.__init__ = other_init
-Gamma.__init__ = other_init
+HalfNormal.__init__ = init_with_softplus_transform
+Gamma.__init__ = init_with_softplus_transform
 
 
 # Own implementation of  Multivariate Student's t-distribution can be removed as soon as the pymc4
 # pull reqeust is merged
-class MvStudentT(pm.distributions.distribution.ContinuousDistribution):
+class MvStudentT(pm.distributions.ContinuousDistribution):
     r"""
     Multivariate Student's t-distribution
 

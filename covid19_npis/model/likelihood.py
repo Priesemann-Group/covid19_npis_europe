@@ -90,17 +90,17 @@ def _studentT_positive_tests(modelParams, pos_tests):
     # Retrieve data from the modelParameters and create a boolean mask
     data = modelParams.pos_tests_data_tensor
     log.debug(f"pos_tests_data_tensor:\n{data}")
-    mask = ~np.isnan(data)
+    mask = np.argwhere(~np.isnan(data).flatten())
 
     len_batch_shape = len(pos_tests.shape) - 3
     likelihood = yield StudentT(
         name="likelihood_pos_tests",
-        loc=tf.boolean_mask(pos_tests, mask, axis=len_batch_shape),
-        scale=tf.boolean_mask(
-            sigma * tf.sqrt(pos_tests) + 1, mask, axis=len_batch_shape
+        loc=index_mask(pos_tests, mask, batch_dims=len_batch_shape),
+        scale=index_mask(
+            sigma * tf.sqrt(pos_tests + 1), mask, batch_dims=len_batch_shape
         ),
         df=4,
-        observed=tf.boolean_mask(data, mask),
+        observed=index_mask(data, mask),
         reinterpreted_batch_ndims=1,
     )
     log.debug(f"likelihood_pos_tests:\n{likelihood}")
@@ -108,6 +108,13 @@ def _studentT_positive_tests(modelParams, pos_tests):
         likelihood, "Nan in likelihood", name="likelihood_pos_tests"
     )
     return likelihood
+
+
+def index_mask(x, mask, batch_dims=0):
+    new_shape = tuple(x.shape[:batch_dims]) + (-1,)
+    x_flattened = tf.reshape(x, new_shape)
+    gathered = tf.gather(x_flattened, mask, axis=-1)[..., 0]
+    return gathered
 
 
 def _studentT_total_tests(modelParams, total_tests):
@@ -151,18 +158,20 @@ def _studentT_total_tests(modelParams, total_tests):
 
     # Retrieve data from the modelParameters and create a boolean mask
     data = modelParams.total_tests_data_tensor
-    mask = ~np.isnan(data)
+    mask = np.argwhere(~np.isnan(data).flatten())
 
     # Create studentT likelihood
     len_batch_shape = len(total_tests_without_age.shape) - 2
     likelihood = yield StudentT(
         name="likelihood_total_tests",
-        loc=tf.boolean_mask(total_tests_without_age, mask, axis=len_batch_shape),
-        scale=tf.boolean_mask(
-            sigma * tf.sqrt(total_tests_without_age) + 1, mask, axis=len_batch_shape
+        loc=index_mask(total_tests_without_age, mask, batch_dims=len_batch_shape),
+        scale=index_mask(
+            sigma * tf.sqrt(total_tests_without_age + 1),
+            mask,
+            batch_dims=len_batch_shape,
         ),
         df=4,
-        observed=tf.boolean_mask(data, mask),
+        observed=index_mask(data, mask),
         reinterpreted_batch_ndims=1,
     )
     log.debug(f"likelihood_total_tests:\n{likelihood}")
@@ -195,10 +204,10 @@ def _studentT_deaths(modelParams, deaths):
     # Scale of the likelihood sigma for each country
     sigma = yield HalfCauchy(
         name="sigma_likelihood_deaths",
-        scale=50.0,
+        scale=5,
         event_stack=modelParams.num_countries,
         conditionally_independent=True,
-        transform=transformations.SoftPlus(scale=50),
+        transform=transformations.SoftPlus(),
         shape_label="country",
     )
 
@@ -220,16 +229,16 @@ def _studentT_deaths(modelParams, deaths):
 
     # Retrieve data from the modelParameters and create a boolean mask
 
-    mask = ~np.isnan(data)
+    mask = np.argwhere(~np.isnan(data).flatten())
 
     # Create studentT likelihood
 
     likelihood = yield StudentT(
         name="likelihood_deaths",
-        loc=tf.boolean_mask(deaths, mask, axis=len_batch_shape),
-        scale=tf.boolean_mask(sigma * tf.sqrt(deaths), mask, axis=len_batch_shape),
+        loc=index_mask(deaths, mask, batch_dims=len_batch_shape),
+        scale=index_mask(sigma * tf.sqrt(deaths + 1), mask, batch_dims=len_batch_shape),
         df=4,
-        observed=tf.boolean_mask(data, mask),
+        observed=index_mask(data, mask),
         reinterpreted_batch_ndims=1,
     )
     log.debug(f"likelihood_deaths:\n{likelihood}")

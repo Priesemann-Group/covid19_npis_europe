@@ -133,11 +133,13 @@ begin_time = time.time()
 log.info("start")
 trace = pm.sample(
     this_model,
-    num_samples=20,
-    burn_in=10,
+    num_samples=50,
+    burn_in=50,
     use_auto_batching=False,
     num_chains=2,
-    xla=False,
+    xla=True,
+    step_size=0.01
+    #    state=pm.evaluate_model_transformed(this_model)[1]
     # sampler_type="nuts",
 )
 

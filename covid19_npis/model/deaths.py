@@ -122,7 +122,10 @@ def _construct_reporting_delay(
     """ # Mean m
     """
     m_sigma = yield HalfNormal(
-        name=f"{name}_m_sigma", scale=m_sigma_scale, conditionally_independent=True,
+        name=f"{name}_m_sigma",
+        scale=m_sigma_scale,
+        conditionally_independent=True,
+        transform=transformations.SoftPlus(),
     )
     mu_m = (
         yield Normal(
@@ -150,10 +153,13 @@ def _construct_reporting_delay(
         )
         + mu_m[..., tf.newaxis]
     )
+    m = tf.math.softplus(m_dagger)
 
-    m = yield Deterministic(
-        name=f"{name}_m", value=tf.math.softplus(m_dagger), shape_label=("country")
-    )
+    # For robustness
+    m = tf.clip_by_value(m, 5, 50)
+    theta = tf.clip_by_value(theta, 0.1, 3)
+
+    m = yield Deterministic(name=f"{name}_m", value=m, shape_label=("country"))
 
     return m, theta
 
@@ -215,7 +221,6 @@ def _calc_Phi_IFR(
         name=f"{name}_alpha",
         loc=alpha_loc,
         scale=alpha_scale,
-        transformations=transformations.LogScale(0.01),
         conditionally_independent=True,
     )
 
@@ -223,12 +228,14 @@ def _calc_Phi_IFR(
         name=f"{name}_beta",
         loc=beta_loc,
         scale=beta_scale,
-        transformations=transformations.LogScale(),
         conditionally_independent=True,
         event_stack=modelParams.num_countries,
-        shape_label="country",
+        shape_label=("country",),
     )
-    alpha = tf.clip_by_value(alpha, 0.05, 0.2)
+
+    # for robustness, clip at about 5 sigmas
+    alpha = tf.clip_by_value(alpha, 0.1, 0.14)
+    beta = tf.clip_by_value(beta, -10, -5)
 
     ages = tf.range(0.0, 101.0, delta=1.0, dtype="float32")  # [0...100]
     log.debug(f"ages\n{ages}")
@@ -266,6 +273,7 @@ def _calc_Phi_IFR(
 
     Phi_IFR = tf.einsum("ca,...ca->...ca", 1.0 / N_agegroups, phi)
     log.debug(f"Phi_IFR\n{Phi_IFR.shape}")
+
     Phi_IFR = yield Deterministic(
         name="Phi_IFR", value=Phi_IFR, shape_label=("country", "age_group")
     )
@@ -354,4 +362,5 @@ def calc_delayed_deaths(name, new_cases, Phi_IFR, m, theta, length_kernel=40):
         value=tf.reduce_sum(delayed_deaths, axis=-1),
         shape_label=("time", "country"),
     )
+    log.debug(f"deaths\n{delayed_deaths_compact}")
     return delayed_deaths

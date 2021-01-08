@@ -135,57 +135,53 @@ def construct_h_0_t(
         E_t = R_current * E_t
         log.debug(f"i, E_t:{i}\n{E_t}")
         h_0_t_mean[i] = E_t
-    h_0_t_mean = tf.stack(h_0_t_mean, axis=-3)
-    h_0_t_mean = tf.clip_by_value(h_0_t_mean, 1e-5, 1e6)
-    log.debug(f"h_0_t_mean:\n{h_0_t_mean.shape}")
+    E_0_t_mean = tf.stack(E_0_t_mean, axis=-3)
+    E_0_t_mean = tf.clip_by_value(E_0_t_mean, 1e-5, 1e6)
+    log.debug(f"E_0_t_mean:\n{E_0_t_mean}")
 
-    h_0_base = h_0_t_mean[..., 0:1, :, :] * tf.exp(
-        (
-            yield Normal(
-                name="E_0_diff_base",
-                loc=0.0,
-                scale=3.0,
-                conditionally_independent=True,
-                event_stack=tuple(h_0_t_mean[..., 0:1, :, :].shape[-3:]),
-            )
-        ),
+    E_0_diff_base = yield Normal(
+        name="E_0_diff_base",
+        loc=0.0,
+        scale=3.0,
+        conditionally_independent=True,
+        event_stack=tuple(E_0_t_mean[..., 0:1, :, :].shape[-3:]),
     )
-    h_0_mean_diff = h_0_t_mean[..., 1:, :, :] - h_0_t_mean[..., :-1, :, :]
-    h_0_base_add = h_0_mean_diff * tf.exp(
-        (
-            yield Normal(
-                name="E_0_diff_add",
-                loc=0.0,
-                scale=1.0,
-                conditionally_independent=True,
-                event_stack=tuple(h_0_mean_diff.shape[-3:]),
-            )
-        ),
+
+    E_0_base = E_0_t_mean[..., 0:1, :, :] * tf.exp(E_0_diff_base)
+    E_0_mean_diff = E_0_t_mean[..., 1:, :, :] - E_0_t_mean[..., :-1, :, :]
+
+    E_0_diff_add = yield Normal(
+        name="E_0_diff_add",
+        loc=0.0,
+        scale=1.0,
+        conditionally_independent=True,
+        event_stack=tuple(E_0_mean_diff.shape[-3:]),
     )
-    log.debug(f"h_0_base:\n{h_0_base.shape}")
-    log.debug(f"h_0_base_add:\n{h_0_base_add.shape}")
+    E_0_base_add = E_0_mean_diff * tf.exp(E_0_diff_add)
+    log.debug(f"E_0_base:\n{E_0_base}")
+    log.debug(f"E_0_base_add:\n{E_0_base_add}")
     log.debug(f"R_t:\n{R_t.shape}")
 
-    h_0_t_rand = tf.math.cumsum(
-        tf.concat([h_0_base, h_0_base_add,], axis=-3,), axis=-3,
+    E_0_t_rand = tf.math.cumsum(
+        tf.concat([E_0_base, E_0_base_add,], axis=-3,), axis=-3,
     )  # shape:  batch_dims x len_gen_interv_kernel x countries x age_groups
 
-    h_0_t_rand = tf.einsum(
-        "...kca->k...ca", h_0_t_rand
+    E_0_t_rand = tf.einsum(
+        "...kca->k...ca", E_0_t_rand
     )  # Now: shape:  len_gen_interv_kernel x batch_dims x countries x age_groups
 
-    log.debug(f"h_0_t_rand:\n{h_0_t_rand.shape}")
-    h_0_t = []
+    log.debug(f"E_0_t_rand:\n{E_0_t_rand}")
+    E_0_t = []
     batch_shape = R_t.shape[1:-2]
     log.debug(f"batch_shape:\n{batch_shape}")
     total_len = R_t.shape[0]
     age_shape = R_t.shape[-1:]
     for i, i_begin in enumerate(i_sim_begin_list):
-        h_0_t.append(
+        E_0_t.append(
             tf.concat(
                 [
                     tf.zeros((i_begin,) + batch_shape + (1,) + age_shape),
-                    h_0_t_rand[..., i : i + 1, :],
+                    E_0_t_rand[..., i : i + 1, :],
                     tf.zeros(
                         (total_len - len_gen_interv_kernel - i_begin,)
                         + batch_shape
@@ -196,8 +192,9 @@ def construct_h_0_t(
                 axis=0,
             )
         )
-    h_0_t = tf.concat(h_0_t, axis=-2)
-    return h_0_t
+    E_0_t = tf.concat(E_0_t, axis=-2)
+
+    return E_0_t
 
 
 def _construct_E_0_t_transposed(E_0, l=16):
@@ -456,12 +453,12 @@ def construct_C(
                 Base_C + Delta_C_age, modelParams.num_age_groups
             )
         ),
-        shape_label=(None, "age_group_i", "age_group_j"),
+        shape_label=("age_group_i", "age_group_j"),
     )
     return C_matrix
 
 
-def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
+def InfectionModel(N, E_0_t, R_t, C, gen_kernel):
     r"""
     This function combines a variety of different steps:
 
@@ -508,6 +505,11 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
     """
 
     # @tf.function(autograph=False)
+
+    # For robustness of inference
+    # R_t = tf.clip_by_value(R_t, 0.5, 7)
+    # R_t = tf.clip_by_norm(R_t, 100, axes=0)
+
     def loop_body(params, elems):
         # Unpack a:
         # Old E_next is E_lastv now
@@ -519,7 +521,7 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
 
         # Convolution:
 
-        log.debug(f"E_t {E_t}")
+        # log.debug(f"E_t {E_t}")
         # Calc "infectious" people, weighted by serial_p (country x age_group)
 
         infectious = tf.einsum("t...ca,...t->...ca", E_lastv, gen_kernel)  # Convolution
@@ -540,7 +542,7 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
         new = tf.einsum("...ci,...cij,...cj->...cj", infectious, R_eff, f) + h
         new = tf.clip_by_value(new, 0, 1e9)
 
-        log.debug(f"new:\n{new}")  # kernel_time,batch,country,age_group
+        # log.debug(f"new:\n{new}")  # kernel_time,batch,country,age_group
         E_nextv = tf.concat(
             [new[tf.newaxis, ...], E_lastv[:-1, ...],], axis=0,
         )  # Create new infected population for new step, insert latest at front
@@ -552,10 +554,10 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
     # Number of days that we look into the past for our convolution
     len_gen_interv_kernel = gen_kernel.shape[-1]
 
-    S_initial = N - tf.reduce_sum(h_0_t, axis=0)
+    S_initial = N - tf.reduce_sum(E_0_t, axis=0)
 
     R_t_for_loop = R_t[len_gen_interv_kernel:]
-    h_t_for_loop = h_0_t[len_gen_interv_kernel:]
+    h_t_for_loop = E_0_t[len_gen_interv_kernel:]
     # Initial susceptible population = total - infected
 
     """ Calculate time evolution of new, daily infections
@@ -565,17 +567,23 @@ def InfectionModel(N, h_0_t, R_t, C, gen_kernel):
 
     initial = (
         tf.zeros(S_initial.shape, dtype=S_initial.dtype),
-        h_0_t[:len_gen_interv_kernel],
+        E_0_t[:len_gen_interv_kernel],
         S_initial,
     )
     out = tf.scan(fn=loop_body, elems=(R_t_for_loop, h_t_for_loop), initializer=initial)
     daily_infections_final = out[0]
     daily_infections_final = tf.concat(
-        [h_0_t[:len_gen_interv_kernel], daily_infections_final], axis=0
+        [E_0_t[:len_gen_interv_kernel], daily_infections_final], axis=0
     )
 
     # Transpose tensor in order to have batch dim before time dim
     daily_infections_final = tf.einsum("t...ca->...tca", daily_infections_final)
+
+    log.debug(f"daily_infections_final:\n{daily_infections_final}")
+    log.debug(
+        f"daily_infections_final sum:\n{tf.reduce_sum(daily_infections_final, axis=-3)}"
+    )
+    daily_infections_final = tf.clip_by_value(daily_infections_final, 1e-6, 1e6)
 
     return daily_infections_final  # batch_dims x time x country x age
 

@@ -425,6 +425,9 @@ def construct_R_t(name, modelParams, R_0):
     """
     exponent = tf.einsum("...ict,...ica->...cat", gamma_i_c, alpha_i_c_a)
 
+    # for robustness
+    # exponent = tf.clip_by_value(exponent, -0.2, 3)
+
     R_eff = tf.einsum("...ca,...cat->...tca", R_0, tf.exp(-exponent))
     log.debug(f"R_eff\n{R_eff}")
 
@@ -468,17 +471,16 @@ def construct_R_0(name, modelParams, loc, scale, hn_scale):
             R_0 tensor |shape| batch, country, age_group
     """
 
-    R_0_star = (
-        yield Normal(
-            name="R_0_star", loc=0.0, scale=scale, conditionally_independent=True,
-        )
+    R_0 = (
+        yield Normal(name="R_0", loc=0.0, scale=scale, conditionally_independent=True,)
     ) + loc
+    log.debug(f"R_0:\n{R_0}")
 
     R_0_sigma_c = yield HalfNormal(
         name="R_0_sigma_c",
         scale=hn_scale,
         conditionally_independent=True,
-        transform=transformations.SoftPlus(scale=hn_scale),
+        transform=transformations.SoftPlus(),
     )
 
     delta_R_0_c = (
@@ -491,14 +493,23 @@ def construct_R_0(name, modelParams, loc, scale, hn_scale):
             conditionally_independent=True,
         )
     ) * R_0_sigma_c[..., tf.newaxis]
+    log.debug(f"delta_R_0_c:\n{delta_R_0_c}")
 
     # Add to trace via deterministic
-    R_0 = R_0_star[..., tf.newaxis] + delta_R_0_c
-    # Softplus because we want to make sure that R_0 > 0.
-    R_0 = 0.1 * tf.math.softplus(10 * R_0)
-    R_0 = yield Deterministic(name=name, value=R_0, shape_label=("country"),)
+    R_0_c = R_0[..., tf.newaxis] + delta_R_0_c
+    log.debug(f"R_0_c before softplus:\n{R_0_c}")
 
-    return tf.repeat(R_0[..., tf.newaxis], repeats=modelParams.num_age_groups, axis=-1)
+    # Softplus because we want to make sure that R_0 > 0.
+    R_0_c = tf.math.softplus(R_0_c)
+    R_0_c = yield Deterministic(name=name, value=R_0_c, shape_label=("country"),)
+    log.debug(f"R_0_c:\n{R_0_c}")
+
+    # for robustness
+    tf.clip_by_value(R_0_c, 1, 5)
+
+    return tf.repeat(
+        R_0_c[..., tf.newaxis], repeats=modelParams.num_age_groups, axis=-1
+    )
 
 
 def construct_R_0_old(name, modelParams, mean, beta):

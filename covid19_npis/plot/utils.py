@@ -79,13 +79,15 @@ def get_math_from_name(name):
         "g_theta": r"g_{\theta}",
         "E_0_diff_base": r"E_{0,diff base}",
         "R_0": r"R_{0}",
+        "R_0_c": r"R_{0, c}",
         "sigma": r"\sigma",
         "new_cases": r"N",
         "R_t": r"R_{t}",
         "alpha_i_c_a": r"\alpha_{i,c,a}",
         "d_i_c_p": r"d_{i,c,p}",
         "l_i_sign": r"l_{i,sign(\Delta\gamma)}",
-        "C": r"C",
+        "C": r"C_c",
+        "C_mean": "C",
     }
 
     if name not in math_keys:

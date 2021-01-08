@@ -86,9 +86,7 @@ def weekly_modulation(name, modelParams, cases):
     f = (1 - weight) * (
         1
         - tf.math.abs(
-            tf.math.sin(
-                tf.reshape(t, (1, -1, 1, 1)) / 7 * tf.constant(np.pi) + offset / 2
-            )
+            tf.math.sin(tf.reshape(t, (-1, 1, 1)) / 7 * tf.constant(np.pi) + offset / 2)
         )
     )
     # modulation factor
@@ -192,7 +190,7 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
     """ # Postive tests
     """
     phi_age = yield _construct_phi_age(name="phi_age", modelParams=modelParams)
-    phi_age = tf.debugging.check_numerics(phi_age, f"phi_age:\n{phi_age}")
+    # phi_age = tf.debugging.check_numerics(phi_age, f"phi_age:\n{phi_age}")
 
     positive_tests = _calc_positive_tests(
         new_E_t_delayed=new_E_t_delayed, phi_plus=phi_t, phi_age=phi_age,
@@ -377,13 +375,16 @@ def _construct_phi_tests_reported(
     mu = yield Normal(
         name=f"{name}_mu", loc=mu_loc, scale=mu_scale, conditionally_independent=True,
     )
-    phi_dagger = yield Normal(
-        name=f"{name}_dagger",
-        loc=mu,
-        scale=sigma,
-        event_stack=modelParams.num_countries,
-        shape_label="country",
-    )
+    phi_dagger = (
+        yield Normal(
+            name=f"{name}_dagger",
+            loc=0,
+            scale=1,
+            event_stack=modelParams.num_countries,
+            shape_label="country",
+            conditionally_independent=True,
+        )
+    ) * sigma[..., tf.newaxis] + mu[..., tf.newaxis]
 
     phi = yield Deterministic(
         name=name, value=tf.math.sigmoid(phi_dagger), shape_label="country"
@@ -824,13 +825,25 @@ def construct_testing_state(
     mu = yield Deterministic(
         name=f"mu_testing_state", value=mu, shape_label=("variable"),
     )
-    state = yield MvNormalCholesky(
-        name="testing_MvNormalCholesky",
-        loc=mu,
-        scale_tril=Sigma,
-        validate_args=True,
-        event_stack=(modelParams.num_countries, num_knots),
-        shape_label=("country", "spline"),
+
+    # To avoid funnels in the likelihood, non-hierarchical implementation of the
+    # multivariate normal distribution:
+    state = (
+        tf.linalg.matvec(
+            Sigma[..., tf.newaxis, tf.newaxis, :, :],
+            (
+                yield MvNormalCholesky(
+                    name="testing_MvNormalCholesky",
+                    loc=0,
+                    scale_tril=tf.eye(4),
+                    validate_args=True,
+                    event_stack=(modelParams.num_countries, num_knots),
+                    shape_label=("country", "spline"),
+                    conditionally_indepedent=True,
+                )
+            ),
+        )
+        + mu[..., tf.newaxis, tf.newaxis, :]
     )
     log.debug(f"state:\n{state}")
 

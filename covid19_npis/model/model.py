@@ -33,13 +33,12 @@ def main_model(modelParams):
     The returned R_0 tensor has the |shape| batch, country, age_group.
     """
     R_0 = yield reproduction_number.construct_R_0(
-        name="R_0",
+        name="R_0_c",
         modelParams=modelParams,
         loc=3.3,
         scale=0.5,
         hn_scale=0.3,  # Scale parameter of HalfNormal for each country
     )
-    log.debug(f"R_0:\n{R_0}")
 
     """ # Create time dependent reproduction number R(t):
     Create interventions and change points from model parameters and initial reproduction number.

@@ -5,6 +5,12 @@
 
 Welcome to COVID-19 NPIS's documentation!
 =========================================
+
+.. figure:: doc/logo.png
+   :alt: Logo
+   :align: right
+   :scale: 40 %
+
 .. toctree::
     :hidden:
 

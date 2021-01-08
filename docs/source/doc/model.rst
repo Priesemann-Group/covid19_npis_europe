@@ -13,7 +13,7 @@ Disease spread
 
 .. autofunction:: covid19_npis.model.disease_spread.construct_generation_interval
 
-.. autofunction:: covid19_npis.model.disease_spread.construct_h_0_t
+.. autofunction:: covid19_npis.model.disease_spread.construct_E_0_t
 
 .. autofunction:: covid19_npis.model.disease_spread.construct_delay_kernel
 

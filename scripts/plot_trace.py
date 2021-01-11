@@ -6,7 +6,7 @@
 #
 # @Author:        Sebastian B. Mohr
 # @Created:       2020-12-18 14:40:45
-# @Last Modified: 2021-01-06 11:44:15
+# @Last Modified: 2021-01-11 18:20:58
 # ------------------------------------------------------------------------------ #
 
 # Get trace fp
@@ -21,7 +21,7 @@ from tqdm.auto import tqdm
 try:
     import covid19_npis
 except Exception as e:
-    sys.path.append("../")
+    sys.path.append("../../")
     import covid19_npis
 
 log = logging.getLogger(__name__)

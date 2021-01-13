@@ -27,7 +27,7 @@ jobs:
           # `git@github.com:` are converted to HTTPS.
           #
           # Default: false
-          submodules: ''
+          submodules: 'recursive'
       
       # Setup python environment
       - name: Set up Python 3.8
@@ -37,10 +37,13 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
   run:
+    needs: [setup]
     runs-on: irazu
     steps:
       - name: Data retrieval
         working-directory: ./scripts/data_generators
         run: python Germany_bundesländer.py
-        
+      - name: Model run & Plots
+        working-directory: ./scripts
+        run: python dummy_model.py
         

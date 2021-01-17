@@ -1,4 +1,4 @@
-git+git://github.com/jdehning/pymc4.git@9a33b7efcca679d72639db591ca1beafb4ff4d68
+git+git://github.com/jdehning/pymc4.git@8ead79e9ed9e566b2bd4c224b636fed8f4eef4f7
 git+git://github.com/psf/black@19.10b0
 pre-commit
 numpy

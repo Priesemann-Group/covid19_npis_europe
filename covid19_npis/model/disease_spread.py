@@ -452,7 +452,7 @@ def construct_C(
                 Base_C + Delta_C_age, modelParams.num_age_groups
             )
         ),
-        shape_label=("age_group_i", "age_group_j"),
+        shape_label=(None, "age_group_i", "age_group_j"),
     )
     return C_matrix
 

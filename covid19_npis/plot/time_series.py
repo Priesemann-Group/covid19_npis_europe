@@ -17,8 +17,122 @@ from scipy import stats
 import locale
 
 import logging
+import os
 
 log = logging.getLogger(__name__)
+
+
+def timeseries_new(
+    trace,
+    sample_state,
+    key,
+    sampling_type="posterior",
+    plot_observed=False,
+    plot_chain_separated=False,
+    dir_save=None,
+):
+    """
+    High level plotting fucntion to create time series for a a give variable,
+    i.e. plot for every additional dimension.
+    Can only be done for variables with a time or date in shape_labels!
+
+    Parameters
+    ----------
+    trace_posterior, trace_prior : arivz InferenceData
+        Raw data from pymc4 sampling
+
+    sample_state : pymc4 sample stae
+
+    key : str
+        Name of the timeseries variable to plot. Same name as in the model definitions.
+
+    sampling_type: str, optional
+        Name of the type (group) in the arviz inference data. |default| posterior
+
+    plot_observed: bool, optional
+        Do you want to plot the new cases? May not work for 1 and 2 dim case.
+
+    dir_save: str, optional
+        where to save the the figures (expecting a folder). Does not save if None
+        |default| None 
+
+    """
+    log.debug(f"Creating timeseries plot for {key}")
+
+    # Check type of arviz trace
+    types = trace.groups()
+    if sampling_type not in types:
+        raise KeyError("sampling_type '{sampling_type}' not found in trace!")
+
+    # Convert trace to dataframe with index levels and values changed to
+    # values specified in model and modelParams
+    df = data.convert_trace_to_dataframe(trace, sample_state, key)
+
+    # Sanity check for "time" or "date" in index
+    if ("time" not in df.index.names) and ("date" not in df.index.names):
+        raise ValueError(
+            "No time or date found in variable dimensions!\n (Is the distribution shape_label set?!)"
+        )
+
+    # Drop chains dimension if seperated!
+    if not plot_chain_separated:
+        df.index = df.index.droplevel("chain")
+
+    # Drop the number of draws
+    # df.index = df.index.droplevel("draw")
+
+    # Define recursive plotting fuction
+    axes = {}
+
+    def recursive_plot(df, name_str):
+        """
+        Every call of this function reduces dimensions by one
+        """
+
+        # We start x function calls depending on the number of dimensions, going from
+        # left to right i.e. country than agegroup
+        if len(df.index.names) > 1:
+
+            # Iterate over all levels expect time
+            levels = df.index.names
+            for lev in levels:
+                if lev == "time":
+                    continue
+                if lev == "draw":
+                    continue
+
+                # Iterate over all level values
+                for i, value in enumerate(df.index.get_level_values(lev).unique()):
+                    # create new dataframe for next recursion
+                    df_t = df.xs(value, level=lev)
+                    recursive_plot(df_t, name_str + "_" + value)
+
+                return  # Stop theses recursions
+
+        # Create pivot table i.e. time on index and draw on columns
+        df = df.reset_index().pivot_table(index="time", columns="draw")
+
+        # Remove "_" from name
+        name_str = name_str[1:]
+
+        # Plot this dimension!
+        axes[name_str] = _timeseries(df.index, df.to_numpy(), what="model",)
+
+    recursive_plot(df, "")
+
+    if dir_save is not None:
+        if not os.path.exists(dir_save):
+            os.makedirs(dir_save)
+        if not os.path.exists(dir_save + f"/{key}"):
+            os.makedirs(dir_save + f"/{key}")
+        for name, ax in axes.items():
+            fig = ax.get_figure()
+            plt.tight_layout()
+            fig.savefig(
+                f"{dir_save}/{key}/{name}", transparent=True, dpi=300,
+            )
+
+    return axes
 
 
 def timeseries(
@@ -30,13 +144,13 @@ def timeseries(
 
     Parameters
     ----------
-    trace_posterior,trace_prior : arivz InferenceData
+    trace_posterior, trace_prior : arivz InferenceData
         Raw data from pymc4 sampling
 
     sample_state : pymc4 sample stae
 
     key : str
-        Name of the variable/distribution to plot. Must be the same as defined in the model.
+        Name of the timeseries variable to plot. Same name as in the model definitions.
 
     plot_observed: bool, optional
         Do you want to plot the new cases? May not work for 1 and 2 dim case.
@@ -253,7 +367,7 @@ def _timeseries(
         draw_ci_50 = rcParams["draw_ci_50"]
 
     if ax is None:
-        figure, ax = plt.subplots(figsize=(3, 1.5))
+        figure, ax = plt.subplots(figsize=(6, 4))
 
     # still need to fix the last dimension being one
     # if x.shape[0] != y.shape[-1]:

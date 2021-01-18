@@ -341,7 +341,9 @@ if __name__ == "__main__":
         header=1,
         encoding="ISO-8859-1",
     )
-    df["Date"] = pd.to_datetime(df["Date"], format="%d.%m.%Y")
+    df["Date"] = pd.to_datetime(df["Date"], format="%d.%m.%Y", errors="coerce").fillna(
+        pd.to_datetime(df["Date"], format="%d.%m%Y", errors="coerce")
+    )
     # Set index of dataframe
     df = df.set_index(
         [

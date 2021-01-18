@@ -50,7 +50,7 @@ def population(ID, path, pop_total):
         for each age group to increase the resolution
     """
     pop_raw = pd.read_csv(
-        "../data/raw/12411-0017.csv",
+        "../../data/raw/12411-0017.csv",
         encoding="cp1252",
         header=5,
         delimiter=";",
@@ -145,7 +145,7 @@ def deaths(ID, data_begin, data_end, path):
         path :str-like
 
     """
-    deaths = pd.read_csv("../data/raw/DeathsRKI.csv")
+    deaths = pd.read_csv("../../data/raw/DeathsRKI.csv")
     deaths["TodesMeldedatum"] = pd.to_datetime(
         deaths["TodesMeldedatum"], format="%Y-%m-%d"
     )
@@ -263,7 +263,7 @@ def cases(ID, data_begin, data_end, rki, path):
 
 
 def get_all_ids():
-    deaths = pd.read_csv("../data/raw/DeathsRKI.csv")
+    deaths = pd.read_csv("../../data/raw/DeathsRKI.csv")
     deaths["IdLandkreis"] = deaths["IdLandkreis"].astype("int64").astype("str")
     return deaths["IdLandkreis"].unique()
 
@@ -273,7 +273,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------------------ #
     # Configuration
     # ------------------------------------------------------------------------------ #
-    path = "../data/Germany_landkreise/"
+    path = "../../data/Germany_landkreise/"
     data_begin = datetime.datetime(2020, 4, 20)
     data_end = datetime.datetime(2020, 12, 27)
     policies = [
@@ -292,10 +292,10 @@ if __name__ == "__main__":
     f_path = download_and_save_file(
         url="https://population.un.org/wpp/Download/Files/1_Indicators%20(Standard)/CSV_FILES/WPP2019_PopulationBySingleAgeSex_1950-2019.csv",
         f_name="WPP2019_PopulationBySingleAgeSex_1950-2019.csv",
-        path="../data/raw/",
+        path="../../data/raw/",
     )
     pop_total = pd.read_csv(
-        "../data/raw/WPP2019_PopulationBySingleAgeSex_1950-2019.csv"
+        "../../data/raw/WPP2019_PopulationBySingleAgeSex_1950-2019.csv"
     )
     pop_total = pop_total.loc[pop_total["Location"] == "Germany"]
     pop_total = pop_total.loc[pop_total["Time"] == 2019]

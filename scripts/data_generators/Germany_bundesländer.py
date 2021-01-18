@@ -29,7 +29,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------------------ #
     # Configuration
     # ------------------------------------------------------------------------------ #
-    path = "../data/Germany_bundesländer/"
+    path = "../../data/Germany_bundesländer/"
     data_begin = datetime.datetime(2020, 4, 20)
     data_end = datetime.datetime(2020, 12, 27)
     policies = [
@@ -48,10 +48,10 @@ if __name__ == "__main__":
     f_path = download_and_save_file(
         url="https://population.un.org/wpp/Download/Files/1_Indicators%20(Standard)/CSV_FILES/WPP2019_PopulationBySingleAgeSex_1950-2019.csv",
         f_name="WPP2019_PopulationBySingleAgeSex_1950-2019.csv",
-        path="../data/raw/",
+        path="../../data/raw/",
     )
     pop_total = pd.read_csv(
-        "../data/raw/WPP2019_PopulationBySingleAgeSex_1950-2019.csv"
+        "../../data/raw/WPP2019_PopulationBySingleAgeSex_1950-2019.csv"
     )
     pop_total = pop_total.loc[pop_total["Location"] == "Germany"]
     pop_total = pop_total.loc[pop_total["Time"] == 2019]

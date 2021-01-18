@@ -1,12 +1,13 @@
 import requests
 import datetime
-import os
+import os, sys
 import zipfile
 import pandas as pd
 import sys
 import logging
 import json
 from tqdm import tqdm
+
 
 try:
     import covid19_inference as cov19
@@ -278,7 +279,7 @@ def align_age_groups(country):
 
 
 def download_and_save_file(
-    url, f_name, path="../data/download/", timestamp=False, overwrite=False,
+    url, f_name, path="../../data/download/", timestamp=False, overwrite=False,
 ):
     """
     Downloads a file and saves it to a path
@@ -326,16 +327,19 @@ if __name__ == "__main__":
     f_path = download_and_save_file(
         url="https://osf.io/9dsfk/download/",
         f_name="CoverAgeDB.zip",
-        path="../data/raw/coverage_db/",
+        path="../../data/raw/coverage_db/",
         timestamp=True,
     )
     # Unzip file and load it
     with zipfile.ZipFile(f_path, "r") as zip_ref:
-        zip_ref.extractall("../data/raw/coverage_db/")
+        zip_ref.extractall("../../data/raw/coverage_db/")
 
     # Open file csv
     df = pd.read_csv(
-        "../data/raw/coverage_db/Data/inputDB.csv", low_memory=False, header=1
+        "../../data/raw/coverage_db/Data/inputDB.csv",
+        low_memory=False,
+        header=1,
+        encoding="ISO-8859-1",
     )
     df["Date"] = pd.to_datetime(df["Date"], format="%d.%m.%Y")
     # Set index of dataframe
@@ -357,7 +361,7 @@ if __name__ == "__main__":
     f_path = download_and_save_file(
         url="https://population.un.org/wpp/Download/Files/1_Indicators%20(Standard)/CSV_FILES/WPP2019_PopulationBySingleAgeSex_1950-2019.csv",
         f_name="WPP2019_PopulationBySingleAgeSex_1950-2019.csv",
-        path="../data/raw/",
+        path="../../data/raw/",
     )
     pop = pd.read_csv(f_path)
 
@@ -372,7 +376,7 @@ if __name__ == "__main__":
     # Preprocess data and save it to path
     # ------------------------------------------------------------------------------ #
     # For each country select data and save it
-    path = "../data/coverage_db/"
+    path = "../../data/coverage_db/"
     data_begin = datetime.datetime(2020, 3, 2)
     data_end = datetime.datetime(2020, 8, 15)
     countries = [

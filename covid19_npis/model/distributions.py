@@ -44,12 +44,14 @@ class DistributionAdditions:
     """
 
     def __init__(self, *args, **kwargs):
+        kwargs["validate_args"] = False
         if "shape_label" in kwargs:
             self.shape_label = kwargs.get("shape_label")
             event_ndim = len(self.shape_label)
             del kwargs["shape_label"]
 
         super().__init__(*args, **kwargs)
+        """
         if "loc" in kwargs and tf.is_tensor(kwargs.get("loc")):
             tf.debugging.check_numerics(
                 kwargs.get("loc"), f"loc not finite in {self.name}"
@@ -58,9 +60,10 @@ class DistributionAdditions:
             tf.debugging.check_numerics(
                 kwargs.get("scale"), f"scale not finite in {self.name}"
             )
+        """
 
     def log_prob(self, value):
-        tf.debugging.check_numerics(value, f"not finite value in {self.name}")
+        # tf.debugging.check_numerics(value, f"not finite value in {self.name}")
         return super().log_prob(value)
 
 
@@ -91,6 +94,7 @@ def other_init(self, *args, **kwargs):
 
 
 def init_with_softplus_transform(self, *args, **kwargs):
+    kwargs["validate_args"] = False
     if "transform" not in kwargs.keys():
         kwargs["transform"] = transformations.SoftPlus()
     super(self.__class__, self).__init__(*args, **kwargs)

@@ -45,7 +45,7 @@ def get_data(country, measure, data_begin, data_end):
     measure: str
         Name of the measure i.e. "Cases", "Tests", "Deaths"
     """
-
+    measure_name = measure
     # Get country
     data = df.xs(country, level="Country")
 
@@ -55,8 +55,13 @@ def get_data(country, measure, data_begin, data_end):
     # Select measure cases
     measure = data.xs(measure, level="Measure")
 
-    # Select male and female
     measure = measure.reset_index()
+    # Drop bad values i.e. TOT and UKN
+    i = measure[measure["Age"] == "TOT"].index
+    measure = measure.drop(i)
+    i = measure[measure["Age"] == "UKN"].index
+    measure = measure.drop(i)
+    # Select male and female
     if "b" in measure["Sex"]:
         measure = measure[measure["Sex"] == "b"]
 
@@ -217,6 +222,11 @@ def align_age_groups(country):
             df["age_group_1"] = cases["30-39"] + cases["40-49"] + cases["50-59"]
             df["age_group_2"] = cases["60-69"] + cases["70-79"]
             df["age_group_3"] = cases["80-89"] + cases["90-104"]
+        elif country == "Spain":
+            df["age_group_0"] = cases["0-9"] + cases["10-19"] + cases["20-29"]
+            df["age_group_1"] = cases["30-39"] + cases["40-49"] + cases["50-59"]
+            df["age_group_2"] = cases["60-69"] + cases["70-79"]
+            df["age_group_3"] = cases["80-104"]
         else:
             df["age_group_0"] = cases["0-9"] + cases["10-19"] + cases["20-29"]
             df["age_group_1"] = cases["30-39"] + cases["40-49"] + cases["50-59"]
@@ -227,37 +237,42 @@ def align_age_groups(country):
     def helper_deaths(deaths):
         df = pd.DataFrame()
         if country == "Germany":
-            df["age_group_0"] = cases["0-4"] + cases["5-14"] + cases["15-34"]
-            df["age_group_1"] = cases["35-59"]
-            df["age_group_2"] = cases["60-79"]
-            df["age_group_3"] = cases["80-104"]
+            df["age_group_0"] = deaths["0-4"] + deaths["5-14"] + deaths["15-34"]
+            df["age_group_1"] = deaths["35-59"]
+            df["age_group_2"] = deaths["60-79"]
+            df["age_group_3"] = deaths["80-104"]
         elif country == "Belgium":
             df["age_group_0"] = deaths["0-24"]
             df["age_group_1"] = deaths["25-44"] + deaths["45-64"]
             df["age_group_2"] = deaths["65-74"] + deaths["75-84"]
             df["age_group_3"] = deaths["85-104"]
         elif country in ["Switzerland", "Romania", "Portugal", "Finland"]:
-            df["age_group_0"] = cases["0-9"] + cases["10-19"] + cases["20-29"]
-            df["age_group_1"] = cases["30-39"] + cases["40-49"] + cases["50-59"]
-            df["age_group_2"] = cases["60-69"] + cases["70-79"]
-            df["age_group_3"] = cases["80-104"]
+            df["age_group_0"] = deaths["0-9"] + deaths["10-19"] + deaths["20-29"]
+            df["age_group_1"] = deaths["30-39"] + deaths["40-49"] + deaths["50-59"]
+            df["age_group_2"] = deaths["60-69"] + deaths["70-79"]
+            df["age_group_3"] = deaths["80-104"]
         elif country == "Greece":
-            df["age_group_0"] = cases["0-17"]
-            df["age_group_1"] = cases["18-39"]
-            df["age_group_2"] = cases["40-64"]
-            df["age_group_3"] = cases["65-104"]
+            df["age_group_0"] = deaths["0-17"]
+            df["age_group_1"] = deaths["18-39"]
+            df["age_group_2"] = deaths["40-64"]
+            df["age_group_3"] = deaths["65-104"]
         elif country == "Czechia":
-            df["age_group_0"] = cases[[str(x) for x in range(0, 29)]].sum(axis=1)
-            df["age_group_1"] = cases[[str(x) for x in range(30, 59)]].sum(axis=1)
-            df["age_group_2"] = cases[[str(x) for x in range(60, 79)]].sum(axis=1)
-            df["age_group_3"] = cases[
-                [str(x) for x in range(80, 120) if str(x) in cases.keys()]
+            df["age_group_0"] = deaths[[str(x) for x in range(0, 29)]].sum(axis=1)
+            df["age_group_1"] = deaths[[str(x) for x in range(30, 59)]].sum(axis=1)
+            df["age_group_2"] = deaths[[str(x) for x in range(60, 79)]].sum(axis=1)
+            df["age_group_3"] = deaths[
+                [str(x) for x in range(80, 120) if str(x) in deaths.keys()]
             ].sum(axis=1)
         elif country == "Bulgaria":
-            df["age_group_0"] = cases["0-19"] + cases["20-29"]
-            df["age_group_1"] = cases["30-39"] + cases["40-49"] + cases["50-59"]
-            df["age_group_2"] = cases["60-69"] + cases["70-79"]
-            df["age_group_3"] = cases["80-89"] + cases["90-104"]
+            df["age_group_0"] = deaths["0-19"] + deaths["20-29"]
+            df["age_group_1"] = deaths["30-39"] + deaths["40-49"] + deaths["50-59"]
+            df["age_group_2"] = deaths["60-69"] + deaths["70-79"]
+            df["age_group_3"] = deaths["80-89"] + deaths["90-104"]
+        elif country == "Spain":
+            df["age_group_0"] = deaths["0-9"] + deaths["10-19"] + deaths["20-29"]
+            df["age_group_1"] = deaths["30-39"] + deaths["40-49"] + deaths["50-59"]
+            df["age_group_2"] = deaths["60-69"] + deaths["70-79"]
+            df["age_group_3"] = deaths["80-104"]
         else:
             df["age_group_0"] = deaths["0-9"] + deaths["10-19"] + deaths["20-29"]
             df["age_group_1"] = deaths["30-39"] + deaths["40-49"] + deaths["50-59"]

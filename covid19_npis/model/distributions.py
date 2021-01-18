@@ -44,7 +44,7 @@ class DistributionAdditions:
     """
 
     def __init__(self, *args, **kwargs):
-        kwargs["validate_args"] = False
+        # kwargs["validate_args"] = False
         if "shape_label" in kwargs:
             self.shape_label = kwargs.get("shape_label")
             event_ndim = len(self.shape_label)

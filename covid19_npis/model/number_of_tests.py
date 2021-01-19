@@ -839,7 +839,7 @@ def construct_testing_state(
                     validate_args=True,
                     event_stack=(modelParams.num_countries, num_knots),
                     shape_label=("country", "spline"),
-                    conditionally_indepedent=True,
+                    conditionally_independent=True,
                 )
             ),
         )

@@ -59,7 +59,11 @@ def timeseries(
 
     dir_save: str, optional
         where to save the the figures (expecting a folder). Does not save if None
-        |default| None 
+        |default| None
+
+    observed: pd.DataFrame, optional
+        modelParams dataframe for the corresponding observed values for the
+        variable e.g. modelParams.pos_tests_dataframe
     """
     log.debug(f"Creating timeseries plot for {key}")
 
@@ -88,7 +92,7 @@ def timeseries(
     # Define recursive plotting fuction
     axes = {}
 
-    def recursive_plot(df, name_str):
+    def recursive_plot(df, name_str, observed=None):
         """
         Every call of this function reduces dimensions by one if
         plot age_groups_together is defined it skips agegroup
@@ -113,7 +117,10 @@ def timeseries(
                 for i, value in enumerate(df.index.get_level_values(lev).unique()):
                     # create new dataframe for next recursion
                     df_t = df.xs(value, level=lev)
-                    recursive_plot(df_t, name_str + "_" + value)
+                    if observed is not None:
+                        # I hope the dataframes have the same format
+                        _observed = observed.xs(value, level=lev, axis=1)
+                    recursive_plot(df_t, name_str + "_" + value, _observed)
 
                 return  # Stop theses recursions
 
@@ -133,23 +140,33 @@ def timeseries(
                 # Create pivot table i.e. time on index and draw on columns
                 temp = temp.reset_index().pivot_table(index="time", columns="draw")
 
-                # Plot this dimension!
+                # Plot data
                 _timeseries(temp.index, temp.to_numpy(), what="model", ax=a_axes[i])
 
+                # Plot observed
+                if observed is not None:
+                    _timeseries(
+                        observed.index, observed.to_numpy(), what="data", ax=a_axes[i]
+                    )
                 # Set title for axis
                 a_axes[i].set_title(ag)
 
             axes[name_str] = a_axes
-            return
+        else:
 
-        # Create pivot table i.e. time on index and draw on columns
-        df = df.reset_index().pivot_table(index="time", columns="draw")
+            # Create pivot table i.e. time on index and draw on columns
+            df = df.reset_index().pivot_table(index="time", columns="draw")
 
-        # Plot this dimension!
-        axes[name_str] = _timeseries(df.index, df.to_numpy(), what="model",)
-        axes[name_str].set_title(name_str.replace("_", " "))
+            # Plot this dimension!
+            axes[name_str] = _timeseries(df.index, df.to_numpy(), what="model",)
+            # Plot observed
+            if observed is not None:
+                _timeseries(
+                    observed.index, observed.to_numpy(), what="data", ax=axes[name_str]
+                )
+            axes[name_str].set_title(name_str.replace("_", " "))
 
-    recursive_plot(df, "")
+    recursive_plot(df, "", observed)
 
     # Create figure supertitle with key and dimensions
     for name, ax in axes.items():
@@ -159,7 +176,7 @@ def timeseries(
             fig = ax.get_figure()
         fig.suptitle(
             f"{key.replace('_', ' ')}:\n{name}",
-            verticalalignment="center",
+            verticalalignment="top",
             fontweight="bold",
         )
 

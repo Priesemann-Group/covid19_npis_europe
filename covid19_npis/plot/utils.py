@@ -2,7 +2,7 @@
 # @Author:        Sebastian B. Mohr
 # @Email:
 # @Created:       2020-08-17 10:35:59
-# @Last Modified: 2021-01-06 11:48:34
+# @Last Modified: 2021-01-19 16:20:40
 # ------------------------------------------------------------------------------ #
 
 import logging
@@ -97,3 +97,15 @@ def get_math_from_name(name):
         return name
     else:
         return math_keys[name]
+
+
+def number_formatter(number, pos=None):
+    """
+    Converts number to magnitude format
+    Taken from https://flynn.gg/blog/better-matplotlib-charts/
+    """
+    magnitude = 0
+    while abs(number) >= 1000:
+        magnitude += 1
+        number /= 1000.0
+    return "%.1f%s" % (number, ["", "K", "M", "B", "T", "Q"][magnitude])

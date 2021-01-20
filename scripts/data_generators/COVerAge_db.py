@@ -222,11 +222,23 @@ def align_age_groups(country):
             df["age_group_1"] = cases["30-39"] + cases["40-49"] + cases["50-59"]
             df["age_group_2"] = cases["60-69"] + cases["70-79"]
             df["age_group_3"] = cases["80-89"] + cases["90-104"]
-        elif country == "Spain":
+        elif country in ["Spain", "Ireland"]:
             df["age_group_0"] = cases["0-9"] + cases["10-19"] + cases["20-29"]
             df["age_group_1"] = cases["30-39"] + cases["40-49"] + cases["50-59"]
             df["age_group_2"] = cases["60-69"] + cases["70-79"]
             df["age_group_3"] = cases["80-104"]
+        elif country == "Ukraine":
+            df["age_group_0"] = cases["0-17"] + cases["18-29"]
+            df["age_group_1"] = cases["30-49"]
+            df["age_group_2"] = cases["50-69"]
+            df["age_group_3"] = cases["70-104"]
+        elif country == "Slovenia":
+            df["age_group_0"] = (
+                cases["0-4"] + cases["5-14"] + cases["15-24"] + cases["25-34"]
+            )
+            df["age_group_1"] = cases["35-44"] + cases["45-54"] + cases["55-64"]
+            df["age_group_2"] = cases["65-74"] + cases["75-84"]
+            df["age_group_3"] = cases["85-104"]
         else:
             df["age_group_0"] = cases["0-9"] + cases["10-19"] + cases["20-29"]
             df["age_group_1"] = cases["30-39"] + cases["40-49"] + cases["50-59"]
@@ -273,6 +285,18 @@ def align_age_groups(country):
             df["age_group_1"] = deaths["30-39"] + deaths["40-49"] + deaths["50-59"]
             df["age_group_2"] = deaths["60-69"] + deaths["70-79"]
             df["age_group_3"] = deaths["80-104"]
+        elif country == "Ukraine":
+            df["age_group_0"] = deaths["0-17"] + deaths["18-29"]
+            df["age_group_1"] = deaths["30-49"]
+            df["age_group_2"] = deaths["50-69"]
+            df["age_group_3"] = deaths["70-104"]
+        elif country == "Slovenia":
+            df["age_group_0"] = (
+                deaths["0-4"] + deaths["5-14"] + deaths["15-24"] + deaths["25-34"]
+            )
+            df["age_group_1"] = deaths["35-44"] + deaths["45-54"] + deaths["55-64"]
+            df["age_group_2"] = deaths["65-74"] + deaths["75-84"]
+            df["age_group_3"] = deaths["85-104"]
         else:
             df["age_group_0"] = deaths["0-9"] + deaths["10-19"] + deaths["20-29"]
             df["age_group_1"] = deaths["30-39"] + deaths["40-49"] + deaths["50-59"]
@@ -398,9 +422,9 @@ if __name__ == "__main__":
     data_end = datetime.datetime(2020, 8, 15)
     countries = [
         "Germany",
-        # "France",
+        "France",
         "Italy",
-        # "UK",
+        # "United Kingdom", #Somehow no reported cases in daterange
         "Belgium",
         "Denmark",
         "Spain",
@@ -408,12 +432,20 @@ if __name__ == "__main__":
         "Switzerland",
         "Romania",
         "Portugal",
-        # "Norway",
+        "Norway",
         "Netherlands",
         "Greece",
         "Finland",
         "Czechia",
         "Bulgaria",
+        # "Hungary",  # no reported cases in daterange
+        # "Ireland",  # no reported cases in daterange
+        # "Italy", #No cases with age resolution
+        # "Scotland", # no owd data
+        # "Ukraine",
+        # "Turkey",
+        "Slovenia",
+        # "Slovakia",  # no reported cases in daterange
     ]
     policies = [
         "C1_School closing",

@@ -54,9 +54,6 @@ def timeseries(
     sampling_type: str, optional
         Name of the type (group) in the arviz inference data. |default| posterior
 
-    plot_observed: bool, optional
-        Do you want to plot the new cases? May not work for 1 and 2 dim case.
-
     dir_save: str, optional
         where to save the the figures (expecting a folder). Does not save if None
         |default| None
@@ -82,7 +79,7 @@ def timeseries(
             "No time or date found in variable dimensions!\n (Is the distribution shape_label set?!)"
         )
 
-    # Drop chains dimension if seperated!
+    # Drop chains index if seperated!
     if not plot_chain_separated:
         df.index = df.index.droplevel("chain")
 
@@ -120,6 +117,8 @@ def timeseries(
                     if observed is not None:
                         # I hope the dataframes have the same format
                         _observed = observed.xs(value, level=lev, axis=1)
+                    else:
+                        _observed = None
                     recursive_plot(df_t, name_str + "_" + value, _observed)
 
                 return  # Stop theses recursions
@@ -127,7 +126,7 @@ def timeseries(
         # Remove "_" from name
         name_str = name_str[1:]
 
-        if plot_age_groups_together:
+        if plot_age_groups_together and "age_group" in df.index.names:
             fig, a_axes = plt.subplots(
                 len(df.index.get_level_values("age_group").unique()),
                 1,
@@ -164,6 +163,8 @@ def timeseries(
                 _timeseries(
                     observed.index, observed.to_numpy(), what="data", ax=axes[name_str]
                 )
+            else:
+                _observed = None
             axes[name_str].set_title(name_str.replace("_", " "))
 
     recursive_plot(df, "", observed)
@@ -177,7 +178,9 @@ def timeseries(
         fig.suptitle(
             f"{key.replace('_', ' ')}:\n{name}",
             verticalalignment="top",
+            ha="left",
             fontweight="bold",
+            x=0.1,
         )
 
     if dir_save is not None:
@@ -186,7 +189,10 @@ def timeseries(
         if not os.path.exists(dir_save + f"/{key}"):
             os.makedirs(dir_save + f"/{key}")
         for name, ax in tqdm(
-            axes.items(), desc=f"Saving figures to '{dir_save}/{key}'"
+            axes.items(),
+            desc=f"Saving figures to '{dir_save}/{key}'",
+            position=1,
+            leave=False,
         ):
             if type(ax) == np.ndarray:
                 fig = ax[0].get_figure()

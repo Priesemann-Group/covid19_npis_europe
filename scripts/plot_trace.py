@@ -6,7 +6,7 @@
 #
 # @Author:        Sebastian B. Mohr
 # @Created:       2020-12-18 14:40:45
-# @Last Modified: 2021-01-18 17:20:50
+# @Last Modified: 2021-01-20 13:31:22
 # ------------------------------------------------------------------------------ #
 
 # Get trace fp
@@ -164,64 +164,42 @@ if args.timeseries == [""]:
 # ------------------------------------------------------------------------------ #
 
 # Progress bar
-pbar = tqdm(total=len(args.distributions) + len(args.timeseries), desc="Creating plots")
+pbar = tqdm(
+    total=len(args.distributions) + len(args.timeseries),
+    desc="Creating plots",
+    position=0,
+)
 # Timeseries
-ts_fig = {}
 ts_axes = {}
 for ts_name in args.timeseries:
     pbar.set_description(f"Creating plots [{ts_name[0:3]}]")
-    ts_fig[ts_name], ts_axes[ts_name] = covid19_npis.plot.timeseries(
+
+    # Set observed data for plotting
+    if ts_name == "new_E_t" or ts_name == "positive_tests":
+        observed = modelParams.pos_tests_dataframe
+    elif (ts_name == "total_tests_compact") and (
+        modelParams.data_summary["files"]["/tests.csv"]
+    ):
+        observed = modelParams.total_tests_dataframe
+    elif (ts_name == "deaths_compact" or ts_name == "deaths") and (
+        modelParams.data_summary["files"]["/deaths.csv"]
+    ):
+        observed = modelParams.deaths_dataframe
+    else:
+        observed = None
+
+    ts_axes[ts_name] = covid19_npis.plot.timeseries(
         trace,
         sample_state=sample_state,
         key=ts_name,
         plot_chain_separated=args.chains_seperated,
+        observed=observed,
+        dir_save=args.folder,
     )
-    # plot observed data into new_cases i.e. pos tests
-    if ts_name == "new_E_t" or ts_name == "positive_tests":
-        for i, c in enumerate(modelParams.data_summary["countries"]):
-            for j, a in enumerate(modelParams.data_summary["age_groups"]):
-                ts_axes[ts_name][j][i] = covid19_npis.plot.time_series._timeseries(
-                    modelParams.pos_tests_dataframe.index[:],
-                    modelParams.pos_tests_dataframe[c][a],
-                    ax=ts_axes[ts_name][j][i],
-                    alpha=0.5,
-                    ls="-",
-                )
-    # plot observed data into total tests
-    if (ts_name == "total_tests_compact") and (
-        modelParams.data_summary["files"]["/tests.csv"]
-    ):
-        for i, c in enumerate(modelParams.data_summary["countries"]):
-            ts_axes[ts_name][i] = covid19_npis.plot.time_series._timeseries(
-                modelParams.total_tests_dataframe.index[:],
-                modelParams.total_tests_dataframe.xs(c, level="country", axis=1),
-                ax=ts_axes[ts_name][i],
-                alpha=0.5,
-                ls="-",
-            )
 
-    # plot observed data into deaths
-    if ts_name == "deaths_compact" or ts_name == "deaths":
-        for i, c in enumerate(modelParams.data_summary["countries"]):
-            ts_axes[ts_name][i] = covid19_npis.plot.time_series._timeseries(
-                modelParams.deaths_dataframe.index[:],
-                modelParams.deaths_dataframe.xs(c, level="country", axis=1),
-                ax=ts_axes[ts_name][i],
-                alpha=0.5,
-                ls="-",
-            )
-
-    # Save figures
-    for i, fig in enumerate(ts_fig[ts_name]):
-        if len(ts_fig[ts_name]) > 1:
-            subname = f"_{i}"
-        else:
-            subname = ""
-        fig.savefig(
-            f"{args.folder}/ts_{ts_name}" + f"{subname}.png", dpi=300, transparent=True
-        )
-        plt.close(fig)
     pbar.update(1)
+
+
 # Distributions
 dist_fig = {}
 dist_axes = {}

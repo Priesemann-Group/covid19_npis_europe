@@ -125,6 +125,7 @@ HalfCauchy.__init__ = init_with_softplus_transform
 StudentT.__init__ = other_init
 HalfNormal.__init__ = init_with_softplus_transform
 Gamma.__init__ = init_with_softplus_transform
+MvNormalCholesky.__init__ = other_init
 
 
 # Own implementation of  Multivariate Student's t-distribution can be removed as soon as the pymc4

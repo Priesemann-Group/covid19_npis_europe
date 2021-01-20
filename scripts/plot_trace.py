@@ -6,12 +6,15 @@
 #
 # @Author:        Sebastian B. Mohr
 # @Created:       2020-12-18 14:40:45
-# @Last Modified: 2021-01-11 18:20:58
+# @Last Modified: 2021-01-18 17:20:50
 # ------------------------------------------------------------------------------ #
 
 # Get trace fp
 import argparse, os, textwrap, sys, logging
 
+abspath = os.path.abspath(sys.argv[0])
+dname = os.path.dirname(abspath)
+os.chdir(dname)
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 import pymc4 as pm
@@ -21,7 +24,7 @@ from tqdm.auto import tqdm
 try:
     import covid19_npis
 except Exception as e:
-    sys.path.append("../../")
+    sys.path.append("../")
     import covid19_npis
 
 log = logging.getLogger(__name__)
@@ -185,7 +188,9 @@ for ts_name in args.timeseries:
                     ls="-",
                 )
     # plot observed data into total tests
-    if ts_name == "total_tests_compact":
+    if (ts_name == "total_tests_compact") and (
+        modelParams.data_summary["files"]["/tests.csv"]
+    ):
         for i, c in enumerate(modelParams.data_summary["countries"]):
             ts_axes[ts_name][i] = covid19_npis.plot.time_series._timeseries(
                 modelParams.total_tests_dataframe.index[:],

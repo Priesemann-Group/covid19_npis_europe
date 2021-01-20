@@ -143,10 +143,10 @@ num_chains = 4
 
 trace_tuning, trace = pm.sample(
     this_model,
-    num_samples=args.num_samples,
+    num_samples=int(args.num_samples),
     num_samples_binning=10,
     burn_in_min=10,
-    burn_in=args.num_burn_in,
+    burn_in=int(args.num_burn_in),
     use_auto_batching=False,
     num_chains=num_chains,
     xla=False,
@@ -164,10 +164,10 @@ end_time = time.time()
 log.info("running time: {:.1f}s".format(end_time - begin_time))
 
 # We also Sample the prior for the kde in the plots (optional)
-trace_prior = pm.sample_prior_predictive(
-    this_model, sample_shape=(4,), use_auto_batching=False
+"""trace_prior = pm.sample_prior_predictive(
+    this_model, sample_shape=(1000,), use_auto_batching=False
 )
-"""
+
 # Save trace
 name, fpath = covid19_npis.utils.save_trace(
     trace,

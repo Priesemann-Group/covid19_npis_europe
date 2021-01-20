@@ -450,9 +450,9 @@ def construct_C(
         value=tf.nn.softmax(
             _subdiagonal_array_to_matrix(
                 Base_C + Delta_C_age, modelParams.num_age_groups
-            )
+            )[0]
         ),
-        shape_label=(None, "age_group_i", "age_group_j"),
+        shape_label=("age_group_i", "age_group_j"),
     )
     return C_matrix
 

@@ -120,10 +120,12 @@ def print_dist_shapes(st):
         st.discrete_distributions.items(), st.continuous_distributions.items(),
     ):
         if dist.log_prob(st.all_values[name]).shape != (3,):
-            log.warning(dist.log_prob(st.all_values[name]).shape, name)
+            log.warning(
+                f"False shape: {dist.log_prob(st.all_values[name]).shape}, {name}"
+            )
     for p in st.potentials:
         if p.value.shape != (3,):
-            log.warning(p.value.shape, p.name)
+            log.warning(f"False shape: {p.value.shape} {p.name}")
 
 
 _, sample_state = pm.evaluate_model_transformed(this_model, sample_shape=(3,))
@@ -151,6 +153,7 @@ trace_tuning, trace = pm.sample(
     max_tree_depth=4,
     decay_rate=0.75,
     target_accept_prob=0.75,
+    step_size_adaption_per_chain=False
     # num_steps_between_results = 9,
     #    state=pm.evaluate_model_transformed(this_model)[1]
     # sampler_type="nuts",

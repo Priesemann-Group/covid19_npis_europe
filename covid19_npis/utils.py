@@ -1,6 +1,7 @@
 import tensorflow as tf
 import logging
 import datetime
+import os
 
 log = logging.getLogger(__name__)
 
@@ -97,3 +98,80 @@ def load_trace(name, fpath="./"):
         modelParams, trace = pickle.load(f)
 
     return modelParams, trace
+
+
+def save_trace_zarr(
+    trace, modelParams, store=None, name=None, trace_prior=None,
+):
+    """
+    Saves trace using new experimental arviz backend zarr!
+
+    Parameters
+    ----------
+    trace: arviz.InferenceData
+        Trace from a model run.
+    modelParams: modelParams
+        ModelParams for observed data.
+    store: str, optional
+        Filepath i.e. where to save the traces datagroups.
+        |default| "./traces/[TIMESTAMP]"
+    name: str, optional
+        Name of the file using timestapm if none.
+        |default| None
+    trace_prior: arviz.InferenceData, optional
+        Trace from prior sampling. pm.sample_prior_predictive
+    """
+    # This is where the files are stored!
+    if name is None:
+        name = datetime.datetime.now().strftime("%y_%m_%d_%H")
+    if store is None:
+        store = f"./traces/{name}"
+
+    # Additional trace given
+    if trace_prior is not None:
+        trace.extend(trace_prior, join="right")
+
+    # Check if folder exists
+    if not os.path.exists(store):
+        os.makedirs(store)
+    trace.to_zarr(store)
+
+    # Save modelParams
+    import pickle
+
+    pickle.dump(
+        modelParams, open(f"{store}/modelParams.pickle", "wb"),
+    )
+    log.info(f"Saved trace & modelParams in {store}!")
+    return store
+
+
+def load_trace_zarr(store):
+    """
+    Load trace using new experimental arviz backend zarr
+    & modelParams using pickle.
+
+    Parameters
+    ----------
+    store: str
+        Filepath i.e. where to save the traces datagroups or
+        zarr store.
+
+    Returns
+    -------
+    trace: arviz.InferenceData
+        Trace object
+    modelParams: covid19_npis.modelParams.modelParams
+        Modelparams class
+    """
+
+    import arviz, pickle
+
+    # Load trace
+    trace = arviz.InferenceData.from_zarr(store)
+
+    # Load modeParams
+    with open(f"{store}/modelParams.pickle", "rb") as f:
+        modelParams = pickle.load(f)
+
+    return trace, modelParams

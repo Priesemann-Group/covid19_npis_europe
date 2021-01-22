@@ -1,5 +1,9 @@
-git+git://github.com/jdehning/pymc4.git@84009ab84a6ed492d438198575a3276add0bcad1
-git+git://github.com/psf/black@19.10b0
+#Own pymc4 version for progressbar and enhancments PR pending
+git+https://github.com/jdehning/pymc4.git@ec389344e2f78d319cc44797ca4e360677694704
+#Fix black version
+git+https://github.com/psf/black@19.10b0
+# Own arviz version till PR is integrated to vection 0.12.0
+git+https://github.com/semohr/arviz.git
 pre-commit
 numpy
 matplotlib
@@ -7,5 +11,4 @@ pandas
 timerit
 coloredlogs
 tqdm
-arviz>=0.10.0
 xarray

@@ -155,4 +155,7 @@ def main_model(modelParams):
     likelihood = yield studentT_likelihood(
         modelParams, positive_tests, total_tests, deaths_delayed
     )
-    return likelihood
+
+    # Removed return value because it produces strange behaviour in prior predictive
+    # InferecneData
+    # return likelihood

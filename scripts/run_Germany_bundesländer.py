@@ -169,11 +169,10 @@ trace_prior = pm.sample_prior_predictive(
 )
 
 # Save trace
-name, fpath = covid19_npis.utils.save_trace(
+store = covid19_npis.utils.save_trace_zarr(
     trace,
     modelParams,
-    fpath=os.path.dirname(args.fp_trace),
-    name=os.path.basename(args.fp_trace),
+    store=f"{os.path.dirname(args.fp_trace)}/{os.path.basename(args.fp_trace)}",
     trace_prior=trace_prior,
 )
 
@@ -181,10 +180,11 @@ name, fpath = covid19_npis.utils.save_trace(
 # ------------------------------------------------------------------------------ #
 # 5. Plotting
 # ------------------------------------------------------------------------------ #
-
+"""
 if args.plots:
     # Run plotting script
     path = os.path.abspath(f"{fpath}/{name}")
     os.system(f"python plot_trace.py {path}")
 else:
     log.info("Plotting skipped!")
+"""

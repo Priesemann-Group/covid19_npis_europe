@@ -145,3 +145,4 @@ scripts/figures/*/*.png
 scripts/figures/*.png
 # traces
 *.h5
+scripts/traces/*

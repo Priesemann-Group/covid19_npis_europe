@@ -439,7 +439,7 @@ def construct_C(
     C_matrix_transformed = _subdiagonal_array_to_matrix(
         C_array, modelParams.num_age_groups
     )
-    C_matrix = tf.nn.softmax(C_matrix_transformed)
+    C_matrix = tf.nn.softmax(C_matrix_transformed, axis=-1)
     C_matrix = yield Deterministic(
         name=f"{name}",
         value=C_matrix,
@@ -450,7 +450,8 @@ def construct_C(
         value=tf.nn.softmax(
             _subdiagonal_array_to_matrix(
                 Base_C + Delta_C_age, modelParams.num_age_groups
-            )[0]
+            )[..., 0, :, :],
+            axis=-1,
         ),
         shape_label=("age_group_i", "age_group_j"),
     )

@@ -303,6 +303,12 @@ def construct_R_t(name, modelParams, R_0):
         alpha_cross_i = yield distributions["alpha_cross_i"]
         # Add all together, dimensions are defined in _create_distributions
         alpha_cross_i_c_a = alpha_cross_i + delta_alpha_cross_c + delta_alpha_cross_a
+        yield Deterministic(
+            name="alpha_i_a",
+            value=tf.math.sigmoid(alpha_cross_i + delta_alpha_cross_a)[..., :, 0, :],
+            shape_label=("intervention", "age_group"),
+        )
+
         return tf.math.sigmoid(alpha_cross_i_c_a)
 
     alpha_i_c_a = yield Deterministic(

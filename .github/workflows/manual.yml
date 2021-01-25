@@ -4,8 +4,21 @@ name: Manual model run
 
 # Controls when the action will run. Workflow runs when manually triggered using the UI
 # or API.
-on: [workflow_dispatch]
-
+on: 
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'
+        required: true
+        default: "INFO"
+      samples:
+        description: 'Number of samples to draw'
+        required: true
+        default: 1000
+      burn_in:
+        description: 'Number of burn in steps'
+        required: true
+        default: 1000
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -45,5 +58,5 @@ jobs:
         run: python Germany_bundesländer.py
       - name: Model run & Plots
         working-directory: ./scripts
-        run: python dummy_model.py
+        run: python run_Germany_bundesländer.py --samples ${{ github.event.inputs.samples }} --burn_in ${{ github.event.inputs.burn_in }} --verbosity ${{ github.event.inputs.logLevel }}
         

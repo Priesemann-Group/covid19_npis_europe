@@ -2,27 +2,29 @@
 # @Author:        Sebastian B. Mohr
 # @Email:
 # @Created:       2020-08-17 10:35:59
-# @Last Modified: 2021-01-19 16:20:40
+# @Last Modified: 2021-01-26 23:01:47
 # ------------------------------------------------------------------------------ #
 
 import logging
 import json
+
+from .. import data
 
 log = logging.getLogger(__name__)
 
 
 def get_model_name_from_sample_state(sample_state):
     dists = list(sample_state.continuous_distributions.items())
-    model_name, dist_name = dists[0][0].split("/")
+    model_name, dist_name = dists[0][0].split("|")
     return model_name
 
 
 def get_dist_by_name_from_sample_state(sample_state, name):
     model_name = get_model_name_from_sample_state(sample_state)
     try:
-        dist = sample_state.continuous_distributions[model_name + "/" + name]
+        dist = sample_state.continuous_distributions[model_name + "|" + name]
     except Exception as e:
-        dist = sample_state.deterministics[model_name + "/" + name]
+        dist = sample_state.deterministics[model_name + "|" + name]
     return dist
 
 
@@ -109,3 +111,31 @@ def number_formatter(number, pos=None):
         magnitude += 1
         number /= 1000.0
     return "%.1f%s" % (number, ["", "K", "M", "B", "T", "Q"][magnitude])
+
+
+def get_posterior_prior_from_trace(trace, sample_state, key, drop_chain_draw=False):
+    """ Returns prior posterior tuple is None if not found in trace
+    """
+
+    # Detect datatype
+    if "posterior" in trace.groups():
+        posterior = data.convert_trace_to_dataframe(
+            trace, sample_state, key, data_type="posterior"
+        )
+        if drop_chain_draw:
+            posterior.index = posterior.index.droplevel("chain")
+            posterior.index = posterior.index.droplevel("draw")
+    else:
+        posterior = None
+
+    if "prior_predictive" in trace.groups():
+        prior = data.convert_trace_to_dataframe(
+            trace, sample_state, key, data_type="prior_predictive"
+        )
+        if drop_chain_draw:
+            prior.index = prior.index.droplevel("chain")
+            prior.index = prior.index.droplevel("draw")
+    else:
+        prior = None
+
+    return (posterior, prior)

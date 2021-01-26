@@ -169,12 +169,14 @@ trace_prior = pm.sample_prior_predictive(
 )
 
 # Save trace
+"""
 store = covid19_npis.utils.save_trace_zarr(
     trace,
     modelParams,
     store=f"{os.path.dirname(args.fp_trace)}/{os.path.basename(args.fp_trace)}",
     trace_prior=trace_prior,
 )
+"""
 
 
 # ------------------------------------------------------------------------------ #

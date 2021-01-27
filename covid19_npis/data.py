@@ -103,28 +103,28 @@ def convert_trace_to_dataframe(trace, sample_state, key, data_type=None):
 
     # Get model and var names a bit hacky but works
     for var in data:
-        model_name, var_name = var.split("/")
+        model_name, var_name = var.split("|")
         break
 
     # Check key value
     dists_and_determs = [
-        dist.split("/")[1] for dist in sample_state.continuous_distributions
+        dist.split("|")[1] for dist in sample_state.continuous_distributions
     ]
     for deter in sample_state.deterministics:
-        dists_and_determs.append(deter.split("/")[1])
+        dists_and_determs.append(deter.split("|")[1])
 
     assert key in dists_and_determs, f"Key '{key}' not found! Check for typos."
 
     # Get distribution
     try:
-        dist = sample_state.continuous_distributions[model_name + "/" + key]
+        dist = sample_state.continuous_distributions[model_name + "|" + key]
     except Exception as e:
-        dist = sample_state.deterministics[model_name + "/" + key]
+        dist = sample_state.deterministics[model_name + "|" + key]
 
     # Check if it has shape and shape_label
     check_for_shape_label(dist)
     # convert to dataframe
-    df = data[f"{model_name}/{dist.name}"].to_dataframe()
+    df = data[f"{model_name}" + "|" + f"{dist.name}"].to_dataframe()
 
     num_of_levels = len(df.index.levels)
     # Rename level to dimension labels
@@ -191,7 +191,7 @@ def convert_trace_to_dataframe(trace, sample_state, key, data_type=None):
         )
 
     # Last rename column
-    df = df.rename(columns={f"{model_name}/{dist.name}": dist.name})
+    df = df.rename(columns={f"{model_name}" + "|" + f"{dist.name}": dist.name})
 
     return df
 
@@ -270,7 +270,7 @@ class Country(object):
             if os.path.isfile(self.path_to_folder + file):
                 return True
             else:
-                log.warning(
+                log.info(
                     f"Could not find {self.path_to_folder + file} file. Trying to continue without it!"
                 )
                 return False

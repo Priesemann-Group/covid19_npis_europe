@@ -5,6 +5,7 @@ from .utils import (
     get_dist_by_name_from_sample_state,
     check_for_shape_label,
     get_shape_from_dataframe,
+    number_formatter,
 )
 from .. import modelParams
 
@@ -17,185 +18,191 @@ from scipy import stats
 import locale
 
 import logging
+import os
+from tqdm.auto import tqdm
 
 log = logging.getLogger(__name__)
 
 
 def timeseries(
-    trace, sample_state, key, plot_observed=False, plot_chain_separated=False
+    trace,
+    sample_state,
+    key,
+    sampling_type="posterior",
+    plot_chain_separated=False,
+    plot_age_groups_together=True,
+    dir_save=None,
+    observed=None,
 ):
     """
-    Create time series overview for a a give variable, i.e. plot for every additional dimension.
-    Should only done to variables with a time shape label at position 0!
+    High level plotting fucntion to create time series for a a give variable,
+    i.e. plot for every additional dimension.
+    Can only be done for variables with a time or date in shape_labels!
+
+    Does NOT plot observed cases, these have to be added manually for now.
 
     Parameters
     ----------
-    trace_posterior,trace_prior : arivz InferenceData
+    trace_posterior, trace_prior : arivz InferenceData
         Raw data from pymc4 sampling
 
     sample_state : pymc4 sample stae
 
     key : str
-        Name of the variable/distribution to plot. Must be the same as defined in the model.
+        Name of the timeseries variable to plot. Same name as in the model definitions.
 
-    plot_observed: bool, optional
-        Do you want to plot the new cases? May not work for 1 and 2 dim case.
+    sampling_type: str, optional
+        Name of the type (group) in the arviz inference data. |default| posterior
+
+    dir_save: str, optional
+        where to save the the figures (expecting a folder). Does not save if None
+        |default| None
+
+    observed: pd.DataFrame, optional
+        modelParams dataframe for the corresponding observed values for the
+        variable e.g. modelParams.pos_tests_dataframe
     """
-
     log.debug(f"Creating timeseries plot for {key}")
 
-    # Convert trace to dataframe
+    # Check type of arviz trace
+    types = trace.groups()
+    if sampling_type not in types:
+        raise KeyError("sampling_type '{sampling_type}' not found in trace!")
+
+    # Convert trace to dataframe with index levels and values changed to
+    # values specified in model and modelParams
     df = data.convert_trace_to_dataframe(trace, sample_state, key)
-    # log.info(df)
-    # Get other important properties
-    model_name = get_model_name_from_sample_state(sample_state)
-    dist = get_dist_by_name_from_sample_state(sample_state, key)
-    check_for_shape_label(dist)
 
-    shape = get_shape_from_dataframe(df)
-    # Determine ndim:
+    # Sanity check for "time" or "date" in index
+    if ("time" not in df.index.names) and ("date" not in df.index.names):
+        raise ValueError(
+            "No time or date found in variable dimensions!\n (Is the distribution shape_label set?!)"
+        )
 
-    def timeseries_ndim_1():
+    # Drop chains index if seperated!
+    if not plot_chain_separated:
+        df.index = df.index.droplevel("chain")
+
+    # Drop the number of draws
+    # df.index = df.index.droplevel("draw")
+
+    # Define recursive plotting fuction
+    axes = {}
+
+    def recursive_plot(df, name_str, observed=None):
         """
-        Only a time dimension nothing else
+        Every call of this function reduces dimensions by one if
+        plot age_groups_together is defined it skips agegroup
+        dimension and creates subplots for each age group.
         """
-        # Since we work with a multiindex pandas dataframe we need to unstack
-        # our time values and transpose
 
-        df = df.unstack(level="time").T
-        df.index = df.index.droplevel(0)
-        # Plot model once for each chain
-        fig, axes = plt.subplots(1, 1, figsize=(3, 1.5))
-        # Plot each chain
-        axes = _timeseries(df.index, df.to_numpy(), ax=axes, what="model")
+        # We start x function calls depending on the number of dimensions, going from
+        # left to right i.e. country than agegroup
+        if len(df.index.names) > 1:
 
-        if plot_chain_separated:
-            for c in df.column.get_level_values("chain").unique():
-                axes = _timeseries(
-                    df.index,
-                    df.xs(c, level="chain", axis=1).to_numpy(),
-                    ax=axes,
-                    what="model",
-                    color=None,
-                    label=f"Chain {c}",
-                )
-                axes.legend()
-        return fig, axes
+            # Iterate over all levels expect time,draw,age_group
+            levels = df.index.names
+            for lev in levels:
+                if lev == "time":
+                    continue
+                if lev == "draw":
+                    continue
+                if plot_age_groups_together and lev == "age_group":
+                    continue
 
-    def timeseries_ndim_2():
-        """
-        Time and an additional dimension
-        """
-        # In the default case: label1 should be time and label2 should age_group
-        if hasattr(dist, "shape_label"):
-            time, label1 = dist.shape_label
-        else:
-            time = model_name + "/" + dist.name + "_dim_0"
-            label1 = model_name + "/" + dist.name + "_dim_1"
-        cols = shape[1]
-        rows = 1  # not time
+                # Iterate over all level values
+                for i, value in enumerate(df.index.get_level_values(lev).unique()):
+                    # create new dataframe for next recursion
+                    df_t = df.xs(value, level=lev)
+                    if observed is not None:
+                        # I hope the dataframes have the same format
+                        _observed = observed.xs(value, level=lev, axis=1)
+                    else:
+                        _observed = None
+                    recursive_plot(df_t, name_str + "_" + value, _observed)
 
-        fig, axes = plt.subplots(rows, cols, figsize=(3 * cols, 1.5 * rows),)
-        for i, value in enumerate(df.index.get_level_values(label1).unique()):
-            df_t = df.xs(value, level=label1)
-            df_t = df_t.unstack(level="time").T
-            df_t.index = df_t.index.droplevel(0)
-            # Plot model
-            axes[i] = _timeseries(df_t.index, df_t.to_numpy(), ax=axes[i], what="model")
+                return  # Stop theses recursions
 
-            if plot_chain_separated:
-                for c in df.index.get_level_values("chain").unique():
-                    axes[i] = _timeseries(
-                        df_t.index,
-                        df_t.xs(c, level="chain", axis=1).to_numpy(),
-                        ax=axes[i],
-                        what="model",
-                        color=None,
-                        label=f"Chain {c}",
+        # Remove "_" from name
+        name_str = name_str[1:]
+
+        if plot_age_groups_together and "age_group" in df.index.names:
+            fig, a_axes = plt.subplots(
+                len(df.index.get_level_values("age_group").unique()),
+                1,
+                figsize=(4, 1.5 * len(df.index.get_level_values("age_group").unique())),
+            )
+            for i, ag in enumerate(df.index.get_level_values("age_group").unique()):
+                temp = df.xs(ag, level="age_group")
+
+                # Create pivot table i.e. time on index and draw on columns
+                temp = temp.reset_index().pivot_table(index="time", columns="draw")
+
+                # Plot data
+                _timeseries(temp.index, temp.to_numpy(), what="model", ax=a_axes[i])
+
+                # Plot observed
+                if observed is not None:
+                    _timeseries(
+                        observed.index, observed.to_numpy(), what="data", ax=a_axes[i]
                     )
-                    axes[i].legend()
+                # Set title for axis
+                a_axes[i].set_title(ag)
 
-        # Set labels on y-axis
-        for i in range(cols):
-            axes[i].set_title(df.index.get_level_values(label1).unique()[i])
-
-        return fig, axes
-
-    def timeseries_ndim_3():
-        if hasattr(dist, "shape_label"):
-            time, label1, label2 = dist.shape_label
+            axes[name_str] = a_axes
         else:
-            time = model_name + "/" + dist.name + "_dim_0"
-            label1 = model_name + "/" + dist.name + "_dim_1"
-            label2 = model_name + "/" + dist.name + "_dim_2"
 
-        # shape[0] == time
-        cols = shape[1]
-        rows = shape[2]
+            # Create pivot table i.e. time on index and draw on columns
+            df = df.reset_index().pivot_table(index="time", columns="draw")
 
-        # Create figure
-        fig, axes = plt.subplots(rows, cols, figsize=(3 * cols, 1.5 * rows),)
-
-        # Loop threw all dimensions of variable
-        for i, value1 in enumerate(df.index.get_level_values(label1).unique()):
-            for j, value2 in enumerate(df.index.get_level_values(label2).unique()):
-
-                # Plot model
-                model = data.select_from_dataframe(
-                    df, **{label1: value1, label2: value2}
+            # Plot this dimension!
+            axes[name_str] = _timeseries(df.index, df.to_numpy(), what="model",)
+            # Plot observed
+            if observed is not None:
+                _timeseries(
+                    observed.index, observed.to_numpy(), what="data", ax=axes[name_str]
                 )
-                model = model.unstack(level="time").T
-                model.index = model.index.droplevel(0)
-                axes[j][i] = _timeseries(
-                    model.index, model.to_numpy(), ax=axes[j][i], what="model"
-                )
+            else:
+                _observed = None
+            axes[name_str].set_title(name_str.replace("_", " "))
 
-                if plot_observed:
-                    axes[j][i] = _timeseries(
-                        modelParams.modelParams.dataframe.index,
-                        modelParams.modelParams.dataframe[(value1, value2)],
-                        ax=axes[j][i],
-                        what="data",
-                    )
-                if plot_chain_separated:
-                    for c in df.index.get_level_values("chain").unique():
-                        axes[j][i] = _timeseries(
-                            model.index,
-                            model.xs(c, level="chain", axis=1).to_numpy(),
-                            ax=axes[j][i],
-                            what="model",
-                            color=None,
-                            label=f"Chain {c}",
-                        )
-                        axes[j][i].legend()
+    recursive_plot(df, "", observed)
 
-        # Set labels on y-axis
-        for i in range(rows):
-            axes[i][0].set_ylabel(df.index.get_level_values(label2).unique()[i])
-        # Set labels on x-axis
-        for i in range(cols):
-            axes[0][i].set_title(df.index.get_level_values(label1).unique()[i])
+    # Create figure supertitle with key and dimensions
+    for name, ax in axes.items():
+        if type(ax) == np.ndarray:
+            fig = ax[0].get_figure()
+        else:
+            fig = ax.get_figure()
+        fig.suptitle(
+            f"{key.replace('_', ' ')}:\n{name}",
+            verticalalignment="top",
+            ha="left",
+            fontweight="bold",
+            x=0.1,
+        )
+        fig.tight_layout(h_pad=1.5, w_pad=1.5)
 
-        return fig, axes
-
-    # ------------------------------------------------------------------------------ #
-    # CASES
-    # ------------------------------------------------------------------------------ #
-    if len(shape) == 1:
-        fig, axes = timeseries_ndim_1()
-    elif len(shape) == 2:
-        fig, axes = timeseries_ndim_2()
-    elif len(shape) == 3:
-        fig, axes = timeseries_ndim_3()
-
-    # ------------------------------------------------------------------------------ #
-    # Title and other
-    # ------------------------------------------------------------------------------ #
-    fig.suptitle(
-        key, verticalalignment="top", fontweight="bold",
-    )
-
-    return [fig], axes
+    if dir_save is not None:
+        if not os.path.exists(dir_save):
+            os.makedirs(dir_save)
+        if not os.path.exists(dir_save + f"/{key}"):
+            os.makedirs(dir_save + f"/{key}")
+        for name, ax in tqdm(
+            axes.items(),
+            desc=f"Saving figures to '{dir_save}/{key}'",
+            position=1,
+            leave=False,
+        ):
+            if type(ax) == np.ndarray:
+                fig = ax[0].get_figure()
+            else:
+                fig = ax.get_figure()
+            fig.savefig(
+                f"{dir_save}/{key}/{name}", transparent=True, dpi=300,
+            )
+    plt.close(fig)
+    return axes
 
 
 def _timeseries(
@@ -253,7 +260,7 @@ def _timeseries(
         draw_ci_50 = rcParams["draw_ci_50"]
 
     if ax is None:
-        figure, ax = plt.subplots(figsize=(3, 1.5))
+        figure, ax = plt.subplots(figsize=(6, 4))
 
     # still need to fix the last dimension being one
     # if x.shape[0] != y.shape[-1]:
@@ -339,6 +346,8 @@ def _timeseries(
     # ------------------------------------------------------------------------------ #
     _format_date_xticks(ax, interval=2)
 
+    ax.yaxis.set_major_formatter(mpl.ticker.FuncFormatter(number_formatter))
+
     return ax
 
 
@@ -355,8 +364,12 @@ def _format_date_xticks(ax, minor=None, interval=1):
         # overwrite local argument with rc params only if default.
         minor = rcParams["date_show_minor_ticks"]
     if minor is True:
-        ax.xaxis.set_minor_locator(mpl.dates.DayLocator())
-    ax.xaxis.set_major_formatter(mpl.dates.DateFormatter(rcParams["date_format"]))
+        # OLD: ax.xaxis.set_minor_locator(mpl.dates.DayLocator())
+        ax.xaxis.set_minor_locator(mpl.dates.MonthLocator(bymonthday=16))
+        ax.xaxis.set_major_formatter(mpl.ticker.NullFormatter())
+    # OLD: ax.xaxis.set_major_formatter(mpl.dates.DateFormatter(rcParams["date_format"]))
+    ax.xaxis.set_major_locator(mpl.dates.MonthLocator())
+    ax.xaxis.set_minor_formatter(mpl.dates.DateFormatter("%b"))
 
     for label in ax.get_xticklabels():
         label.set_rotation(rcParams["timeseries_xticklabel_rotation"])

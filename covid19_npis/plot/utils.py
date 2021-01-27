@@ -2,27 +2,29 @@
 # @Author:        Sebastian B. Mohr
 # @Email:
 # @Created:       2020-08-17 10:35:59
-# @Last Modified: 2021-01-06 11:48:34
+# @Last Modified: 2021-01-27 13:20:26
 # ------------------------------------------------------------------------------ #
 
 import logging
 import json
+
+from .. import data
 
 log = logging.getLogger(__name__)
 
 
 def get_model_name_from_sample_state(sample_state):
     dists = list(sample_state.continuous_distributions.items())
-    model_name, dist_name = dists[0][0].split("/")
+    model_name, dist_name = dists[0][0].split("|")
     return model_name
 
 
 def get_dist_by_name_from_sample_state(sample_state, name):
     model_name = get_model_name_from_sample_state(sample_state)
     try:
-        dist = sample_state.continuous_distributions[model_name + "/" + name]
+        dist = sample_state.continuous_distributions[model_name + "|" + name]
     except Exception as e:
-        dist = sample_state.deterministics[model_name + "/" + name]
+        dist = sample_state.deterministics[model_name + "|" + name]
     return dist
 
 
@@ -88,12 +90,64 @@ def get_math_from_name(name):
         "l_i_sign": r"l_{i,sign(\Delta\gamma)}",
         "C": r"C_c",
         "C_mean": "C",
+        "Phi_IFR": r"\Phi_{IFR}",
+        "phi_age": r"\phi_{age}",
+        "phi_tests_reported": r"\phi_{tests reported}",
+        "mu_testing_state": r"\mu_{testing state}",
+        "delay_deaths_m": r"d_{deaths, m}",
+        "delay_deaths_theta": r"d_{deaths, \theta}",
     }
 
     if name not in math_keys:
-        log.warning(
+        log.debug(
             f"Math key for distribution with name '{name}' not found! Expect strange behaviour."
         )
         return name
     else:
         return math_keys[name]
+
+
+def number_formatter(number, pos=None):
+    """
+    Converts number to magnitude format
+    Taken from https://flynn.gg/blog/better-matplotlib-charts/
+    """
+    magnitude = 0
+    while abs(number) >= 1000:
+        magnitude += 1
+        number /= 1000.0
+    return "%.1f%s" % (number, ["", "K", "M", "B", "T", "Q"][magnitude])
+
+
+def get_posterior_prior_from_trace(trace, sample_state, key, drop_chain_draw=False):
+    """ Returns prior posterior tuple is None if not found in trace
+    """
+
+    # Detect datatype
+    if "posterior" in trace.groups():
+        posterior = data.convert_trace_to_dataframe(
+            trace, sample_state, key, data_type="posterior"
+        )
+        if drop_chain_draw and len(posterior.index.names) > 2:
+            posterior.index = posterior.index.droplevel("chain")
+            posterior.index = posterior.index.droplevel("draw")
+        elif drop_chain_draw:
+            print("Hi")
+            posterior = posterior.reset_index()
+            posterior = posterior[key]
+    else:
+        posterior = None
+
+    if "prior_predictive" in trace.groups():
+        prior = data.convert_trace_to_dataframe(
+            trace, sample_state, key, data_type="prior_predictive"
+        )
+        if drop_chain_draw and len(prior.index.names) > 2:
+            prior.index = prior.index.droplevel("chain")
+            prior.index = prior.index.droplevel("draw")
+        elif drop_chain_draw:
+            prior = prior[key]
+    else:
+        prior = None
+
+    return (posterior, prior)

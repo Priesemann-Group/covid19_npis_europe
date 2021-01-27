@@ -164,16 +164,16 @@ end_time = time.time()
 log.info("running time: {:.1f}s".format(end_time - begin_time))
 
 # We also Sample the prior for the kde in the plots (optional)
-"""trace_prior = pm.sample_prior_predictive(
-    this_model, sample_shape=(1000,), use_auto_batching=False
+trace_prior = pm.sample_prior_predictive(
+    this_model, sample_shape=(10,), use_auto_batching=False
 )
 
 # Save trace
-name, fpath = covid19_npis.utils.save_trace(
+
+store = covid19_npis.utils.save_trace_zarr(
     trace,
     modelParams,
-    fpath=os.path.dirname(args.fp_trace),
-    name=os.path.basename(args.fp_trace),
+    store=f"{os.path.dirname(args.fp_trace)}/{os.path.basename(args.fp_trace)}",
     trace_prior=trace_prior,
 )
 
@@ -181,7 +181,7 @@ name, fpath = covid19_npis.utils.save_trace(
 # ------------------------------------------------------------------------------ #
 # 5. Plotting
 # ------------------------------------------------------------------------------ #
-
+"""
 if args.plots:
     # Run plotting script
     path = os.path.abspath(f"{fpath}/{name}")

@@ -51,7 +51,7 @@ jobs:
         run: pip install -r requirements.txt
   run:
     needs: [setup]
-    runs-on: irazu
+    runs-on: tur007
     steps:
       - name: Data retrieval
         working-directory: ./scripts/data_generators

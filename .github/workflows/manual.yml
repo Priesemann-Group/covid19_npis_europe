@@ -25,7 +25,7 @@ jobs:
   # We use multiple jobs 
   setup:
     # The type of runner that the job will run on
-    runs-on: irazu
+    runs-on: tur007
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:

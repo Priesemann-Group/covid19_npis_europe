@@ -1,401 +1,407 @@
-from .rcParams import *
-from .. import data
-from .. import modelParams
-
-from .utils import (
-    get_model_name_from_sample_state,
-    get_dist_by_name_from_sample_state,
-    check_for_shape_label,
-    get_math_from_name,
-    get_shape_from_dataframe,
-)
-
+import os, sys
+import logging
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import matplotlib.patches
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from tqdm.auto import tqdm
 from scipy import stats
-from scipy.linalg import LinAlgError
 
-import logging
+from .rcParams import *
 
+from .utils import (
+    get_posterior_prior_from_trace,
+    get_math_from_name,
+    get_dist_by_name_from_sample_state,
+)
+
+mpl.rc("figure", max_open_warning=0)
 log = logging.getLogger(__name__)
-plt.rcParams.update({"figure.max_open_warning": 0})
 
 
-def _plot_prior(x, ax=None, **kwargs):
+def distribution(
+    trace,
+    sample_state,
+    key,
+    dir_save=None,
+    plot_age_groups_together=True,
+    force_matrix=False,
+):
     """
-    Low level plotting function, plots the prior as line for sampling data by using kernel density estimation.
-    For more references see `scipy documentation <https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.gaussian_kde.html>`_.
+        High level plotting function for distributions,
+        plots prior and posterior if they are given in the trace.
 
-    It is highly recommended to pass an axis otherwise the xlim may be a bit wonky.
+        Parameters
+        ----------
+        trace: arivz.InferenceData
+            Raw data from pymc4 sampling, can contain both posterior data
+            and prior data. Or only one of both!
 
-    Parameters
-    ----------
-    x :
-        Input values, from sampling
+        sample_state : pymc4 sample state
+            Used mainly for shape labels
 
-    ax : mpl axes element, optional
-        Plot into an existing axes element
-        |default| :code:`None`
+        key : str
+            Name of the variable to plot
 
-    kwargs : dict, optional
-        Directly passed to plotting mpl.
-    """
-    reset_xlim = False
-    if ax is None:
-        fig, ax = plt.subplots()
-        xlim = [x.min(), x.max()]
-    else:
-        # may need to convert axes values, and restore xlimits after adding prior
-        xlim = ax.get_xlim()
-        reset_xlim = True
-    try:
-        prior = stats.kde.gaussian_kde(x)
-    except LinAlgError:  # Probably only one value of x
-        return ax
-    x_for_ax = np.linspace(*xlim, num=1000)
-    x_for_pr = x_for_ax
+        dir_save: str, optional
+            where to save the the figures (expecting a folder). Does not save if None
+            |default| None
+        force_matrix: bool, optional
+            Forces matrix plotting behaviour for last two dimensions
+            |default| False
 
-    ax.plot(
-        x_for_ax,
-        prior(x_for_ax),
-        label="Prior",
-        color=rcParams.color_prior,
-        linewidth=3,
-        **kwargs,
-    )
-
-    if reset_xlim:
-        ax.set_xlim(*xlim)
-
-    return ax
-
-
-def _plot_posterior(x, bins=50, ax=None, **kwargs):
-    """
-    Low level plotting function to plot an sampling data as histogram.
-
-    Parameters
-    ----------
-    x:
-        Input values, from sampling
-
-    bins: int, optional
-        Defines the number of equal-width bins in the range.
-        |default| 50
-
-    ax : mpl axes element, optional
-        Plot into an existing axes element
-        |default| :code:`None`
-
-    kwargs : dict, optional
-        Directly passed to plotting mpl.
-    """
-    if ax is None:
-        fig, ax = plt.subplots()
-
-    ax.hist(
-        x,
-        bins=bins,
-        color=rcParams.color_posterior,
-        label="Posterior",
-        alpha=0.7,
-        zorder=-5,
-        density=True,
-        **kwargs,
-    )
-
-    return ax
-
-
-def distribution(trace, sample_state, key):
-    """
-    High level function for creating plot overview for a variable. Works for
-    one and two dimensional variable at the moment.
-
-    TODO
-    ----
-    - ndim=3
-
-
-    Parameters
-    ----------
-    trace: arivz.InferenceData
-        Raw data from pymc4 sampling, can contain both posterior data
-        and prior data. Or only one of both!
-    sample_state : pymc4 sample state
-
-    key : str
-        Name of the variable to plot
-
-    Returns
-    -------
-    array of mpl figures
-        one figure for each country
-
+        Returns
+        -------
+        array of mpl figures
+            one figure for each country
     """
     log.debug(f"Creating distibution plot for {key}")
 
-    # Check which data we have in the trace
-    if "posterior" in trace.groups():
-        posterior = data.convert_trace_to_dataframe(
-            trace, sample_state, key, data_type="posterior"
-        )
-        plt_posterior = True
-    else:
-        posterior = None
-        plt_posterior = False
+    # Check for special behaviour
+    if key in ["C", "C_mean", "Sigma"] or force_matrix:
+        return distribution_matrix(trace, sample_state, key, dir_save=dir_save)
 
-    if "prior_predictive" in trace.groups():
-        prior = data.convert_trace_to_dataframe(
-            trace, sample_state, key, data_type="prior_predictive"
-        )
-        plt_prior = True
+    # Convert trace to dataframe with index levels and values changed to
+    # values specified in model and modelParams
+    # Uses `data.convert_trace_to_dataframe`
+    posterior, prior = get_posterior_prior_from_trace(
+        trace, sample_state, key, drop_chain_draw=True
+    )
+    if posterior is not None:
+        main = posterior
+    elif prior is not None:
+        main = prior
     else:
-        prior = None
-        plt_prior = False
+        raise ValueError("Posterior and prior none!!")
 
-    # Get other model parameters which we need
-    model_name = get_model_name_from_sample_state(sample_state)
+    # Get distribution object instance
     dist = get_dist_by_name_from_sample_state(sample_state, key)
-    check_for_shape_label(dist)
 
-    # Get shape from data, should be the same for posterior and prior
-    shape = get_shape_from_dataframe(posterior)
+    # Check if directory exists
+    if dir_save is not None:
+        if not os.path.exists(dir_save):
+            os.makedirs(dir_save)
+        if not os.path.exists(dir_save + f"/{key}"):
+            os.makedirs(dir_save + f"/{key}")
 
-    def dist_ndim_1():
-        # E.g. only age groups or only one value over all age groups
-        rows = shape[0]
-        cols = 1
+    # Progress bar
+    pbar = tqdm(
+        total=len(main.index.unique()), desc=f"Plotting {key}", position=1, leave=False,
+    )
 
-        if hasattr(dist, "shape_label"):
-            label1 = dist.shape_label
+    axes = {}
+
+    def helper_plot(posterior, prior, name_str):
+        if posterior is not None:
+            df = posterior
         else:
-            label1 = f"{model_name}/{dist.name}_dim_0"
+            df = prior
 
-        fig, ax = plt.subplots(rows, cols, figsize=(4.5 / 3 * cols, rows * 1 + 0.2),)
-        if rows == 1:
-            # Flatten chains and other sampling dimensions of df into one array
-            array_posterior = posterior.to_numpy().flatten() if plt_posterior else None
-            array_prior = prior.to_numpy().flatten() if plt_prior else None
-            return (
-                [fig],
-                _distribution(
-                    array_posterior=array_posterior,
-                    array_prior=array_prior,
-                    dist_name=dist.name,
-                    dist_math=get_math_from_name(dist.name),
-                    ax=ax,
+        if plot_age_groups_together and ("age_group" in df.index.names):
+            fig, ax = plt.subplots(
+                len(df.index.get_level_values("age_group").unique()),
+                1,
+                figsize=(
+                    2.2,
+                    2.2 * len(df.index.get_level_values("age_group").unique()),
                 ),
             )
-        else:
-            for i, value in enumerate(
-                posterior.index.get_level_values(label1).unique()
-            ):
-                # Flatten chains and other sampling dimensions of df into one array
-                array_posterior = (
-                    posterior.xs(value, level=label1).to_numpy().flatten()
-                    if plt_posterior
-                    else None
-                )
-                array_prior = (
-                    prior.xs(value, level=label1).to_numpy().flatten()
-                    if plt_prior
-                    else None
-                )
-                ax[i] = _distribution(
-                    array_posterior=array_posterior,
-                    array_prior=array_prior,
+            for i, ag in enumerate(df.index.get_level_values("age_group").unique()):
+                # Create pivot table i.e. time on index and draw on columns
+                if posterior is not None:
+                    posterior_t = posterior.xs(ag).to_numpy().flatten()
+                else:
+                    posterior_t = None
+                if prior is not None:
+                    prior_t = prior.xs(ag).to_numpy().flatten()
+                else:
+                    prior_t = None
+
+                # Plot
+                _distribution(
+                    array_posterior=posterior_t,
+                    array_prior=prior_t,
                     dist_name=dist.name,
                     dist_math=get_math_from_name(dist.name),
-                    ax=ax[i],
                     suffix=f"{i}",
+                    ax=ax[i],
                 )
-
-            # Set labels on y-axis
-            for i in range(rows):
-                ax[i].set_title(posterior.index.get_level_values(label1).unique()[i])
-
-            fig.suptitle(
-                f"{key}", verticalalignment="top", fontweight="bold",
+                # Set title for axis
+                ax[i].set_title(ag)
+        elif len(df.index.names) == 1:
+            fig, ax = plt.subplots(
+                len(df.index.get_level_values(df.index.names[0]).unique()),
+                1,
+                figsize=(
+                    2.2,
+                    2.2 * len(df.index.get_level_values(df.index.names[0]).unique()),
+                ),
             )
-            return [fig], ax
-
-    def dist_ndim_2():
-
-        # In the default case: label1 should be country and label2 should age_group
-        if hasattr(dist, "shape_label"):
-            label1, label2 = dist.shape_label
-        else:
-            label1 = model_name + "/" + dist.name + "_dim_0"
-            label2 = model_name + "/" + dist.name + "_dim_1"
-
-        # First label is rows
-        # Second label is columns
-        cols, rows = shape
-
-        fig, ax = plt.subplots(rows, cols, figsize=(4.5 / 3 * cols, rows * 1 + 0.2),)
-        for i, value1 in enumerate(posterior.index.get_level_values(label1).unique()):
-            for j, value2 in enumerate(
-                posterior.index.get_level_values(label2).unique()
+            for i, ag in enumerate(
+                df.index.get_level_values(df.index.names[0]).unique()
             ):
-                # Select values from datafram
-                arry_posterior = (
-                    (
-                        data.select_from_dataframe(
-                            posterior, **{label1: value1, label2: value2}
-                        )
-                        .to_numpy()
-                        .flatten()
-                    )
-                    if plt_posterior
-                    else None
-                )
+                if posterior is not None:
+                    posterior_t = posterior.xs(ag).to_numpy().flatten()
+                else:
+                    posterior_t = None
+                if prior is not None:
+                    prior_t = prior.xs(ag).to_numpy().flatten()
+                else:
+                    prior_t = None
 
-                array_prior = (
-                    (
-                        data.select_from_dataframe(
-                            prior, **{label1: value1, label2: value2}
-                        )
-                        .to_numpy()
-                        .flatten()
-                    )
-                    if plt_prior
-                    else None
-                )
-
-                ax[j][i] = _distribution(
-                    array_posterior=arry_posterior,
-                    array_prior=array_prior,
+                # Plot
+                _distribution(
+                    array_posterior=posterior_t,
+                    array_prior=prior_t,
                     dist_name=dist.name,
                     dist_math=get_math_from_name(dist.name),
-                    ax=ax[j][i],
-                    suffix=f"{i},{j}",
+                    suffix=f"{i}",
+                    ax=ax[i],
+                )
+                ax[i].set_title(ag)
+        else:
+            i = 0
+            if posterior is not None:
+                posterior_t = posterior.to_numpy().flatten()
+            else:
+                posterior_t = None
+            if prior is not None:
+                prior_t = prior.to_numpy().flatten()
+            else:
+                prior_t = None
+
+            fig, ax = plt.subplots(1, 1, figsize=(2.2, 2.2))
+            # Plot
+            _distribution(
+                array_posterior=posterior_t,
+                array_prior=prior_t,
+                dist_name=dist.name,
+                dist_math=get_math_from_name(dist.name),
+                suffix=f"{i}",
+                ax=ax,
+            )
+
+        # Suptitle
+        fig.suptitle(
+            f"{key}:\n" + name_str.replace("/", "\n"),
+            verticalalignment="top",
+            ha="left",
+            fontweight="bold",
+            x=0.01,
+            y=0.99,
+        )
+        fig.tight_layout(h_pad=1.5, w_pad=1.5)
+        # Save figure if save_dir is defined
+        if dir_save is not None:
+            if not os.path.exists(os.path.dirname(f"{dir_save}/{key}/{name_str}.png")):
+                os.makedirs(os.path.dirname(f"{dir_save}/{key}/{name_str}.png"))
+            # Get path to folder
+            if f"{dir_save}/{key}/{name_str}.png".split("/")[-1] == ".png":
+                name_str = name_str + "all"
+            fig.savefig(
+                f"{dir_save}/{key}/{name_str}.png", transparent=True, dpi=300,
+            )
+        axes[name_str] = ax
+        plt.close(fig)
+        pbar.update(i + 1)
+
+    # Some kind of recursion to unfold every other dimension
+    def recursion(posterior, prior, name_str):
+        if posterior is not None:
+            index = posterior.index
+        else:
+            index = prior.index
+        if len(index.names) > 1:
+            if posterior is not None:
+                levels = posterior.index.names
+            else:
+                levels = prior.index.names
+            for lev in levels:
+                # Iterate over all level values
+                if plot_age_groups_together and lev == "age_group":
+                    continue
+                for i, value in enumerate(index.get_level_values(lev).unique()):
+                    if posterior is not None:
+                        posterior_t = posterior.xs(value, level=lev)
+                    else:
+                        posterior_t = None
+                    if prior is not None:
+                        prior_t = posterior.xs(value, level=lev)
+                    else:
+                        prior_t = None
+                    recursion(
+                        posterior_t, prior_t, name_str + "/" + str(value),
+                    )
+                return
+        # else
+        name_str = name_str[1:]
+        helper_plot(posterior, prior, name_str)
+
+    #
+    # START RECURSION
+    recursion(posterior, prior, "")
+    pbar.close()
+    return axes
+
+
+def distribution_matrix(trace, sample_state, key, dir_save=None):
+    """
+    High level function to create a distribution plot
+    for matrix like variables e.g. 'C'.
+    Uses last two dimensions for matrix like plot.
+    
+    Parameters
+    ----------
+        trace: arivz.InferenceData
+            Raw data from pymc4 sampling, can contain both posterior data
+            and prior data. Or only one of both!
+
+        sample_state : pymc4 sample state
+            Used mainly for shape labels
+
+        key : str
+            Name of the variable to plot
+
+        dir_save: str, optional
+            where to save the the figures (expecting a folder). Does not save if None
+            |default| None
+
+    Returns
+    -------
+    axes
+    """
+    # Get dataframes
+    posterior, prior = get_posterior_prior_from_trace(
+        trace, sample_state, key, drop_chain_draw=True
+    )
+
+    if posterior is not None:
+        main = posterior
+    elif prior is not None:
+        main = prior
+    else:
+        raise ValueError("Posterior and prior none!!")
+
+    # Get unique entries for last two dimensions
+    rows = main.index.get_level_values(main.index.names[-1]).unique()
+    cols = main.index.get_level_values(main.index.names[-2]).unique()
+
+    # Get distribution object instance
+    dist = get_dist_by_name_from_sample_state(sample_state, key)
+
+    # Check if directory exists
+    if dir_save is not None:
+        if not os.path.exists(dir_save):
+            os.makedirs(dir_save)
+        if not os.path.exists(dir_save + f"/{key}"):
+            os.makedirs(dir_save + f"/{key}")
+
+    # Progress bar
+    pbar = tqdm(
+        total=len(main.index.unique()), desc=f"Plotting {key}", position=1, leave=False,
+    )
+
+    axes = {}
+
+    def helper_plot(posterior, prior, name_str):
+        """
+        Plots matrix from the last two dimensions
+        """
+        fig, ax = plt.subplots(
+            len(rows), len(cols), figsize=(2.2 * len(cols), 2.2 * len(rows))
+        )
+        for x, row in enumerate(rows):
+            if posterior is not None:
+                posterior_x = posterior.xs(row, level=posterior.index.names[-1])
+            if prior is not None:
+                prior_x = prior.xs(row, level=prior.index.names[-1])
+            for y, col in enumerate(cols):
+                if posterior is not None:
+                    posterior_xy = posterior_x.xs(col).to_numpy().flatten()
+                else:
+                    posterior_xy = None
+                if prior is not None:
+                    prior_xy = prior_x.xs(col).to_numpy().flatten()
+                else:
+                    prior_xy = None
+
+                # Plot
+                _distribution(
+                    array_posterior=posterior_xy,
+                    array_prior=prior_xy,
+                    dist_name=dist.name,
+                    dist_math=get_math_from_name(dist.name),
+                    suffix=f"{x},{y}",
+                    ax=ax[x, y],
                 )
 
-        # Set labels on y-axis
-        for i in range(cols):
-            ax[0][i].set_xlabel(posterior.index.get_level_values(label1).unique()[i])
-        # Set labels on x-axis
-        for i in range(rows):
-            ax[i][0].set_ylabel(posterior.index.get_level_values(label2).unique()[i])
+        # Create titles for the axes
+        for x, row in enumerate(rows):
+            ax[x, 0].set_ylabel(row)
+        for y, col in enumerate(cols):
+            ax[0, y].set_title(col)
 
+        # Suptitle
         fig.suptitle(
-            f"{key}", verticalalignment="top", fontweight="bold",
+            f"{key.replace('_', ' ')}:\n{name_str}",
+            verticalalignment="top",
+            ha="left",
+            fontweight="bold",
+            x=0.01,
+            y=0.99,
         )
-        return [fig], ax
 
-    def dist_ndim_3():
-        # In the default case: label2 should be country and label3 should age_group
-        if hasattr(dist, "shape_label"):
-            label1, label2, label3 = dist.shape_label
+        # Save figure if save_dir is defined
+        fig.tight_layout(h_pad=1.5, w_pad=1.5)
+        if dir_save is not None:
+            if not os.path.exists(os.path.dirname(f"{dir_save}/{key}/{name_str}.png")):
+                os.makedirs(os.path.dirname(f"{dir_save}/{key}/{name_str}.png"))
+            if f"{dir_save}/{key}/{name_str}.png".split("/")[-1] == ".png":
+                name_str = name_str + "all"
+            fig.savefig(
+                f"{dir_save}/{key}/{name_str}", transparent=True, dpi=300,
+            )
+        axes[name_str] = ax
+
+        plt.close(fig)
+        pbar.update(len(rows) * len(cols))
+
+    # Some kind of recursion to unfold every other dimension
+    def recursion(posterior, prior, name_str):
+        if posterior is not None:
+            index = posterior.index
         else:
-            label1 = model_name + "/" + dist.name + "_dim_0"
-            label2 = model_name + "/" + dist.name + "_dim_1"
-            label3 = model_name + "/" + dist.name + "_dim_2"
-
-        # First label is rows
-        # Second label is columns
-        num_figs, cols, rows = shape
-        cols = cols
-        rows = rows
-        # Create a new figure for each dim_0 entry
-        figs = []
-        axes = []
-        for f, value1 in enumerate(posterior.index.get_level_values(label1).unique()):
-            fig, ax = plt.subplots(
-                rows, cols, figsize=(4.5 / 3 * cols, rows * 1 + 0.2),
-            )
-            for i, value2 in enumerate(
-                posterior.index.get_level_values(label2).unique()
-            ):
-                for j, value3 in enumerate(
-                    posterior.index.get_level_values(label3).unique()
-                ):
-                    # Select values from datafram
-                    arry_posterior = (
-                        (
-                            data.select_from_dataframe(
-                                posterior,
-                                **{label1: value1, label2: value2, label3: value3},
-                            )
-                            .to_numpy()
-                            .flatten()
-                        )
-                        if plt_posterior
-                        else None
-                    )
-
-                    array_prior = (
-                        (
-                            data.select_from_dataframe(
-                                prior,
-                                **{label1: value1, label2: value2, label3: value3},
-                            )
-                            .to_numpy()
-                            .flatten()
-                        )
-                        if plt_prior
-                        else None
-                    )
-
-                    if (cols == 1) and (rows == 1):
-                        ax = _distribution(
-                            array_posterior=arry_posterior,
-                            array_prior=array_prior,
-                            dist_name=dist.name,
-                            dist_math=get_math_from_name(dist.name),
-                            ax=ax,
-                            suffix=f"{i},{j}",
-                        )
-                    elif rows == 1:
-                        ax[i] = _distribution(
-                            array_posterior=arry_posterior,
-                            array_prior=array_prior,
-                            dist_name=dist.name,
-                            dist_math=get_math_from_name(dist.name),
-                            ax=ax[i],
-                            suffix=f"{i},{j}",
-                        )
-                    elif cols == 1:
-                        ax[j] = _distribution(
-                            array_posterior=arry_posterior,
-                            array_prior=array_prior,
-                            dist_name=dist.name,
-                            dist_math=get_math_from_name(dist.name),
-                            ax=ax[j],
-                            suffix=f"{i},{j}",
-                        )
+            index = prior.index
+        if len(index.names) > 2:
+            if posterior is not None:
+                levels = posterior.index.names[0:-2]
+            else:
+                levels = prior.index.names[0:-2]
+            for lev in levels:
+                # Iterate over all level values
+                for i, value in enumerate(index.get_level_values(lev).unique()):
+                    if posterior is not None:
+                        posterior_t = posterior.xs(value, level=lev)
                     else:
-                        ax[j][i] = _distribution(
-                            array_posterior=arry_posterior,
-                            array_prior=array_prior,
-                            dist_name=dist.name,
-                            dist_math=get_math_from_name(dist.name),
-                            ax=ax[j][i],
-                            suffix=f"{i},{j}",
-                        )
-            fig.suptitle(
-                f"{key} {value1}", verticalalignment="top", fontweight="bold",
-            )
-            figs.append(fig)
-            axes.append(ax)
+                        posterior_t = None
+                    if prior is not None:
+                        prior_t = posterior.xs(value, level=lev)
+                    else:
+                        prior_t = None
+                    recursion(posterior_t, prior_t, name_str + "/" + value)
+                return
+        # else
+        name_str = name_str[1:]
+        helper_plot(posterior, prior, name_str)
 
-        return figs, axes
+    # START RECURSION
+    recursion(posterior, prior, "")
+    pbar.close()
+    return axes
 
-    # ------------------------------------------------------------------------------ #
-    # CASES
-    # ------------------------------------------------------------------------------ #
-    if len(shape) == 1:
-        figs, axes = dist_ndim_1()
-    elif len(shape) == 2:
-        figs, axes = dist_ndim_2()
-    elif len(shape) == 3:
-        figs, axes = dist_ndim_3()
 
-    return figs, axes
+# ------------------------------------------------------------------------------ #
+# Low level functions
+# ------------------------------------------------------------------------------ #
 
 
 def _distribution(
@@ -482,6 +488,92 @@ def _distribution(
     ax.set_rasterization_zorder(rcParams.rasterization_zorder)
     ax.spines["right"].set_visible(False)
     ax.spines["top"].set_visible(False)
+
+    return ax
+
+
+def _plot_prior(x, ax=None, **kwargs):
+    """
+    Low level plotting function, plots the prior as line for sampling data by using kernel density estimation.
+    For more references see `scipy documentation <https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.gaussian_kde.html>`_.
+
+    It is highly recommended to pass an axis otherwise the xlim may be a bit wonky.
+
+    Parameters
+    ----------
+    x :
+        Input values, from sampling
+
+    ax : mpl axes element, optional
+        Plot into an existing axes element
+        |default| :code:`None`
+
+    kwargs : dict, optional
+        Directly passed to plotting mpl.
+    """
+    reset_xlim = False
+    if ax is None:
+        fig, ax = plt.subplots()
+        xlim = [x.min(), x.max()]
+    else:
+        # may need to convert axes values, and restore xlimits after adding prior
+        xlim = ax.get_xlim()
+        reset_xlim = True
+    try:
+        prior = stats.kde.gaussian_kde(x)
+    except Exception as e:  # Probably only one value of x
+        return ax
+    x_for_ax = np.linspace(*xlim, num=1000)
+    x_for_pr = x_for_ax
+
+    ax.plot(
+        x_for_ax,
+        prior(x_for_ax),
+        label="Prior",
+        color=rcParams.color_prior,
+        linewidth=3,
+        **kwargs,
+    )
+
+    if reset_xlim:
+        ax.set_xlim(*xlim)
+
+    return ax
+
+
+def _plot_posterior(x, bins=50, ax=None, **kwargs):
+    """
+    Low level plotting function to plot an sampling data as histogram.
+
+    Parameters
+    ----------
+    x:
+        Input values, from sampling
+
+    bins: int, optional
+        Defines the number of equal-width bins in the range.
+        |default| 50
+
+    ax : mpl axes element, optional
+        Plot into an existing axes element
+        |default| :code:`None`
+
+    kwargs : dict, optional
+        Directly passed to plotting mpl.
+    """
+    if ax is None:
+        fig, ax = plt.subplots()
+
+    ax.hist(
+        x,
+        bins=bins,
+        color=rcParams.color_posterior,
+        label="Posterior",
+        alpha=0.7,
+        zorder=-5,
+        density=True,
+        **kwargs,
+    )
 
     return ax
 

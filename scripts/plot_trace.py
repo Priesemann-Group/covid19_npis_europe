@@ -6,7 +6,7 @@
 #
 # @Author:        Sebastian B. Mohr
 # @Created:       2020-12-18 14:40:45
-# @Last Modified: 2021-01-20 13:31:22
+# @Last Modified: 2021-01-27 12:54:39
 # ------------------------------------------------------------------------------ #
 
 # Get trace fp
@@ -53,7 +53,7 @@ parser = argparse.ArgumentParser(
     ),
 )
 parser.add_argument(
-    "file", metavar="f", type=str, help="Pickled trace to plot.",
+    "file", metavar="f", type=str, help="Path to stored trace.",
 )
 # Output folder
 parser.add_argument(
@@ -101,8 +101,7 @@ args = parser.parse_args()
 # ------------------------------------------------------------------------------ #
 # Load pickled trace
 # ------------------------------------------------------------------------------ #
-fpath, name = os.path.split(args.file)
-modelParams, trace = covid19_npis.utils.load_trace(name, fpath)
+modelParams, trace = covid19_npis.utils.load_trace_zarr(args.file)
 
 # Create model and sample state from modelParams
 this_model = covid19_npis.model.main_model(modelParams)
@@ -122,6 +121,7 @@ skip_dist_ts = [
     "new_E_t_delayed",
     "total_tests",
     "deaths",
+    "testing_delay",
 ]
 
 
@@ -129,13 +129,13 @@ def check_for_dist_or_ts(this_model, sample_state_dict):
     ts = []
     dists = []
     for key, item in sample_state_dict.items():
-        if key.replace(f"{this_model.name}/", "") in skip_dist_ts:
+        if key.replace(f"{this_model.name}|", "") in skip_dist_ts:
             continue
         try:
             if "time" in item.shape_label:
-                ts.append(key.replace(f"{this_model.name}/", ""))
+                ts.append(key.replace(f"{this_model.name}|", ""))
             else:
-                dists.append(key.replace(f"{this_model.name}/", ""))
+                dists.append(key.replace(f"{this_model.name}|", ""))
         except:
             continue
     return ts, dists
@@ -143,8 +143,28 @@ def check_for_dist_or_ts(this_model, sample_state_dict):
 
 # Get all default distributions and timesries
 all_ts, all_dists = check_for_dist_or_ts(this_model, sample_state.deterministics)
-print(all_ts)
-print(all_dists)
+log.info("Plotting may take some time! Go ahead and grab a coffee or two.")
+print(
+    r"""
+        ..
+      ..  ..
+            ..
+             ..
+            ..
+           ..
+         ..
+##       ..    ####
+##.............##  ##
+##.............##   ##
+##.............## ##
+##.............###
+ ##...........##
+  #############
+  #############
+#################"""
+)
+log.info(f"Timeseries plots: {all_ts}")
+log.info(f"Distribtuion plots: {all_dists}")
 
 if args.distributions is None:
     args.distributions = all_dists
@@ -205,21 +225,9 @@ dist_fig = {}
 dist_axes = {}
 for dist_name in args.distributions:
     pbar.set_description(f"Creating plots [{dist_name[0:3]}]")
-    dist_fig[dist_name], dist_axes[dist_name] = covid19_npis.plot.distribution(
-        trace, sample_state=sample_state, key=dist_name
+    dist_axes[dist_name] = covid19_npis.plot.distribution(
+        trace, sample_state=sample_state, key=dist_name, dir_save=args.folder,
     )
-    # Save figure
-    for i, fig in enumerate(dist_fig[dist_name]):
-        if len(dist_fig[dist_name]) > 1:
-            subname = f"_{i}"
-        else:
-            subname = ""
-        fig.savefig(
-            f"{args.folder}/dist_{dist_name}" + f"{subname}.png",
-            dpi=300,
-            transparent=True,
-        )
-        plt.close(fig)
     pbar.update(1)
 
 

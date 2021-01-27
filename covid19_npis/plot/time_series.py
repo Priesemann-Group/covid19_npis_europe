@@ -131,7 +131,6 @@ def timeseries(
                 len(df.index.get_level_values("age_group").unique()),
                 1,
                 figsize=(4, 1.5 * len(df.index.get_level_values("age_group").unique())),
-                constrained_layout=True,
             )
             for i, ag in enumerate(df.index.get_level_values("age_group").unique()):
                 temp = df.xs(ag, level="age_group")
@@ -182,6 +181,7 @@ def timeseries(
             fontweight="bold",
             x=0.1,
         )
+        fig.tight_layout(h_pad=1.5, w_pad=1.5)
 
     if dir_save is not None:
         if not os.path.exists(dir_save):

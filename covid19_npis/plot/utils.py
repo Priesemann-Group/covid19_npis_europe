@@ -2,7 +2,7 @@
 # @Author:        Sebastian B. Mohr
 # @Email:
 # @Created:       2020-08-17 10:35:59
-# @Last Modified: 2021-01-26 23:01:47
+# @Last Modified: 2021-01-27 13:20:26
 # ------------------------------------------------------------------------------ #
 
 import logging
@@ -90,10 +90,16 @@ def get_math_from_name(name):
         "l_i_sign": r"l_{i,sign(\Delta\gamma)}",
         "C": r"C_c",
         "C_mean": "C",
+        "Phi_IFR": r"\Phi_{IFR}",
+        "phi_age": r"\phi_{age}",
+        "phi_tests_reported": r"\phi_{tests reported}",
+        "mu_testing_state": r"\mu_{testing state}",
+        "delay_deaths_m": r"d_{deaths, m}",
+        "delay_deaths_theta": r"d_{deaths, \theta}",
     }
 
     if name not in math_keys:
-        log.warning(
+        log.debug(
             f"Math key for distribution with name '{name}' not found! Expect strange behaviour."
         )
         return name
@@ -122,9 +128,13 @@ def get_posterior_prior_from_trace(trace, sample_state, key, drop_chain_draw=Fal
         posterior = data.convert_trace_to_dataframe(
             trace, sample_state, key, data_type="posterior"
         )
-        if drop_chain_draw:
+        if drop_chain_draw and len(posterior.index.names) > 2:
             posterior.index = posterior.index.droplevel("chain")
             posterior.index = posterior.index.droplevel("draw")
+        elif drop_chain_draw:
+            print("Hi")
+            posterior = posterior.reset_index()
+            posterior = posterior[key]
     else:
         posterior = None
 
@@ -132,9 +142,11 @@ def get_posterior_prior_from_trace(trace, sample_state, key, drop_chain_draw=Fal
         prior = data.convert_trace_to_dataframe(
             trace, sample_state, key, data_type="prior_predictive"
         )
-        if drop_chain_draw:
+        if drop_chain_draw and len(prior.index.names) > 2:
             prior.index = prior.index.droplevel("chain")
             prior.index = prior.index.droplevel("draw")
+        elif drop_chain_draw:
+            prior = prior[key]
     else:
         prior = None
 

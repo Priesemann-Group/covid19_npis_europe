@@ -174,4 +174,4 @@ def load_trace_zarr(store):
     with open(f"{store}/modelParams.pickle", "rb") as f:
         modelParams = pickle.load(f)
 
-    return trace, modelParams
+    return modelParams, trace

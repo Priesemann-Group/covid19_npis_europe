@@ -432,7 +432,7 @@ def construct_R_t(name, modelParams, R_0):
     exponent = tf.einsum("...ict,...ica->...cat", gamma_i_c, alpha_i_c_a)
 
     # for robustness
-    # exponent = tf.clip_by_value(exponent, -0.2, 3)
+    # exponent = tf.clip_by_value(exponent, -0.t2, 3)
 
     R_eff = tf.einsum("...ca,...cat->...tca", R_0, tf.exp(-exponent))
     log.debug(f"R_eff\n{R_eff}")
@@ -440,6 +440,11 @@ def construct_R_t(name, modelParams, R_0):
     R_t = yield Deterministic(
         name=name, value=R_eff, shape_label=("time", "country", "age_group"),
     )
+    sum_noise = yield construct_noise("noise_R", modelParams)
+
+    # Add noise to R, this softplus has the same value and slope at 0 than exp but
+    # grows more slowly.
+    R_t = R_t * tf.nn.softplus(sum_noise / tf.math.log(2.0)) / tf.math.log(2.0)
 
     R_t = tf.einsum("...tca -> t...ca", R_t)
 
@@ -516,6 +521,32 @@ def construct_R_0(name, modelParams, loc, scale, hn_scale):
     return tf.repeat(
         R_0_c[..., tf.newaxis], repeats=modelParams.num_age_groups, axis=-1
     )
+
+
+def construct_noise(name, modelParams, sigma=0.05):
+
+    noise_R_sigma = yield HalfNormal(
+        name=f"{name}_sigma",
+        scale=sigma,
+        conditionally_independent=True,
+        event_stack=(modelParams.num_countries,),
+        shape_label=("country"),
+        transform=transformations.SoftPlus(),
+    )
+
+    noise_R = (
+        yield Normal(
+            name=f"{name}",
+            loc=0.0,
+            scale=1.0,
+            event_stack=(modelParams.length_sim, modelParams.num_countries,),
+            shape_label=("time", "country"),
+            conditionally_independent=True,
+        )
+    ) * noise_R_sigma[..., tf.newaxis, :]
+
+    sum_noise_R = tf.math.cumsum(noise_R, exclusive=True, axis=-2)[..., tf.newaxis]
+    return sum_noise_R
 
 
 def construct_R_0_old(name, modelParams, mean, beta):

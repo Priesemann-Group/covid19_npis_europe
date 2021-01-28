@@ -29,8 +29,8 @@ log = logging.getLogger(__name__)
 @pm.model()
 def main_model(modelParams):
     """
-    ToDo:
-    -----
+    ToDo
+    ----
     Create Docstring for this function.
     """
 

@@ -523,7 +523,7 @@ def construct_R_0(name, modelParams, loc, scale, hn_scale):
     )
 
 
-def construct_noise(name, modelParams, sigma=0.05):
+def construct_noise(name, modelParams, sigma=0.05, sigma_age=0.02):
 
     noise_R_sigma = yield HalfNormal(
         name=f"{name}_sigma",
@@ -531,6 +531,15 @@ def construct_noise(name, modelParams, sigma=0.05):
         conditionally_independent=True,
         event_stack=(modelParams.num_countries,),
         shape_label=("country"),
+        transform=transformations.SoftPlus(),
+    )
+
+    noise_R_sigma_age = yield HalfNormal(
+        name=f"{name}_sigma_age",
+        scale=sigma_age,
+        conditionally_independent=True,
+        event_stack=(modelParams.num_countries, modelParams.num_age_groups),
+        shape_label=("country", "age_group"),
         transform=transformations.SoftPlus(),
     )
 
@@ -545,7 +554,24 @@ def construct_noise(name, modelParams, sigma=0.05):
         )
     ) * noise_R_sigma[..., tf.newaxis, :]
 
-    sum_noise_R = tf.math.cumsum(noise_R, exclusive=True, axis=-2)[..., tf.newaxis]
+    noise_R_age = (
+        yield Normal(
+            name=f"{name}_age",
+            loc=0.0,
+            scale=1.0,
+            event_stack=(
+                modelParams.length_sim,
+                modelParams.num_countries,
+                modelParams.num_age_groups,
+            ),
+            shape_label=("time", "country", "age_group"),
+            conditionally_independent=True,
+        )
+    ) * noise_R_sigma_age[..., tf.newaxis, :, :]
+
+    sum_noise_R = tf.math.cumsum(
+        noise_R[..., tf.newaxis] + noise_R_age, exclusive=True, axis=-2
+    )
     return sum_noise_R
 
 

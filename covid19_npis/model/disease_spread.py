@@ -381,8 +381,35 @@ def _subdiagonal_array_to_matrix(array, size):
     return matrix
 
 
+def normalize_matrix(matrix):
+    size = matrix.shape[-1]
+    diag = tf.linalg.diag_part(matrix, 0, 0)
+    lower_triang = tf.linalg.band_part(matrix, -1, 0)
+    sub_diag = tf.linalg.set_diag(
+        lower_triang, tf.zeros(matrix.shape[:-1], dtype=matrix.dtype)
+    )
+    sub_diag = (
+        sub_diag / tf.sqrt(diag)[..., tf.newaxis, :] / tf.sqrt(diag)[..., tf.newaxis]
+    )
+    # sum_sub_diag = tf.reduce_sum(sub_diag, axis=(-2, -1), keepdims=True)
+    sum_rows_non_diag = tf.reduce_sum(
+        sub_diag + tf.linalg.matrix_transpose(sub_diag), axis=-1
+    )
+    norm_by = tf.reduce_max(sum_rows_non_diag, axis=-1)[..., tf.newaxis, tf.newaxis]
+
+    diag_transf = (
+        tf.eye(size, dtype=matrix.dtype) - sum_rows_non_diag[..., tf.newaxis] + norm_by
+    ) / (norm_by + 1)
+    sub_diag_transf = sub_diag / (norm_by + 1)
+    return (
+        tf.linalg.band_part(diag_transf, 0, 0)
+        + sub_diag_transf
+        + tf.linalg.matrix_transpose(sub_diag_transf)
+    )
+
+
 def construct_C(
-    name, modelParams, mean_C=-1.5, sigma_C=1, sigma_country=0.5, sigma_age=0.5
+    name, modelParams, mean_C=-0.5, sigma_C=1, sigma_country=0.5, sigma_age=0.5
 ):
 
     C_country_sigma = yield HalfNormal(
@@ -433,13 +460,18 @@ def construct_C(
         )
     ) + mean_C
     C_array = Base_C + Delta_C_age + Delta_C_country
+    C_array = tf.math.sigmoid(C_array)
     C_array = tf.clip_by_value(
-        C_array, -20, -0.01
+        C_array, 0, 0.99
     )  # ensures off diagonal terms are smaller than diagonal terms
-    C_matrix_transformed = _subdiagonal_array_to_matrix(
-        C_array, modelParams.num_age_groups
+
+    size = modelParams.num_age_groups
+    transf_array = lambda arr: normalize_matrix(
+        _subdiagonal_array_to_matrix(arr, size) + tf.linalg.eye(size, dtype=arr.dtype)
     )
-    C_matrix = tf.nn.softmax(C_matrix_transformed, axis=-1)
+
+    C_matrix = transf_array(C_array)
+
     C_matrix = yield Deterministic(
         name=f"{name}",
         value=C_matrix,
@@ -447,12 +479,7 @@ def construct_C(
     )
     yield Deterministic(
         name=f"{name}_mean",
-        value=tf.nn.softmax(
-            _subdiagonal_array_to_matrix(
-                Base_C + Delta_C_age, modelParams.num_age_groups
-            )[..., 0, :, :],
-            axis=-1,
-        ),
+        value=transf_array(Base_C + Delta_C_age)[..., 0, :, :],
         shape_label=("age_group_i", "age_group_j"),
     )
     return C_matrix

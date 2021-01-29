@@ -383,7 +383,7 @@ def _subdiagonal_array_to_matrix(array, size):
 
 def normalize_matrix(matrix):
     size = matrix.shape[-1]
-    diag = tf.linalg.diag_part(matrix, 0, 0)
+    diag = tf.linalg.diag_part(matrix)
     lower_triang = tf.linalg.band_part(matrix, -1, 0)
     sub_diag = tf.linalg.set_diag(
         lower_triang, tf.zeros(matrix.shape[:-1], dtype=matrix.dtype)

@@ -11,8 +11,10 @@ import pandas as pd
 import sys
 import logging
 import json
+import time
 from tqdm.auto import tqdm
 from COVerAge_db import download_and_save_file
+from geopy.geocoders import Nominatim
 
 try:
     import covid19_inference as cov19
@@ -28,8 +30,22 @@ def config(ID, path, name=None):
     """
         Generate config for bundesland and saves it
     """
+
+    # Get Location via name
+    app = Nominatim(user_agent="covid")
+
+    def get_location_by_address(address):
+        """This function returns a location as raw from an address
+        will repeat until success"""
+        time.sleep(1)
+        try:
+            return app.geocode(address).raw
+        except:
+            return get_location_by_address(address)
+
     if name is None:
         name = ID
+    location = get_location_by_address(name)
     config = {
         "name": name,
         "age_groups": {
@@ -38,6 +54,8 @@ def config(ID, path, name=None):
             "age_group_2": [60, 79],
             "age_group_3": [80, 100],
         },
+        "Latitude": location["lat"],
+        "Longitude": location["lon"],
     }
     with open(path + ID + "/config.json", "w") as outfile:
         json.dump(config, outfile, indent=2)
@@ -341,7 +359,6 @@ if __name__ == "__main__":
 
         try:
             config(ID=ID, path=path)
-
             deaths(ID=ID, data_begin=data_begin, data_end=data_end, path=path)
             interventions(
                 ID=ID,

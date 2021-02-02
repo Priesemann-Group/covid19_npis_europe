@@ -67,7 +67,7 @@ def timeseries(
     # Check type of arviz trace
     types = trace.groups()
     if sampling_type not in types:
-        raise KeyError("sampling_type '{sampling_type}' not found in trace!")
+        raise KeyError(f"sampling_type '{sampling_type}' not found in trace!")
 
     # Convert trace to dataframe with index levels and values changed to
     # values specified in model and modelParams

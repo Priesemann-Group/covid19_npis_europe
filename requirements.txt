@@ -12,3 +12,4 @@ timerit
 coloredlogs
 tqdm
 xarray
+zarr>=2.5.0

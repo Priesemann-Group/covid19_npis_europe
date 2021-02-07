@@ -411,6 +411,12 @@ def normalize_matrix(matrix):
 def construct_C(
     name, modelParams, mean_C=-0.5, sigma_C=1, sigma_country=0.5, sigma_age=0.5
 ):
+    """
+    TODO
+    ----
+    Docstring
+    """
+
 
     C_country_sigma = yield HalfNormal(
         name=f"{name}_country_sigma",
@@ -485,7 +491,7 @@ def construct_C(
     return C_matrix
 
 
-def InfectionModel(N, E_0_t, R_t, C, gen_kernel):
+def InfectionModel(N, E_0_t, R_t, C, gen_kernel, K=None,):
     r"""
     This function combines a variety of different steps:
 
@@ -521,6 +527,9 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel):
     C:
         inter-age-group Contact-Matrix (see 8)
         |shape| country, age_group, age_group
+    K: optional
+        inter-country Contact-Matrix
+        |shape| country, country, age_group
     gen_kernel:
         Normalized PDF of the generation interval
         |shape| batch_dims(?), l
@@ -538,44 +547,66 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel):
     # R_t = tf.clip_by_norm(R_t, 100, axes=0)
 
     def loop_body(params, elems):
-        # Unpack a:
-        # Old E_next is E_lastv now
-        R, h = elems
+        # Unpack elems and params:
+        R, h = elems 
         E_t, E_lastv, S_t = params  # Internal state
 
-        # Internal state
+        # Susceptible ratio
         f = S_t / N
 
-        # Convolution:
+        """ Convolution:
+        Calculate now "infectious" people by convolution with generation kernel
+        """
+        infectious = tf.einsum("t...ca,...t->...ca", E_lastv, gen_kernel) 
 
-        # log.debug(f"E_t {E_t}")
-        # Calc "infectious" people, weighted by serial_p (country x age_group)
-
-        infectious = tf.einsum("t...ca,...t->...ca", E_lastv, gen_kernel)  # Convolution
-
-        # Calculate effective R_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
+        """ New Reproduction number:
+        Calculate effective reproduction number, with inter age-group Contact matrix C
+        and inter country Contact matrix K.
+        """
+        # R vector to diagonal R age-group matrix
         R_sqrt = tf.math.sqrt(R)
         R_diag = tf.linalg.diag(R_sqrt)
-        R_eff = tf.einsum(
-            "...cij,...cik,...ckl->...cil", R_diag, C, R_diag
-        )  # Effective growth number
 
+        # inter age-group Contact matrix C
+        R_eff = tf.einsum( # Effective growth number
+            "...cij,...cik,...ckl->...cil", R_diag, C, R_diag
+        ) 
+
+        # inter country Contact matrix K
+        if K is not None:
+            """ Shapes:
+            K: country, country, 1
+            R_eff: country, age_group, age_group
+            R_diag: country, age_group, age_group
+            C: country, age_group, age_group
+            """
+            R_eff = R_eff[...,tf.newaxis,:,:] + K[...,tf.newaxis]
+
+        """Debug:
+        """
         # log.debug(f"infectious: {infectious}")
         # log.debug(f"R_eff:\n{R_eff}")
         # log.debug(f"f:\n{f}")
         # log.debug(f"h:\n{h}")
 
-        # Calculate new infections
-        new = tf.einsum("...ci,...cij,...cj->...cj", infectious, R_eff, f) + h
+        """Calculate new infections:
+        """
+        if K is not None:
+            new = tf.einsum("...ci,...cdij,...ci->...dj", infectious, R_eff, f) + h
+        else:
+            new = tf.einsum("...ci,...cij,...ci->...cj", infectious, R_eff, f) + h
+            
         new = tf.clip_by_value(new, 0, 1e9)
 
         # log.debug(f"new:\n{new}")  # kernel_time,batch,country,age_group
+
+        # Create new infected population for new step, insert latest at front
         E_nextv = tf.concat(
             [new[tf.newaxis, ...], E_lastv[:-1, ...],], axis=0,
-        )  # Create new infected population for new step, insert latest at front
+        )  
 
+        # Calculate new susceptible pool
         S_t = S_t - new
-
         return new, E_nextv, S_t
 
     # Number of days that we look into the past for our convolution

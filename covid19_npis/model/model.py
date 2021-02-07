@@ -29,10 +29,16 @@ log = logging.getLogger(__name__)
 @pm.model()
 def main_model(modelParams):
     """
-    ToDo
-    ----
-    Create Docstring for this function.
+    This function (pmc4 model) is the main entry point for our model, for a detailed
+    explanation make sure to read our publication (wip) or the comments in the
+    source code.
+
+    Parameters
+    ----------
+    modelParams:
+        An instance of our modelParams class. Houses the data and a variety of other useful parameters.
     """
+    log.debug("main_model call")
 
     """# Create initial Reproduction Number R_0:
     The returned R_0 tensor has the |shape| batch, country, age_group.
@@ -44,6 +50,7 @@ def main_model(modelParams):
         scale=0.5,
         hn_scale=0.3,  # Scale parameter of HalfNormal for each country
     )
+    log.debug(f"R_0:\n{R_0}")
 
     """ # Create time dependent reproduction number R(t):
     Create interventions and change points from model parameters and initial reproduction number.
@@ -55,14 +62,21 @@ def main_model(modelParams):
     )
     log.debug(f"R_t:\n{R_t}")
 
-    """ # Create Contact matrix C:
-    We use the Cholesky version as the non Cholesky version uses tf.linalg.slogdet which isn't implemented in JAX.
-    The returned tensor has the |shape| batch, country, age_group, age_group.
+    """ # Create inter age-group Contact matrix C:
+    The returned 'C' tensor has the |shape| batch, country, age_group, age_group.
     """
-    C = yield construct_C(name="C", modelParams=modelParams)
+    C = yield construct_C(name="C", modelParams=modelParams, dim_type="age")
     log.debug(f"C:\n{C}")
 
+    """ # Create inter country Contact matrix K:
+    The returned 'K' tensor has the |shape| batch, country, country, age_group.
+    """
+    K = yield construct_C(name="K", modelParams=modelParams, dim_type="country")
+    log.debug(f"K:\n{K}")
+
     """ # Create generation interval g:
+    Create an gamma kernel as the generation interval i.e. delay. We use a default length
+    of 12 days for the tensor because this spans 99% of our gamma kernel with mean 4 days.
     """
     len_gen_interv_kernel = 12
     # Create normalized pdf of generation interval
@@ -74,7 +88,7 @@ def main_model(modelParams):
 
     """ # Generate exponential distribution initial infections E_0(t):
     We need to generate initial infectious before our data starts, because we do a convolution
-    in the infectiousmodel loops. This convolution needs start values which we do not want
+    in the infectious model loops. This convolution needs start values which we do not want
     to set to 0!
     The returned E_0(t) tensor has the |shape| time, batch, country, age_group.
     """
@@ -94,20 +108,19 @@ def main_model(modelParams):
     log.debug(f"E_0(t):\n{E_0_t}")
 
     """ # Get population size tensor from modelParams:
-    Should be done earlier in the real model i.e. in the modelParams
-    The N tensor has the |shape| country, age_group.
+    The returned 'N' tensor has the |shape| country, age_group.
     """
     N = modelParams.N_data_tensor
     log.debug(f"N:\n{N}")
 
     """ # Create new cases new_E(t):
-    This is done via Infection dynamics in InfectionModel, see describtion
+    This is done via Infection dynamics in InfectionModel, see description
     The returned tensor has the |shape| batch, time,country, age_group.
     """
     new_E_t = InfectionModel(
-        N=N, E_0_t=E_0_t, R_t=R_t, C=C, gen_kernel=gen_kernel  # default valueOp:AddV2
+        N=N, E_0_t=E_0_t, R_t=R_t, C=C, gen_kernel=gen_kernel, K=K  # default valueOp:AddV2
     )
-    log.debug(f"new_E_t:\n{new_E_t[0,:]}")  # dimensons=t,c,a
+    log.debug(f"new_E_t:\n{new_E_t[0,:]}")  # dimensions=t,c,a
 
     # Clip in order to avoid infinities
     new_E_t = tf.clip_by_value(new_E_t, 1e-7, 1e9)
@@ -118,9 +131,8 @@ def main_model(modelParams):
     )
     log.debug(f"new_E_t\n{new_E_t.shape}")
 
-    """ # Number of tests and deaths
-        We simulate our reported cases i.e positiv test and totalnumber of tests total
-        and deaths.
+    """ # Number of total and positive tests:
+    TODO    - description
     """
     # Tests
     total_tests, positive_tests = yield number_of_tests.generate_testing(
@@ -130,8 +142,9 @@ def main_model(modelParams):
         new_E_t=new_E_t,
     )
 
-    # Deaths
-
+    """ # Number of deaths:
+    TODO    - description
+    """
     # Infection fatality ratio
     death_Phi = yield deaths._calc_Phi_IFR(name="IFR", modelParams=modelParams)
     # Death reporting delay
@@ -150,12 +163,11 @@ def main_model(modelParams):
     """ Likelihood
     TODO    - description on fitting data
             - add deaths and total tests
+            - add K to likelihood with mobility data 
     """
-
     likelihood = yield studentT_likelihood(
         modelParams, positive_tests, total_tests, deaths_delayed
     )
 
-    # Removed return value because it produces strange behaviour in prior predictive
-    # InferecneData
+    # Removed return value because it produces strange behaviour in prior predictive InferecneData
     # return likelihood

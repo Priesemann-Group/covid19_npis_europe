@@ -479,7 +479,7 @@ def construct_C(
     )
     yield Deterministic(
         name=f"{name}_mean",
-        value=transf_array(Base_C + Delta_C_age)[..., 0, :, :],
+        value=transf_array(tf.math.sigmoid(Base_C + Delta_C_age))[..., 0, :, :],
         shape_label=("age_group_i", "age_group_j"),
     )
     return C_matrix

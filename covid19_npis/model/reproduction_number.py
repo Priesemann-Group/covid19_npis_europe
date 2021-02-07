@@ -487,12 +487,14 @@ def construct_R_0(name, modelParams, loc, scale, hn_scale):
     ) + loc
     log.debug(f"R_0:\n{R_0}")
 
-    R_0_sigma_c = yield HalfNormal(
-        name="R_0_sigma_c",
-        scale=hn_scale,
-        conditionally_independent=True,
-        transform=transformations.SoftPlus(),
-    )
+    R_0_sigma_c = (
+        yield HalfNormal(
+            name="R_0_sigma_c",
+            scale=1.0,
+            conditionally_independent=True,
+            transform=transformations.SoftPlus(),
+        )
+    ) * hn_scale
 
     delta_R_0_c = (
         yield Normal(
@@ -525,23 +527,27 @@ def construct_R_0(name, modelParams, loc, scale, hn_scale):
 
 def construct_noise(name, modelParams, sigma=0.05, sigma_age=0.02):
 
-    noise_R_sigma = yield HalfNormal(
-        name=f"{name}_sigma",
-        scale=sigma,
-        conditionally_independent=True,
-        event_stack=(modelParams.num_countries,),
-        shape_label=("country"),
-        transform=transformations.SoftPlus(),
-    )
+    noise_R_sigma = (
+        yield HalfNormal(
+            name=f"{name}_sigma",
+            scale=1.0,
+            conditionally_independent=True,
+            event_stack=(modelParams.num_countries,),
+            shape_label=("country"),
+            transform=transformations.SoftPlus(),
+        )
+    ) * sigma
 
-    noise_R_sigma_age = yield HalfNormal(
-        name=f"{name}_sigma_age",
-        scale=sigma_age,
-        conditionally_independent=True,
-        event_stack=(modelParams.num_countries, modelParams.num_age_groups),
-        shape_label=("country", "age_group"),
-        transform=transformations.SoftPlus(),
-    )
+    noise_R_sigma_age = (
+        yield HalfNormal(
+            name=f"{name}_sigma_age",
+            scale=1.0,
+            conditionally_independent=True,
+            event_stack=(modelParams.num_countries, modelParams.num_age_groups),
+            shape_label=("country", "age_group"),
+            transform=transformations.SoftPlus(),
+        )
+    ) * sigma_age
 
     noise_R = (
         yield Normal(

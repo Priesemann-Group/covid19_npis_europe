@@ -83,8 +83,10 @@ def get_math_from_name(name):
         "R_0": r"R_{0}",
         "R_0_c": r"R_{0, c}",
         "sigma": r"\sigma",
+        "Sigma": r"\Sigma",
         "new_cases": r"N",
         "R_t": r"R_{t}",
+        "alpha_i_a": r"\alpha_{i,a}",
         "alpha_i_c_a": r"\alpha_{i,c,a}",
         "d_i_c_p": r"d_{i,c,p}",
         "l_i_sign": r"l_{i,sign(\Delta\gamma)}",
@@ -99,7 +101,7 @@ def get_math_from_name(name):
     }
 
     if name not in math_keys:
-        log.debug(
+        log.warning(
             f"Math key for distribution with name '{name}' not found! Expect strange behaviour."
         )
         return name

@@ -3,6 +3,7 @@ import logging
 import time
 import itertools
 import os
+import datetime
 
 
 """
@@ -26,12 +27,10 @@ os.environ["KMP_AFFINITY"] = "granularity=fine,verbose,compact,1,0"
 """
 import pymc4 as pm
 import tensorflow as tf
-import tensorflow_probability as tfp
 import numpy as np
 import time
 import os
 import matplotlib.pyplot as plt
-import arviz as az
 
 """
 SM: I dont know what this is doing, please explain :)
@@ -89,17 +88,17 @@ if tf.executing_eagerly():
 
 countries = [
     "Germany",
-    #    "Belgium",
+    "Belgium",
     #    "Czechia",
-    #    "Denmark",
-    #    "Finland",
-    #    "Greece",
+    "Denmark",
+    "Finland",
+    "Greece",
     # "Italy",
     # "Netherlands",
     "Portugal",
     # "Romania",
     # "Spain",
-    #    "Sweden",
+    "Sweden",
     "Switzerland",
 ]
 c = [
@@ -136,7 +135,7 @@ print_dist_shapes(sample_state)
 
 begin_time = time.time()
 log.info("start")
-num_chains = 4
+num_chains = 3
 
 
 trace_tuning, trace = pm.sample(
@@ -171,15 +170,15 @@ plt.show()
 
 # We also Sample the prior for the kde in the plots (optional)
 trace_prior = pm.sample_prior_predictive(
-    this_model, sample_shape=(1000,), use_auto_batching=False
+    this_model, sample_shape=(500,), use_auto_batching=False
 )
+
+fpath = f'./traces/{datetime.datetime.now().strftime("%y_%m_%d_%H")}'
 
 # Save our traces for the plotting script
-name, fpath = covid19_npis.utils.save_trace(
-    trace, modelParams, fpath="./traces", trace_prior=trace_prior
+store = covid19_npis.utils.save_trace_zarr(
+    trace, modelParams, store=fpath, trace_prior=trace_prior,
 )
 
 
-# Run plotting script
-path = os.path.abspath(f"{fpath}/{name}")
-os.system(f"python plot_trace.py {path}")
+os.system(f"python plot_trace.py {fpath}")

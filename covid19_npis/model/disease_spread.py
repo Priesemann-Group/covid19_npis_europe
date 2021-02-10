@@ -1,21 +1,20 @@
-import tensorflow as tf
 import logging
-import pymc4 as pm
-from .utils import gamma, convolution_with_fixed_kernel
+
 import numpy as np
+import pymc4 as pm
+import tensorflow as tf
 import tensorflow_probability as tfp
-
-
 from covid19_npis import transformations
 from covid19_npis.model.distributions import (
-    HalfCauchy,
-    Normal,
-    Gamma,
-    LogNormal,
     Deterministic,
+    Gamma,
+    HalfCauchy,
     HalfNormal,
+    LogNormal,
+    Normal,
 )
 
+from .utils import convolution_with_fixed_kernel, gamma
 
 log = logging.getLogger(__name__)
 
@@ -341,206 +340,9 @@ def construct_generation_interval(
     )  # shape g: batch_shape x len_gen_interv, shape g_mu: batch_shape x 1 x 1
 
 
-def _subdiagonal_array_to_matrix(array, size):
-    """
-    Transforms an array containing the subdiagonal elements of a matrix into a symmetric
-    matrix. Keeps prepended batch_dims in the generated matrix
-    Parameters
-    ----------
-    array: array with shape (batch_dims,) + (num_dims * (num_dims - 1) // 2,)
-    size: Size of square matrix
-
-    Returns
-    -------
-    matrix with shape (batch_dims,) + (num_dims, num_dims)
-
-    """
-    assert array.shape[-1] == size * (size - 1) // 2
-    i = 0
-    diag_indices = [0]
-    for _ in range(size // 2 + 2):
-        i += size
-        diag_indices += [i, i + 1]
-        i += 1
-    diag_indices = diag_indices[:size]
-    mask = np.ones(size * (size + 1) // 2, dtype=np.bool)
-    mask[diag_indices] = 0
-    indices = np.arange(len(mask))[mask]
-    array_scattered = tf.scatter_nd(
-        indices[..., None],
-        tf.transpose(
-            array, perm=(len(array.shape) - 1,) + tuple(range(len(array.shape) - 1))
-        ),
-        shape=(size * (size + 1) // 2,) + array.shape[:-1],
-    )
-    array_scattered = tf.transpose(
-        array_scattered, perm=tuple(range(1, len(array_scattered.shape))) + (0,)
-    )
-    triangular = tfp.math.fill_triangular(array_scattered, upper=True)
-    matrix = triangular + tf.linalg.matrix_transpose(triangular)
-    return matrix
-
-
-def normalize_matrix(matrix):
-    size = matrix.shape[-1]
-    diag = tf.linalg.diag_part(matrix)
-    lower_triang = tf.linalg.band_part(matrix, -1, 0)
-    sub_diag = tf.linalg.set_diag(
-        lower_triang, tf.zeros(matrix.shape[:-1], dtype=matrix.dtype)
-    )
-    sub_diag = (
-        sub_diag / tf.sqrt(diag)[..., tf.newaxis, :] / tf.sqrt(diag)[..., tf.newaxis]
-    )
-    # sum_sub_diag = tf.reduce_sum(sub_diag, axis=(-2, -1), keepdims=True)
-    sum_rows_non_diag = tf.reduce_sum(
-        sub_diag + tf.linalg.matrix_transpose(sub_diag), axis=-1
-    )
-    norm_by = tf.reduce_max(sum_rows_non_diag, axis=-1)[..., tf.newaxis, tf.newaxis]
-
-    diag_transf = (
-        tf.eye(size, dtype=matrix.dtype) - sum_rows_non_diag[..., tf.newaxis] + norm_by
-    ) / (norm_by + 1)
-    sub_diag_transf = sub_diag / (norm_by + 1)
-    return (
-        tf.linalg.band_part(diag_transf, 0, 0)
-        + sub_diag_transf
-        + tf.linalg.matrix_transpose(sub_diag_transf)
-    )
-
-
-def construct_C(
-    name, modelParams, mean_C=-0.5, sigma_C=1, sigma_country=0.5, sigma_age=0.5, dim_type="age"
+def InfectionModel(
+    N, E_0_t, R_t, C, gen_kernel, K=None,
 ):
-    """
-    TODO
-    ----
-    Docstring
-
-    Parameters
-    ----------
-    name: str
-    modelParams:
-    mean_C:
-    sigma_C:
-    sigma_country:
-    sigma_age:
-    dim_type: str, optional
-        Matrix type, possible values are 'age' and 'country'
-    """
-
-    C_country_sigma = yield HalfNormal(
-        name=f"{name}_country_sigma",
-        scale=sigma_country,
-        conditionally_independent=True,
-        event_stack=(1, 1),
-    )
-    C_age_sigma = yield HalfNormal(
-        name=f"{name}_age_sigma",
-        scale=sigma_age,
-        conditionally_independent=True,
-        event_stack=(1, 1),
-    )
-    # We look at our two cases:
-    if dim_type == "age":
-        Delta_C_country = (
-            yield Normal(
-                name=f"Delta_{name}_country",
-                loc=0,
-                scale=1,
-                conditionally_independent=True,
-                event_stack=(modelParams.num_countries, 1),
-                shape_label=("country", None),
-            )
-        ) * C_country_sigma
-
-        Delta_C_age = (
-            yield Normal(
-                name=f"Delta_{name}_age",
-                loc=0,
-                scale=1,
-                conditionally_independent=True,
-                event_stack=(
-                    1,
-                    modelParams.num_age_groups * (modelParams.num_age_groups - 1) // 2,
-                ),
-                shape_label=(None, "age groups cross terms"),
-            )
-        ) * C_age_sigma
-
-    elif dim_type == "country":
-        Delta_C_country = (
-            yield Normal(
-                name=f"Delta_{name}_country",
-                loc=0,
-                scale=1,
-                conditionally_independent=True,
-                event_stack=(modelParams.num_countries * (modelParams.num_countries-1) // 2, 1),
-                shape_label=("country cross terms", None),
-            )
-        ) * C_country_sigma
-
-        Delta_C_age = (
-            yield Normal(
-                name=f"Delta_{name}_age",
-                loc=0,
-                scale=1,
-                conditionally_independent=True,
-                event_stack=(
-                    1,
-                    modelParams.num_age_groups,
-                ),
-                shape_label=(None, "age groups"),
-            )
-        ) * C_age_sigma
-
-    Base_C = (
-        yield Normal(
-            name=f"Base_{name}",
-            loc=0,
-            scale=sigma_C,
-            conditionally_independent=True,
-            event_stack=(1, 1),
-        )
-    ) + mean_C
-    C_array = Base_C + Delta_C_age + Delta_C_country
-    C_array = tf.math.sigmoid(C_array)
-    C_array = tf.clip_by_value(
-        C_array, 0, 0.99
-    )  # ensures off diagonal terms are smaller than diagonal terms
-
-    size = modelParams.num_age_groups
-    transf_array = lambda arr: normalize_matrix(
-        _subdiagonal_array_to_matrix(arr, size) + tf.linalg.eye(size, dtype=arr.dtype)
-    )
-
-    if dim_type == "age":
-        C_matrix = transf_array(C_array)
-        C_matrix = yield Deterministic(
-            name=f"{name}",
-            value=C_matrix,
-            shape_label=("country", "age_group_i", "age_group_j"),
-        )
-        yield Deterministic(
-            name=f"{name}_mean",
-            value=transf_array(tf.math.sigmoid(Base_C + Delta_C_age))[..., 0, :, :],
-            shape_label=("age_group_i", "age_group_j"),
-        )
-    elif dim_type == "country":
-        # We need to put the country dimensions to the back
-        # and than to the front again
-        C_array = tf.transpose(C_array, perm=[...,-1,-3,-2])
-        C_matrix = transf_array(C_array)
-        C_matrix = tf.transpose(C_matrix, perm=[...,-2,-1,-3])
-        C_matrix = yield Deterministic(
-            name=f"{name}",
-            value=C_matrix,
-            shape_label=("country_i", "country_j", "age_group"),
-        )
-
-    return C_matrix
-
-
-def InfectionModel(N, E_0_t, R_t, C, gen_kernel, K=None,):
     r"""
     This function combines a variety of different steps:
 
@@ -597,7 +399,7 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel, K=None,):
 
     def loop_body(params, elems):
         # Unpack elems and params:
-        R, h = elems 
+        R, h = elems
         E_t, E_lastv, S_t = params  # Internal state
 
         # Susceptible ratio
@@ -606,7 +408,7 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel, K=None,):
         """ Convolution:
         Calculate now "infectious" people by convolution with generation kernel
         """
-        infectious = tf.einsum("t...ca,...t->...ca", E_lastv, gen_kernel) 
+        infectious = tf.einsum("t...ca,...t->...ca", E_lastv, gen_kernel)
 
         """ New Reproduction number:
         Calculate effective reproduction number, with inter age-group Contact matrix C
@@ -617,9 +419,9 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel, K=None,):
         R_diag = tf.linalg.diag(R_sqrt)
 
         # inter age-group Contact matrix C
-        R_eff = tf.einsum( # Effective growth number
+        R_eff = tf.einsum(  # Effective growth number
             "...cij,...cik,...ckl->...cil", R_diag, C, R_diag
-        ) 
+        )
 
         # inter country Contact matrix K
         if K is not None:
@@ -629,7 +431,7 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel, K=None,):
             R_diag: country, age_group, age_group
             C: country, age_group, age_group
             """
-            R_eff = R_eff[...,tf.newaxis,:,:] + K[...,tf.newaxis]
+            R_eff = R_eff[..., tf.newaxis, :, :] + K[..., tf.newaxis]
 
         """Debug:
         """
@@ -644,15 +446,13 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel, K=None,):
             new = tf.einsum("...ci,...cdij,...ci->...dj", infectious, R_eff, f) + h
         else:
             new = tf.einsum("...ci,...cij,...ci->...cj", infectious, R_eff, f) + h
-            
+
         new = tf.clip_by_value(new, 0, 1e9)
 
         # log.debug(f"new:\n{new}")  # kernel_time,batch,country,age_group
 
         # Create new infected population for new step, insert latest at front
-        E_nextv = tf.concat(
-            [new[tf.newaxis, ...], E_lastv[:-1, ...],], axis=0,
-        )  
+        E_nextv = tf.concat([new[tf.newaxis, ...], E_lastv[:-1, ...],], axis=0,)
 
         # Calculate new susceptible pool
         S_t = S_t - new

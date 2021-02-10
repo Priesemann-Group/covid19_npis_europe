@@ -23,6 +23,7 @@ from .distributions import (
 )
 from .utils import convolution_with_varying_kernel, gamma
 
+
 log = logging.getLogger(__name__)
 
 
@@ -65,13 +66,13 @@ def main_model(modelParams):
     """ # Create inter age-group Contact matrix C:
     The returned 'C' tensor has the |shape| batch, country, age_group, age_group.
     """
-    C = yield construct_C(name="C", modelParams=modelParams, dim_type="age")
+    C = yield contact.construct_C(name="C", modelParams=modelParams)
     log.debug(f"C:\n{C}")
 
     """ # Create inter country Contact matrix K:
     The returned 'K' tensor has the |shape| batch, country, country, age_group.
     """
-    K = yield construct_C(name="K", modelParams=modelParams, dim_type="country")
+    K = yield contact.construct_K(name="K", modelParams=modelParams)
     log.debug(f"K:\n{K}")
 
     """ # Create generation interval g:
@@ -118,7 +119,12 @@ def main_model(modelParams):
     The returned tensor has the |shape| batch, time,country, age_group.
     """
     new_E_t = InfectionModel(
-        N=N, E_0_t=E_0_t, R_t=R_t, C=C, gen_kernel=gen_kernel, K=K  # default valueOp:AddV2
+        N=N,
+        E_0_t=E_0_t,
+        R_t=R_t,
+        C=C,
+        gen_kernel=gen_kernel,
+        K=K,  # default valueOp:AddV2
     )
     log.debug(f"new_E_t:\n{new_E_t[0,:]}")  # dimensions=t,c,a
 

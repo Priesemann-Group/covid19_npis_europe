@@ -6,7 +6,7 @@
 #
 # @Author:        Sebastian B. Mohr
 # @Created:       2020-12-18 14:40:45
-# @Last Modified: 2021-01-27 12:54:39
+# @Last Modified: 2021-02-01 01:04:30
 # ------------------------------------------------------------------------------ #
 
 # Get trace fp
@@ -195,7 +195,11 @@ for ts_name in args.timeseries:
     pbar.set_description(f"Creating plots [{ts_name[0:3]}]")
 
     # Set observed data for plotting
-    if ts_name == "new_E_t" or ts_name == "positive_tests":
+    if (
+        ts_name == "new_E_t"
+        or ts_name == "positive_tests"
+        or ts_name == "positive_tests_modulated"
+    ):
         observed = modelParams.pos_tests_dataframe
     elif (ts_name == "total_tests_compact") and (
         modelParams.data_summary["files"]["/tests.csv"]

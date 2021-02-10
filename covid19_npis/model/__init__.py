@@ -1,30 +1,24 @@
+from . import (
+    deaths,
+    number_of_tests,
+    reproduction_number,
+    contact,
+    utils,
+    distributions,
+)
 from .disease_spread import (
     InfectionModel,
-    construct_generation_interval,
     InfectionModel_unrolled,
-    construct_E_0_t,
     construct_delay_kernel,
-    construct_C,
+    construct_E_0_t,
+    construct_generation_interval,
 )
-
+from .distributions import *
 from .likelihood import studentT_likelihood
-
-from .reproduction_number import construct_R_t, construct_R_0
-
+from .model import main_model
+from .reproduction_number import construct_R_0, construct_R_t
 from .utils import (
     convolution_with_fixed_kernel,
-    convolution_with_varying_kernel,
     convolution_with_map,
+    convolution_with_varying_kernel,
 )
-
-from . import number_of_tests
-from . import deaths
-from . import utils
-
-from .model import main_model
-
-
-# We need a workaround for the documentation here this is maybe fixed in a newer sphinx version...
-import sys
-
-from .distributions import *

@@ -1,3 +1,4 @@
+python >= 3.6
 #Own pymc4 version for progressbar and enhancments PR pending
 git+https://github.com/jdehning/pymc4.git@60ebbc1c4e1e59dec57c7e26c3400e80bcc913ae
 #Fix black version

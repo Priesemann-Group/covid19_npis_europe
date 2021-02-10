@@ -27,6 +27,7 @@ os.environ["KMP_AFFINITY"] = "granularity=fine,verbose,compact,1,0"
 """
 import pymc4 as pm
 import tensorflow as tf
+import tensorflow_probability as tfp
 import numpy as np
 import time
 import os
@@ -129,6 +130,95 @@ def print_dist_shapes(st):
 
 _, sample_state = pm.evaluate_model_transformed(this_model, sample_shape=(3,))
 print_dist_shapes(sample_state)
+
+
+from covid19_npis.utils import StructuredBijector
+from tensorflow_probability import distributions as tfd
+from tensorflow_probability import bijectors as tfb
+
+
+_, state = pm.evaluate_model_transformed(this_model)
+state, transformed_names = state.as_sampling_state()
+
+exclude = ("main_model|noise_R", "main_model|noise_R_age")
+init_dict = dict(state.all_unobserved_values)
+init_iaf = {k: v for k, v in init_dict.items() if k not in exclude}
+init_rest = {k: v for k, v in init_dict.items() if k in exclude}
+
+
+size_iaf = sum([int(np.prod(tensor.shape)) for tensor in init_iaf.values()])
+bijector_iaf = StructuredBijector(
+    init_iaf,
+    tfb.Invert(
+        tfb.MaskedAutoregressiveFlow(
+            shift_and_log_scale_fn=tfp.bijectors.AutoregressiveNetwork(
+                params=2, hidden_units=[size_iaf]
+            )
+        )
+    ),
+)
+normal_base = tfd.JointDistributionNamed(
+    {
+        name: tfd.Sample(tfd.Normal(loc=0.0, scale=1.0), sample_shape=tensor.shape)
+        for name, tensor in init_dict.items()
+    },
+    validate_args=False,
+    name=None,
+)
+
+bijector_rest = tfb.JointMap(
+    {
+        name: tfb.AffineScalar(
+            shift=tf.Variable(tf.zeros(shape=tensor.shape)),
+            scale=tfp.util.TransformedVariable(
+                tf.Variable(tf.ones(shape=tensor.shape)), tfb.Softplus()
+            ),
+        )
+        for name, tensor in init_rest.items()
+    }
+)
+
+init_struct = {k: v.ref() for k, v in init_dict.items()}
+init_iaf_struct = {k: v.ref() for k, v in init_iaf.items()}
+init_rest_struct = {k: v.ref() for k, v in init_rest.items()}
+
+restructure_split = tfb.Restructure([init_iaf_struct, init_rest_struct], init_struct)
+restructure_merge = tfb.Restructure(init_struct, [init_iaf_struct, init_rest_struct])
+bijector = tfb.Chain(
+    [restructure_merge, tfb.JointMap([bijector_iaf, bijector_rest]), restructure_split],
+)
+
+posterior_approx = tfd.TransformedDistribution(normal_base, bijector=bijector)
+
+sample_size = 2
+
+(
+    logpfn,
+    init_random,
+    _deterministics_callback,
+    deterministic_names,
+    state_,
+) = pm.mcmc.samplers.build_logp_and_deterministic_functions(
+    this_model, num_chains=sample_size, collect_reduced_log_prob=False
+)
+
+begin = time.time()
+posterior = tfp.vi.fit_surrogate_posterior(
+    logpfn,
+    posterior_approx,
+    tf.optimizers.Adam(learning_rate=0.001, epsilon=0.01),
+    3,
+    convergence_criterion=None,
+    sample_size=sample_size,
+    trainable_variables=None,
+    jit_compile=False,
+    variational_loss_fn=functools.partial(
+        tfp.vi.monte_carlo_variational_loss,
+        discrepancy_fn=tfp.vi.kl_forward,
+        use_reparameterization=True,
+    ),
+)
+print(f"Runtime: {time.time() - begin:.3f} s")
 
 """ # 2. MCMC Sampling
 """

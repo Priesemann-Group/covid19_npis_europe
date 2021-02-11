@@ -381,7 +381,9 @@ def construct_R_t(name, modelParams, R_0):
         # We need to expand the dims of d_icp because we need a additional time dimension
         # for "t - d_icp"
         d_i_c_p = tf.expand_dims(d_i_c_p, axis=-1)
-        inner_sigmoid = tf.einsum("...i,...icpt->...icpt", 4.0 / l_i_sign, t - d_i_c_p)
+        inner_sigmoid = tf.einsum(
+            "...i,...icpt->...icpt", 4.0 / (l_i_sign + 1e-3), t - d_i_c_p
+        )
         log.debug(f"inner_sigmoid\n{inner_sigmoid}")
         gamma_i_c_p = tf.einsum(
             "...icpt,icp->...icpt",
@@ -534,7 +536,7 @@ def construct_noise(name, modelParams, sigma=0.05, sigma_age=0.02):
             conditionally_independent=True,
             event_stack=(modelParams.num_countries,),
             shape_label=("country"),
-            transform=transformations.SoftPlus(),
+            transform=transformations.SoftPlus(scale=100),
         )
     ) * sigma
 
@@ -545,7 +547,7 @@ def construct_noise(name, modelParams, sigma=0.05, sigma_age=0.02):
             conditionally_independent=True,
             event_stack=(modelParams.num_countries, modelParams.num_age_groups),
             shape_label=("country", "age_group"),
-            transform=transformations.SoftPlus(),
+            transform=transformations.SoftPlus(scale=100),
         )
     ) * sigma_age
 

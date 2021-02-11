@@ -63,8 +63,8 @@ def construct_E_0_t(
 
     # eigvals, _ = tf.linalg.eigh(R_t[..., i_data_begin, :, :])
     # largest_eigval = eigvals[-1]
-    R_t_rescaled = R_t ** (1 / 5.0)
-    R_inv = 1 / R_t_rescaled
+    R_t_rescaled = (R_t + 1e-5) ** (1 / 5.0)
+    R_inv = 1 / (R_t_rescaled + 1e-3)
     R_inv = tf.clip_by_value(R_inv, clip_value_min=0.7, clip_value_max=1.2)
     """
     R = R_t_rescaled[0]
@@ -462,7 +462,7 @@ def construct_C(
     C_array = Base_C + Delta_C_age + Delta_C_country
     C_array = tf.math.sigmoid(C_array)
     C_array = tf.clip_by_value(
-        C_array, 0, 0.99
+        C_array, 0.001, 0.99
     )  # ensures off diagonal terms are smaller than diagonal terms
 
     size = modelParams.num_age_groups
@@ -554,7 +554,7 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel):
         infectious = tf.einsum("t...ca,...t->...ca", E_lastv, gen_kernel)  # Convolution
 
         # Calculate effective R_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
-        R_sqrt = tf.math.sqrt(R)
+        R_sqrt = tf.math.sqrt(R + 1e-7)
         R_diag = tf.linalg.diag(R_sqrt)
         R_eff = tf.einsum(
             "...cij,...cik,...ckl->...cil", R_diag, C, R_diag
@@ -567,7 +567,7 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel):
 
         # Calculate new infections
         new = tf.einsum("...ci,...cij,...cj->...cj", infectious, R_eff, f) + h
-        new = tf.clip_by_value(new, 0, 1e9)
+        new = tf.clip_by_value(new, 0.01, 1e9)  # for robustness
 
         # log.debug(f"new:\n{new}")  # kernel_time,batch,country,age_group
         E_nextv = tf.concat(

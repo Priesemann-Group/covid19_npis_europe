@@ -365,7 +365,7 @@ def construct_R_t(name, modelParams, R_0):
 
         # Get the sigmoid and multiply it with our gamma tensor
         sigmoid = tf.math.sigmoid(
-            tf.einsum("...i,...icpt->...icpt", 4.0 / l_i_sign, (t - d_i_c_p))
+            tf.einsum("...i,...icpt->...icpt", 4.0 /  (l_i_sign + 1e-3), (t - d_i_c_p))
         )
         gamma_i_c_p = tf.einsum(
             "...icpt,icp->...icpt", sigmoid, modelParams.gamma_data_tensor,
@@ -546,7 +546,7 @@ def construct_noise(name, modelParams, sigma=0.05, sigma_age=0.02):
             conditionally_independent=True,
             event_stack=(modelParams.num_countries,),
             shape_label=("country"),
-            transform=transformations.SoftPlus(),
+            transform=transformations.SoftPlus(scale=100),
         )
     ) * sigma
 
@@ -557,7 +557,7 @@ def construct_noise(name, modelParams, sigma=0.05, sigma_age=0.02):
             conditionally_independent=True,
             event_stack=(modelParams.num_countries, modelParams.num_age_groups),
             shape_label=("country", "age_group"),
-            transform=transformations.SoftPlus(),
+            transform=transformations.SoftPlus(scale=100),
         )
     ) * sigma_age
 

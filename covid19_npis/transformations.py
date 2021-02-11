@@ -25,10 +25,10 @@ class SoftPlus(BackwardTransform):
 
     def __init__(self, scale=None, **kwargs):
         if scale is None:
-            scaling = tfb.Identity()
+            scaling = tfb.Scale(20)
         else:
             scaling = tfb.Scale(scale)
-        transform = tfb.Chain([scaling, tfb.Softplus()])
+        transform = tfb.Chain([tfb.Shift(1e-5), scaling, tfb.Softplus()])
         super().__init__(transform, **kwargs)
 
 

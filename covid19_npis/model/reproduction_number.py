@@ -14,6 +14,7 @@ from covid19_npis.model.distributions import (
     Deterministic,
     HalfNormal,
     Gamma,
+    HalfStudentT,
 )
 from .. import modelParams
 
@@ -89,16 +90,18 @@ def _create_distributions(modelParams):
     """
         Δ Alpha cross for each country and age group with hyperdistributions
     """
-    alpha_sigma_c = HalfNormal(
+    alpha_sigma_c = HalfStudentT(
+        df=4,
         name="alpha_sigma_country",
         scale=0.1,
-        transform=transformations.SoftPlus(scale=0.1),
+        transform=transformations.SoftPlus(scale=1),
         conditionally_independent=True,
     )
-    alpha_sigma_a = HalfNormal(
+    alpha_sigma_a = HalfStudentT(
+        df=4,
         name="alpha_sigma_age_group",
         scale=0.1,
-        transform=transformations.SoftPlus(scale=0.1),
+        transform=transformations.SoftPlus(scale=1),
         conditionally_independent=True,
     )
     # We need to multiply alpha_sigma_c and alpha_sigma_a later. (See construct R_t)
@@ -138,7 +141,8 @@ def _create_distributions(modelParams):
     """
         l distributions
     """
-    l_sigma_interv = HalfNormal(
+    l_sigma_interv = HalfStudentT(
+        df=4,
         name="l_sigma_interv",
         scale=1.0,
         transform=transformations.SoftPlus(),
@@ -173,16 +177,18 @@ def _create_distributions(modelParams):
     """
         date d distributions
     """
-    d_sigma_interv = HalfNormal(
+    d_sigma_interv = HalfStudentT(
+        df=4,
         name="d_sigma_interv",
         scale=0.3,
-        transform=transformations.SoftPlus(scale=0.3),
+        transform=transformations.SoftPlus(scale=3),
         conditionally_independent=True,
     )
-    d_sigma_country = HalfNormal(
+    d_sigma_country = HalfStudentT(
+        df=4,
         name="d_sigma_country",
         scale=0.3,
-        transform=transformations.SoftPlus(scale=0.3),
+        transform=transformations.SoftPlus(scale=3),
         conditionally_independent=True,
     )
     delta_d_i = Normal(
@@ -434,7 +440,7 @@ def construct_R_t(name, modelParams, R_0):
     exponent = tf.einsum("...ict,...ica->...cat", gamma_i_c, alpha_i_c_a)
 
     # for robustness
-    # exponent = tf.clip_by_value(exponent, -0.t2, 3)
+    exponent = tf.clip_by_value(exponent, -1, 5)
 
     R_eff = tf.einsum("...ca,...cat->...tca", R_0, tf.exp(-exponent))
     log.debug(f"R_eff\n{R_eff}")
@@ -490,7 +496,8 @@ def construct_R_0(name, modelParams, loc, scale, hn_scale):
     log.debug(f"R_0:\n{R_0}")
 
     R_0_sigma_c = (
-        yield HalfNormal(
+        yield HalfStudentT(
+            df=4,
             name="R_0_sigma_c",
             scale=1.0,
             conditionally_independent=True,
@@ -530,24 +537,26 @@ def construct_R_0(name, modelParams, loc, scale, hn_scale):
 def construct_noise(name, modelParams, sigma=0.05, sigma_age=0.02):
 
     noise_R_sigma = (
-        yield HalfNormal(
+        yield HalfStudentT(
+            df=4,
             name=f"{name}_sigma",
             scale=1.0,
             conditionally_independent=True,
             event_stack=(modelParams.num_countries,),
             shape_label=("country"),
-            transform=transformations.SoftPlus(scale=100),
+            transform=transformations.SoftPlus_SinhArcsinh(skewness=2, tailweight=2),
         )
     ) * sigma
 
     noise_R_sigma_age = (
-        yield HalfNormal(
+        yield HalfStudentT(
+            df=4,
             name=f"{name}_sigma_age",
             scale=1.0,
             conditionally_independent=True,
             event_stack=(modelParams.num_countries, modelParams.num_age_groups),
             shape_label=("country", "age_group"),
-            transform=transformations.SoftPlus(scale=100),
+            transform=transformations.SoftPlus_SinhArcsinh(skewness=2, tailweight=2),
         )
     ) * sigma_age
 
@@ -577,9 +586,9 @@ def construct_noise(name, modelParams, sigma=0.05, sigma_age=0.02):
         )
     ) * noise_R_sigma_age[..., tf.newaxis, :, :]
 
-    sum_noise_R = tf.math.cumsum(
-        noise_R[..., tf.newaxis] + noise_R_age, exclusive=True, axis=-2
-    )
+    noise_R = noise_R[..., tf.newaxis] + noise_R_age
+    noise_R = tf.clip_by_value(noise_R, -1, 1)
+    sum_noise_R = tf.math.cumsum(noise_R, exclusive=True, axis=-2)
     return sum_noise_R
 
 

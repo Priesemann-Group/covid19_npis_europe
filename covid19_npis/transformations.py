@@ -23,12 +23,14 @@ class SoftPlus(BackwardTransform):
     name = "SoftPlus"
     JacobianPreference = JacobianPreference.Backward
 
-    def __init__(self, scale=None, **kwargs):
+    def __init__(self, scale=None, hinge_softness=None, **kwargs):
         if scale is None:
-            scaling = tfb.Scale(20)
+            scaling = tfb.Scale(10)
         else:
-            scaling = tfb.Scale(scale)
-        transform = tfb.Chain([tfb.Shift(1e-5), scaling, tfb.Softplus()])
+            scaling = tfb.Scale(scale=scale)
+        transform = tfb.Chain(
+            [tfb.Shift(1e-7), scaling, tfb.Softplus(hinge_softness=hinge_softness)]
+        )
         super().__init__(transform, **kwargs)
 
 

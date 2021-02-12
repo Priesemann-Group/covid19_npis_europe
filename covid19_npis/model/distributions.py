@@ -31,6 +31,7 @@ dists_to_modify = [
     "StudentT",
     "Gamma",
     "HalfNormal",
+    "HalfStudentT",
     "Deterministic",
     "MvNormalCholesky",
     "VonMises",
@@ -124,6 +125,7 @@ LKJCholesky.__init__ = other_init
 HalfCauchy.__init__ = init_with_softplus_transform
 StudentT.__init__ = other_init
 HalfNormal.__init__ = init_with_softplus_transform
+HalfStudentT.__init__ = init_with_softplus_transform
 Gamma.__init__ = init_with_softplus_transform
 MvNormalCholesky.__init__ = other_init
 

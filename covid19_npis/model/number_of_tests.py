@@ -16,6 +16,7 @@ from .distributions import (
     MvNormalCholesky,
     Deterministic,
     VonMises,
+    HalfStudentT,
 )
 from .. import transformations
 from . import utils
@@ -424,7 +425,8 @@ def _construct_phi_age(name, modelParams, sigma_scale=0.2):
             |shape| batch, age_group
     """
 
-    sigma = yield HalfNormal(
+    sigma = yield HalfStudentT(
+        df=4,
         name=f"{name}_sigma",
         scale=sigma_scale,
         event_stack=modelParams.num_age_groups,
@@ -513,7 +515,8 @@ def _construct_reporting_delay(
     """
 
     # Theta
-    theta_sigma = yield HalfNormal(
+    theta_sigma = yield HalfStudentT(
+        df=4,
         name=f"{name}_theta_sigma",
         scale=theta_sigma_scale,
         conditionally_independent=True,
@@ -543,8 +546,11 @@ def _construct_reporting_delay(
     )
 
     # m
-    m_sigma = yield HalfNormal(
-        name=f"{name}_m_sigma", scale=m_sigma_scale, conditionally_independent=True
+    m_sigma = yield HalfStudentT(
+        df=4,
+        name=f"{name}_m_sigma",
+        scale=m_sigma_scale,
+        conditionally_independent=True,
     )
     delta_m = tf.einsum(
         "...c,...->...c",
@@ -734,7 +740,8 @@ def construct_testing_state(
     """ First construct all hierachical variables: m,phi,xi,eta
     """
     # m
-    m_sigma = yield HalfNormal(
+    m_sigma = yield HalfStudentT(
+        df=4,
         name=f"{name_m_ast}_sigma",
         scale=m_sigma_scale,
         conditionally_independent=True,

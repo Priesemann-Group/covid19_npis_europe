@@ -14,6 +14,7 @@ from .distributions import (
     LKJCholesky,
     MvStudentT,
     Deterministic,
+    HalfStudentT,
 )
 from .. import transformations
 from .utils import gamma, get_filter_axis_data_from_dims, convolution_with_fixed_kernel
@@ -79,7 +80,8 @@ def _construct_reporting_delay(
 
     """ # Theta
     """
-    theta_sigma = yield HalfNormal(
+    theta_sigma = yield HalfStudentT(
+        df=4,
         name=f"{name}_theta_sigma",
         scale=theta_sigma_scale,
         conditionally_independent=True,
@@ -121,7 +123,8 @@ def _construct_reporting_delay(
 
     """ # Mean m
     """
-    m_sigma = yield HalfNormal(
+    m_sigma = yield HalfStudentT(
+        df=4,
         name=f"{name}_m_sigma",
         scale=m_sigma_scale,
         conditionally_independent=True,

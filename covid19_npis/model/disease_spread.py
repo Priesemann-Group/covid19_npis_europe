@@ -14,6 +14,7 @@ from covid19_npis.model.distributions import (
     LogNormal,
     Deterministic,
     HalfNormal,
+    HalfStudentT,
 )
 
 
@@ -148,6 +149,8 @@ def construct_E_0_t(
         event_stack=tuple(E_0_t_mean[..., 0:1, :, :].shape[-3:]),
     )
 
+    E_0_diff_base = tf.clip_by_value(E_0_diff_base, -10, 10)
+
     E_0_base = E_0_t_mean[..., 0:1, :, :] * tf.exp(E_0_diff_base)
     E_0_mean_diff = E_0_t_mean[..., 1:, :, :] - E_0_t_mean[..., :-1, :, :]
 
@@ -158,6 +161,8 @@ def construct_E_0_t(
         conditionally_independent=True,
         event_stack=tuple(E_0_mean_diff.shape[-3:]),
     )
+    E_0_diff_add = tf.clip_by_value(E_0_diff_add, -10, 10)
+
     E_0_base_add = E_0_mean_diff * tf.exp(E_0_diff_add)
     log.debug(f"E_0_base:\n{E_0_base}")
     log.debug(f"E_0_base_add:\n{E_0_base_add}")
@@ -422,13 +427,15 @@ def construct_C(
         )
         return C_matrix
     else:
-        C_country_sigma = yield HalfNormal(
+        C_country_sigma = yield HalfStudentT(
+            df=4,
             name=f"{name}_country_sigma",
             scale=sigma_country,
             conditionally_independent=True,
             event_stack=(1, 1),
         )
-        C_age_sigma = yield HalfNormal(
+        C_age_sigma = yield HalfStudentT(
+            df=4,
             name=f"{name}_age_sigma",
             scale=sigma_age,
             conditionally_independent=True,

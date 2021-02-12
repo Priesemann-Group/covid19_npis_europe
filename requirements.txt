@@ -1,5 +1,5 @@
 #Own pymc4 version for progressbar and enhancments PR pending
-git+https://github.com/jdehning/pymc4.git@4612a4b544af8ebd6b539f4db7ec65f040d3103f 
+git+https://github.com/jdehning/pymc4.git@1c867c031e49e9901930bb7b2bcdbaabdac9d0a8
 #Fix black version
 git+https://github.com/psf/black@19.10b0
 # Own arviz version till PR is integrated to version 0.12.0

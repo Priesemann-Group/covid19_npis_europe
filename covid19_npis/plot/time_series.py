@@ -119,7 +119,7 @@ def timeseries(
                         _observed = observed.xs(value, level=lev, axis=1)
                     else:
                         _observed = None
-                    recursive_plot(df_t, name_str + "_" + value, _observed)
+                    recursive_plot(df_t, name_str + "_" + str(value), _observed)
 
                 return  # Stop theses recursions
 

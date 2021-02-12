@@ -49,6 +49,21 @@ class SoftPlus_SinhArcsinh(BackwardTransform):
         super().__init__(transform, **kwargs)
 
 
+class Exp_SinhArcsinh(BackwardTransform):
+    name = "SoftPlus_SinhTanh"
+    JacobianPreference = JacobianPreference.Backward
+
+    def __init__(self, scale1=0.5, scale2=1e4, skewness=-10, tailweight=0.02, **kwargs):
+
+        scaling1 = tfb.Scale(scale1)
+        scaling2 = tfb.Scale(scale2)
+
+        transform = tfb.Chain(
+            [scaling2, tfb.Exp(), scaling1, tfb.SinhArcsinh(skewness, tailweight,),]
+        )
+        super().__init__(transform, **kwargs)
+
+
 class CorrelationCholesky(BackwardTransform):
     name = "CorrelationCholesky"
     JacobianPreference = JacobianPreference.Backward

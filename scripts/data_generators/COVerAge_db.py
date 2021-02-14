@@ -7,7 +7,8 @@ import sys
 import logging
 import json
 from tqdm import tqdm
-
+from geopy.geocoders import Nominatim
+import time
 
 try:
     import covid19_inference as cov19
@@ -136,6 +137,23 @@ def config(country):
         conf["age_groups"]["age_group_1"] = [30, 59]
         conf["age_groups"]["age_group_2"] = [60, 79]
         conf["age_groups"]["age_group_3"] = [80, 100]
+
+    # Get Location via name
+    app = Nominatim(user_agent="covid")
+
+    def get_location_by_address(address):
+        """This function returns a location as raw from an address
+        will repeat until success"""
+        time.sleep(1)
+        try:
+            return app.geocode(address).raw
+        except:
+            return get_location_by_address(address)
+
+    location = get_location_by_address(country)
+    conf["Latitude"] = (location["lat"],)
+    conf["Longitude"] = (location["lon"],)
+
     with open(path + country + "/config.json", "w") as outfile:
         json.dump(conf, outfile, indent=2)
     log.debug(f"Successfully created config file for {country}!")

@@ -4,6 +4,7 @@ import time
 import itertools
 import os
 import datetime
+import functools
 
 
 """
@@ -87,21 +88,38 @@ if tf.executing_eagerly():
 
 # Load our data from csv files into our own custom data classes
 
+# countries = [
+#     "Germany",
+#     "Belgium",
+#     #    "Czechia",
+#     "Denmark",
+#     "Finland",
+#     "Greece",
+#     # "Italy",
+#     # "Netherlands",
+#     "Portugal",
+#     # "Romania",
+#     # "Spain",
+#     "Sweden",
+#     "Switzerland",
+# ]
+
 countries = [
     "Germany",
-    "Belgium",
+    # "Belgium",
     #    "Czechia",
-    "Denmark",
-    "Finland",
-    "Greece",
+    # "Denmark",
+    # "Finland",
+    # "Greece",
     # "Italy",
     # "Netherlands",
     "Portugal",
     # "Romania",
     # "Spain",
-    "Sweden",
+    # "Sweden",
     "Switzerland",
 ]
+
 c = [
     covid19_npis.data.Country(f"../data/coverage_db/{country}",)
     for country in countries
@@ -131,66 +149,10 @@ def print_dist_shapes(st):
 _, sample_state = pm.evaluate_model_transformed(this_model, sample_shape=(3,))
 print_dist_shapes(sample_state)
 
+posterior_approx, bijector = covid19_npis.model.build_approximate_posterior(this_model)
 
-from covid19_npis.utils import StructuredBijector
-from tensorflow_probability import distributions as tfd
-from tensorflow_probability import bijectors as tfb
-
-
-_, state = pm.evaluate_model_transformed(this_model)
-state, transformed_names = state.as_sampling_state()
-
-exclude = ("main_model|noise_R", "main_model|noise_R_age")
-init_dict = dict(state.all_unobserved_values)
-init_iaf = {k: v for k, v in init_dict.items() if k not in exclude}
-init_rest = {k: v for k, v in init_dict.items() if k in exclude}
-
-
-size_iaf = sum([int(np.prod(tensor.shape)) for tensor in init_iaf.values()])
-bijector_iaf = StructuredBijector(
-    init_iaf,
-    tfb.Invert(
-        tfb.MaskedAutoregressiveFlow(
-            shift_and_log_scale_fn=tfp.bijectors.AutoregressiveNetwork(
-                params=2, hidden_units=[size_iaf]
-            )
-        )
-    ),
-)
-normal_base = tfd.JointDistributionNamed(
-    {
-        name: tfd.Sample(tfd.Normal(loc=0.0, scale=1.0), sample_shape=tensor.shape)
-        for name, tensor in init_dict.items()
-    },
-    validate_args=False,
-    name=None,
-)
-
-bijector_rest = tfb.JointMap(
-    {
-        name: tfb.AffineScalar(
-            shift=tf.Variable(tf.zeros(shape=tensor.shape)),
-            scale=tfp.util.TransformedVariable(
-                tf.Variable(tf.ones(shape=tensor.shape)), tfb.Softplus()
-            ),
-        )
-        for name, tensor in init_rest.items()
-    }
-)
-
-init_struct = {k: v.ref() for k, v in init_dict.items()}
-init_iaf_struct = {k: v.ref() for k, v in init_iaf.items()}
-init_rest_struct = {k: v.ref() for k, v in init_rest.items()}
-
-restructure_split = tfb.Restructure([init_iaf_struct, init_rest_struct], init_struct)
-restructure_merge = tfb.Restructure(init_struct, [init_iaf_struct, init_rest_struct])
-bijector = tfb.Chain(
-    [restructure_merge, tfb.JointMap([bijector_iaf, bijector_rest]), restructure_split],
-)
-
-posterior_approx = tfd.TransformedDistribution(normal_base, bijector=bijector)
-
-sample_size = 2
+sample_size = 50
+posterior = []
 
 (
     logpfn,
@@ -202,25 +164,56 @@ sample_size = 2
     this_model, num_chains=sample_size, collect_reduced_log_prob=False
 )
 
+
+learning_rate_fn = tf.keras.optimizers.schedules.PiecewiseConstantDecay(
+    [20, 200], [0.001, 0.0002, 0.0001]
+)
+
+trace_loss = lambda traceable_quantities: tf.debugging.check_numerics(
+    traceable_quantities.loss, f"loss not finite: {traceable_quantities.loss}"
+)
+
 begin = time.time()
 posterior = tfp.vi.fit_surrogate_posterior(
     logpfn,
     posterior_approx,
-    tf.optimizers.Adam(learning_rate=0.001, epsilon=0.01),
-    3,
+    tf.optimizers.Adam(
+        learning_rate=0.0001, epsilon=0.1, beta_1=0.9, beta_2=0.999, clipvalue=10.0
+    ),
+    200,
     convergence_criterion=None,
     sample_size=sample_size,
     trainable_variables=None,
-    jit_compile=False,
+    # jit_compile=False,
     variational_loss_fn=functools.partial(
         tfp.vi.monte_carlo_variational_loss,
-        discrepancy_fn=tfp.vi.kl_forward,
+        discrepancy_fn=tfp.vi.kl_reverse,
         use_reparameterization=True,
     ),
+    trace_fn=trace_loss,
 )
 print(f"Runtime: {time.time() - begin:.3f} s")
 
-""" # 2. MCMC Sampling
+
+_, st = pm.evaluate_model_posterior_predictive(
+    this_model, values=posterior_approx.sample(100)
+)
+var_names = list(st.all_values.keys()) + list(st.deterministics_values.keys())
+samples = {
+    k: (
+        st.untransformed_values[k]
+        if k in st.untransformed_values
+        else (
+            st.deterministics_values[k]
+            if k in st.deterministics_values
+            else st.transformed_values[k]
+        )
+    )
+    for k in var_names
+}
+
+
+"""  # 2. MCMC Sampling
 """
 
 begin_time = time.time()
@@ -242,7 +235,7 @@ trace_tuning, trace = pm.sample(
     max_tree_depth=4,
     decay_rate=0.75,
     target_accept_prob=0.75,
-    step_size_adaption_per_chain=False
+    step_size_adaption_per_chain=False,
     # num_steps_between_results = 9,
     #    state=pm.evaluate_model_transformed(this_model)[1]
     # sampler_type="nuts",

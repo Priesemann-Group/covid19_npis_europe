@@ -35,7 +35,7 @@ class SoftPlus(BackwardTransform):
 
 
 class SoftPlus_SinhArcsinh(BackwardTransform):
-    name = "SoftPlus_SinhTanh"
+    name = "SoftPlus-SinhTanh"
     JacobianPreference = JacobianPreference.Backward
 
     def __init__(self, scale=None, skewness=None, tailweight=None, **kwargs):
@@ -50,7 +50,7 @@ class SoftPlus_SinhArcsinh(BackwardTransform):
 
 
 class Exp_SinhArcsinh(BackwardTransform):
-    name = "SoftPlus_SinhTanh"
+    name = "Exp-SinhTanh"
     JacobianPreference = JacobianPreference.Backward
 
     def __init__(self, scale1=0.5, scale2=1e4, skewness=-10, tailweight=0.02, **kwargs):

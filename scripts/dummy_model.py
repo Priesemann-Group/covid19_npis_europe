@@ -149,10 +149,13 @@ def print_dist_shapes(st):
 _, sample_state = pm.evaluate_model_transformed(this_model, sample_shape=(3,))
 print_dist_shapes(sample_state)
 
-posterior_approx, bijector = covid19_npis.model.build_approximate_posterior(this_model)
+(
+    posterior_approx,
+    bijector,
+    transformed_names,
+) = covid19_npis.model.build_approximate_posterior(this_model)
 
 sample_size = 50
-posterior = []
 
 (
     logpfn,
@@ -165,10 +168,6 @@ posterior = []
 )
 
 
-learning_rate_fn = tf.keras.optimizers.schedules.PiecewiseConstantDecay(
-    [20, 200], [0.001, 0.0002, 0.0001]
-)
-
 trace_loss = lambda traceable_quantities: tf.debugging.check_numerics(
     traceable_quantities.loss, f"loss not finite: {traceable_quantities.loss}"
 )
@@ -180,7 +179,7 @@ posterior = tfp.vi.fit_surrogate_posterior(
     tf.optimizers.Adam(
         learning_rate=0.0001, epsilon=0.1, beta_1=0.9, beta_2=0.999, clipvalue=10.0
     ),
-    200,
+    4000,
     convergence_criterion=None,
     sample_size=sample_size,
     trainable_variables=None,
@@ -220,22 +219,33 @@ begin_time = time.time()
 log.info("start")
 num_chains = 6
 
+from tensorflow_probability import bijectors as tfb
+
+init_state = posterior_approx.sample(num_chains)
+init_state = [init_state[name] for name in transformed_names]
+bijector_to_list = tfb.Restructure(
+    [name for name in transformed_names], {name: name for name in transformed_names}
+)
+bijector_list = tfb.Chain([bijector_to_list, bijector, tfb.Invert(bijector_to_list)])
+
 
 trace_tuning, trace = pm.sample(
     this_model,
-    num_samples=1000,
+    num_samples=500,
     num_samples_binning=10,
     burn_in_min=10,
-    burn_in=200,
+    burn_in=500,
     use_auto_batching=False,
     num_chains=num_chains,
     xla=False,
-    initial_step_size=0.00001,
+    initial_step_size=0.001,
     ratio_tuning_epochs=1.3,
-    max_tree_depth=4,
+    max_tree_depth=5,
     decay_rate=0.75,
     target_accept_prob=0.75,
     step_size_adaption_per_chain=False,
+    bijector=bijector_list,
+    init_state=init_state
     # num_steps_between_results = 9,
     #    state=pm.evaluate_model_transformed(this_model)[1]
     # sampler_type="nuts",

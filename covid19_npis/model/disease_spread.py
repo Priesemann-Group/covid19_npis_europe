@@ -461,10 +461,10 @@ def construct_C(
                 conditionally_independent=True,
                 event_stack=(
                     1,
-                    modelParams.num_age_groups * (modelParams.num_age_groups - 1) // 2,
-                ),
+                        modelParams.num_age_groups * (modelParams.num_age_groups - 1) // 2,
+                    ),
                 shape_label=(None, "age groups cross terms"),
-            )
+                )
         ) * C_age_sigma
 
         Base_C = (

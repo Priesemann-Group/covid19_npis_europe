@@ -417,56 +417,66 @@ def construct_C(
     name, modelParams, mean_C=-0.5, sigma_C=1, sigma_country=0.5, sigma_age=0.5
 ):
 
-    C_country_sigma = yield HalfStudentT(
-        df=4,
-        name=f"{name}_country_sigma",
-        scale=sigma_country,
-        conditionally_independent=True,
-        event_stack=(1, 1),
+    # C_country_sigma = yield HalfStudentT(
+    #     df=4,
+    #     name=f"{name}_country_sigma",
+    #     scale=sigma_country,
+    #     conditionally_independent=True,
+    #     event_stack=(1, 1),
+    # )
+    # C_age_sigma = yield HalfStudentT(
+    #     df=4,
+    #     name=f"{name}_age_sigma",
+    #     scale=sigma_age,
+    #     conditionally_independent=True,
+    #     event_stack=(1, 1),
+    # )
+    #
+    # Delta_C_country = (
+    #     yield Normal(
+    #         name=f"Delta_{name}_country",
+    #         loc=0,
+    #         scale=1,
+    #         conditionally_independent=True,
+    #         event_stack=(modelParams.num_countries, 1),
+    #         shape_label=("country", None),
+    #     )
+    # ) * C_country_sigma
+    #
+    # Delta_C_age = (
+    #     yield Normal(
+    #         name=f"Delta_{name}_age",
+    #         loc=0,
+    #         scale=1,
+    #         conditionally_independent=True,
+    #         event_stack=(
+    #             1,
+    #             modelParams.num_age_groups * (modelParams.num_age_groups - 1) // 2,
+    #         ),
+    #         shape_label=(None, "age groups cross terms"),
+    #     )
+    # ) * C_age_sigma
+    #
+    # Base_C = (
+    #     yield Normal(
+    #         name=f"Base_{name}",
+    #         loc=0,
+    #         scale=sigma_C,
+    #         conditionally_independent=True,
+    #         event_stack=(1, 1),
+    #     )
+    # ) + mean_C
+    #
+    # C_array = Base_C + Delta_C_age + Delta_C_country
+
+    C_array = mean_C * np.ones(
+        (
+            modelParams.num_countries,
+            modelParams.num_age_groups * (modelParams.num_age_groups - 1) // 2,
+        ),
+        dtype="float32",
     )
-    C_age_sigma = yield HalfStudentT(
-        df=4,
-        name=f"{name}_age_sigma",
-        scale=sigma_age,
-        conditionally_independent=True,
-        event_stack=(1, 1),
-    )
 
-    Delta_C_country = (
-        yield Normal(
-            name=f"Delta_{name}_country",
-            loc=0,
-            scale=1,
-            conditionally_independent=True,
-            event_stack=(modelParams.num_countries, 1),
-            shape_label=("country", None),
-        )
-    ) * C_country_sigma
-
-    Delta_C_age = (
-        yield Normal(
-            name=f"Delta_{name}_age",
-            loc=0,
-            scale=1,
-            conditionally_independent=True,
-            event_stack=(
-                1,
-                modelParams.num_age_groups * (modelParams.num_age_groups - 1) // 2,
-            ),
-            shape_label=(None, "age groups cross terms"),
-        )
-    ) * C_age_sigma
-
-    Base_C = (
-        yield Normal(
-            name=f"Base_{name}",
-            loc=0,
-            scale=sigma_C,
-            conditionally_independent=True,
-            event_stack=(1, 1),
-        )
-    ) + mean_C
-    C_array = Base_C + Delta_C_age + Delta_C_country
     C_array = tf.math.sigmoid(C_array)
     C_array = tf.clip_by_value(
         C_array, 0.001, 0.99
@@ -484,11 +494,11 @@ def construct_C(
         value=C_matrix,
         shape_label=("country", "age_group_i", "age_group_j"),
     )
-    yield Deterministic(
-        name=f"{name}_mean",
-        value=transf_array(tf.math.sigmoid(Base_C + Delta_C_age))[..., 0, :, :],
-        shape_label=("age_group_i", "age_group_j"),
-    )
+    # yield Deterministic(
+    #     name=f"{name}_mean",
+    #     value=transf_array(tf.math.sigmoid(Base_C + Delta_C_age))[..., 0, :, :],
+    #     shape_label=("age_group_i", "age_group_j"),
+    # )
     return C_matrix
 
 

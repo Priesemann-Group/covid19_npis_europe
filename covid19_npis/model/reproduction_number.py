@@ -315,7 +315,7 @@ def construct_R_t(name, modelParams, R_0):
             shape_label=("intervention", "age_group"),
         )
 
-        return tf.math.sigmoid(alpha_cross_i_c_a)
+        return tf.math.softplus(alpha_cross_i_c_a)
 
     alpha_i_c_a = yield Deterministic(
         name="alpha_i_c_a",

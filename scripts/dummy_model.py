@@ -254,11 +254,11 @@ trace_tuning, trace = pm.sample(
 end_time = time.time()
 log.info("running time: {:.1f}s".format(end_time - begin_time))
 
-plt.figure()
-plt.plot(trace_tuning.sample_stats["step_size"][0])
-plt.figure()
-plt.plot(trace_tuning.sample_stats["lp"].T)
-plt.show()
+# plt.figure()
+# plt.plot(trace_tuning.sample_stats["step_size"][0])
+# plt.figure()
+# plt.plot(trace_tuning.sample_stats["lp"].T)
+# plt.show()
 
 
 # We also Sample the prior for the kde in the plots (optional)

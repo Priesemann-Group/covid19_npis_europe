@@ -414,7 +414,7 @@ def normalize_matrix(matrix):
 
 
 def construct_C(
-    name, modelParams, mean_C=-0.5, sigma_C=1, sigma_country=0.5, sigma_age=0.5
+    name, modelParams, mean_C=-2.0, sigma_C=1, sigma_country=0.5, sigma_age=0.5
 ):
 
     # C_country_sigma = yield HalfStudentT(

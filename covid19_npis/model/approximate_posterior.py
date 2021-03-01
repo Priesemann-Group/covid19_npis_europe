@@ -131,8 +131,8 @@ def build_iaf(values_iaf_dict, order_list, values_exclude_dict=None):
 
 
 def build_approximate_posterior(model):
-
-    order_list = ["right-to-left", "left-to-right"]
+    order_list = ["left-to-right", "right-to-left", "left-to-right"]
+    order_list_short = ["right-to-left", "left-to-right"]
     _, state = pm.evaluate_model_transformed(model)
     state, _ = state.as_sampling_state()
 
@@ -142,6 +142,13 @@ def build_approximate_posterior(model):
     noise_vars = ("main_model|noise_R", "main_model|noise_R_age")
     values_without_noise = {k: v for k, v in values_dict.items() if k not in noise_vars}
     values_with_noise = {k: v for k, v in values_dict.items() if k in noise_vars}
+
+    values_except_noise_age = {
+        k: v for k, v in values_dict.items() if k not in ("main_model|noise_R_age",)
+    }
+    values_noise_age = {
+        k: v for k, v in values_dict.items() if k in ("main_model|noise_R_age",)
+    }
 
     normal_base = tfd.JointDistributionNamed(
         {
@@ -155,8 +162,11 @@ def build_approximate_posterior(model):
     bijectors_list = []
     for vals, orders, vals_exclude in [
         (values_without_noise, order_list, values_with_noise),
-        (values_dict, order_list, None),
-        (values_without_noise, order_list, values_with_noise),
+        (values_without_noise, order_list[::-1], values_with_noise),
+        (values_except_noise_age, order_list_short, values_noise_age),
+        (values_dict, order_list_short, None),
+        # (values_without_noise, order_list, values_with_noise),
+        (values_without_noise, order_list[::-1], values_with_noise),
     ]:
         bijectors_list.append(build_iaf(vals, orders, vals_exclude))
 

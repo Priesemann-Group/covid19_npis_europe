@@ -1,0 +1,22 @@
+Index: lib/python3.8/site-packages/tensorflow_probability/python/bijectors/sigmoid.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- lib/python3.8/site-packages/tensorflow_probability/python/bijectors/sigmoid.py	(date 1613231204680)
++++ lib/python3.8/site-packages/tensorflow_probability/python/bijectors/sigmoid.py	(date 1613231204680)
+@@ -44,7 +44,13 @@
+       cutoff = -20
+     else:
+       cutoff = -9
+-    return tf.where(x < cutoff, tf.exp(x), tf.math.sigmoid(x))
++    try:
++      res = tf.where(x < cutoff, tf.exp(x), tf.math.sigmoid(x))
++    except tf.errors.InvalidArgumentError:
++      tf.debugging.disable_check_numerics()
++      res = tf.where(x < cutoff, tf.exp(x), tf.math.sigmoid(x))
++      tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
++    return res
+ 
+   @tf.custom_gradient
+   def _stable_grad_softplus(x):

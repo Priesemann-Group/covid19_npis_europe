@@ -10,11 +10,13 @@ We use some functions of our `toolbox for inference and forecast of the spread o
 
 		git clone --recurse-submodules git@github.com:Priesemann-Group/covid19_npis_europe.git
 
-Next install all required python libaries.
+Next install all required python libaries. Tensorflow isn't put in the
+requirements.txt to allow the installation of another distribution (tensorflow-gpu for instance)
 
 .. code-block:: console
 
-		pip install -r requirements.txt
+    pip install tensorflow==2.4.1
+    pip install -r requirements.txt
 
 
 Now we should be setup and ready to run our code or look into the source code.

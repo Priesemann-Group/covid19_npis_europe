@@ -132,6 +132,7 @@ dmypy.json
 data/WPP2019_PopulationBySingleAgeSex_1950-2019.csv
 
 # Datafiles folders
+data/*
 data/coverage_db/*
 data/coverage_db*
 data/unzip*

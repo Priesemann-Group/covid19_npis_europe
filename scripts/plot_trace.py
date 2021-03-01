@@ -101,7 +101,8 @@ args = parser.parse_args()
 # ------------------------------------------------------------------------------ #
 # Load pickled trace
 # ------------------------------------------------------------------------------ #
-modelParams, trace = covid19_npis.utils.load_trace_zarr(args.file)
+# modelParams, trace = covid19_npis.utils.load_trace_zarr(args.file)
+modelParams, trace = covid19_npis.utils.load_trace(args.file)
 
 # Create model and sample state from modelParams
 this_model = covid19_npis.model.main_model(modelParams)

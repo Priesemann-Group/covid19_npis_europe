@@ -43,7 +43,7 @@ def setup_colored_logs():
 
 
 def save_trace(
-    trace, modelParams, fpath="./", name=None, trace_prior=None,
+    trace, modelParams, store="./", name=None, trace_prior=None,
 ):
     """
     Saves a traces from our model run. Adds data and prior traces to InferenceData before
@@ -73,6 +73,9 @@ def save_trace(
     if trace_prior is not None:
         trace.extend(trace_prior, join="right")
 
+    if not os.path.exists(store):
+        os.makedirs(store)
+    
     # Name of file
     if name is None:
         name = datetime.datetime.now().strftime("%y_%m_%d_%H")
@@ -81,11 +84,11 @@ def save_trace(
     import pickle
 
     pickle.dump(
-        [modelParams, trace], open(f"{fpath}/{name}", "wb"),
+        [modelParams, trace], open(f"{store}/{name}", "wb"),
     )
-    log.info(f"Saved trace as {name} in {fpath}!")
+    log.info(f"Saved trace as {name} in {store}!")
 
-    return name, fpath
+    return name, store
 
 
 def load_trace(name, fpath="./"):

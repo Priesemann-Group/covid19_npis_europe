@@ -135,15 +135,15 @@ print_dist_shapes(sample_state)
 
 begin_time = time.time()
 log.info("start")
-num_chains = 3
+num_chains = 6
 
 
 trace_tuning, trace = pm.sample(
     this_model,
-    num_samples=60,
+    num_samples=1000,
     num_samples_binning=10,
     burn_in_min=10,
-    burn_in=100,
+    burn_in=200,
     use_auto_batching=False,
     num_chains=num_chains,
     xla=False,
@@ -165,7 +165,7 @@ plt.figure()
 plt.plot(trace_tuning.sample_stats["step_size"][0])
 plt.figure()
 plt.plot(trace_tuning.sample_stats["lp"].T)
-plt.show()
+plt.show(block=False)
 
 
 # We also Sample the prior for the kde in the plots (optional)
@@ -176,7 +176,8 @@ trace_prior = pm.sample_prior_predictive(
 fpath = f'./traces/{datetime.datetime.now().strftime("%y_%m_%d_%H")}'
 
 # Save our traces for the plotting script
-store = covid19_npis.utils.save_trace_zarr(
+# store = covid19_npis.utils.save_trace_zarr(
+store = covid19_npis.utils.save_trace(
     trace, modelParams, store=fpath, trace_prior=trace_prior,
 )
 

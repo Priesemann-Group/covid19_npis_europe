@@ -7,6 +7,7 @@ import pymc4 as pm
 import tensorflow as tf
 from tensorflow_probability import distributions as tfd
 from tensorflow_probability import bijectors as tfb
+from .. import transformations
 
 
 # The code in this module raises an error during cleanup. This hook catches it such that
@@ -34,11 +35,13 @@ def create_bijector_fn(shift_and_log_scale_fn):
 
     def bijector_fn(x, **condition_kwargs):
         params = shift_and_log_scale_fn(x, **condition_kwargs)
-        shift, log_scale = tf.unstack(params, num=2, axis=-1)
+        shift, scale = tf.unstack(params, num=2, axis=-1)
 
         bijectors = []
         bijectors.append(tfb.Shift(shift))
-        bijectors.append(tfb.Scale(log_scale=log_scale))
+        bijectors.append(
+            tfb.Scale(scale=transformations.Exp_SinhArcsinh().inverse(scale))
+        )
         return tfb.Chain(bijectors, validate_event_size=False)
 
     return bijector_fn
@@ -73,11 +76,13 @@ def build_iaf(values_iaf_dict, order_list, values_exclude_dict=None):
         bijectors_iaf_list.append(
             tfb.Invert(
                 tfb.MaskedAutoregressiveFlow(
-                    shift_and_log_scale_fn=tfp.bijectors.AutoregressiveNetwork(
-                        params=2,
-                        hidden_units=[size_iaf, size_iaf],
-                        input_order=order,
-                        activation="elu",
+                    bijector_fn=create_bijector_fn(
+                        tfp.bijectors.AutoregressiveNetwork(
+                            params=2,
+                            hidden_units=[size_iaf, size_iaf],
+                            input_order=order,
+                            activation="elu",
+                        )
                     )
                 )
             )

@@ -1,0 +1,28 @@
+Index: lib/python3.8/site-packages/tensorflow_probability/python/math/generic.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- lib/python3.8/site-packages/tensorflow_probability/python/math/generic.py	(date 1614119717126)
++++ lib/python3.8/site-packages/tensorflow_probability/python/math/generic.py	(date 1614119717126)
+@@ -656,10 +656,19 @@
+   logcosh = abs_x + tf.math.softplus(-2 * abs_x) - np.log(2).astype(
+       numpy_dtype)
+   bound = 45. * np.power(np.finfo(numpy_dtype).tiny, 1 / 6.)
+-  return tf.where(
++  try:
++    res = tf.where(
+       abs_x <= bound,
+       tf.math.exp(tf.math.log(abs_x) + tf.math.log1p(-tf.square(abs_x) / 6.)),
+       logcosh)
++  except tf.errors.InvalidArgumentError:
++      tf.debugging.disable_check_numerics()
++      res = tf.where(
++          abs_x <= bound,
++          tf.math.exp(tf.math.log(abs_x) + tf.math.log1p(-tf.square(abs_x) / 6.)),
++          logcosh)
++      tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
++  return res
+ 
+ 
+ def _log_cosh_jvp(primals, tangents):

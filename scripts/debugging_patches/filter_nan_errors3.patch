@@ -1,0 +1,33 @@
+Index: lib/python3.8/site-packages/tensorflow_probability/python/bijectors/softplus.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- lib/python3.8/site-packages/tensorflow_probability/python/bijectors/softplus.py	(date 1614198880654)
++++ lib/python3.8/site-packages/tensorflow_probability/python/bijectors/softplus.py	(date 1614198880654)
+@@ -50,11 +50,22 @@
+     else:
+       cutoff = -9
+ 
+-    y = tf.where(x < cutoff, tf.math.log1p(tf.exp(x)), tf.nn.softplus(x))
++    try:
++        y = tf.where(x < cutoff, tf.math.log1p(tf.exp(x)), tf.nn.softplus(x))
++    except tf.errors.InvalidArgumentError:
++        tf.debugging.disable_check_numerics()
++        y = tf.where(x < cutoff, tf.math.log1p(tf.exp(x)), tf.nn.softplus(x))
++        tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
+ 
+     def grad_fn(dy):
+-      return dy * tf.where(x < cutoff, tf.exp(x), tf.nn.sigmoid(x))
+-
++        try:
++            res = tf.where(x < cutoff, tf.exp(x), tf.nn.sigmoid(x))
++        except tf.errors.InvalidArgumentError:
++            tf.debugging.disable_check_numerics()
++            res = tf.where(x < cutoff, tf.exp(x), tf.nn.sigmoid(x))
++            tf.debugging.enable_check_numerics(stack_height_limit=50,
++                                               path_length_limit=50)
++        return dy * res
+     return y, grad_fn
+ 
+ 

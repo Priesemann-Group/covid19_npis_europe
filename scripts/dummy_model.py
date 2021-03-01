@@ -67,9 +67,6 @@ logging.getLogger("parso.python.diff").disabled = True
 # Mute Tensorflow warnings ...
 # logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
-# For eventual debugging:
-# tf.config.run_functions_eagerly(True)
-# tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
 
 if tf.executing_eagerly():
     log.warning("Running in eager mode!")
@@ -171,6 +168,10 @@ sample_size = 50
 trace_loss = lambda traceable_quantities: tf.debugging.check_numerics(
     traceable_quantities.loss, f"loss not finite: {traceable_quantities.loss}"
 )
+
+# For eventual debugging:
+# tf.config.run_functions_eagerly(True)
+# tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
 
 begin = time.time()
 posterior = tfp.vi.fit_surrogate_posterior(

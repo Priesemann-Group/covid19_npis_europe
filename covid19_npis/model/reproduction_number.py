@@ -368,7 +368,13 @@ def construct_R_t(name, modelParams, R_0):
             modelParams.date_data_tensor
         )  # shape intervention, country, change_points
 
-        return d_data + delta_d_i + delta_d_c
+        d_return = d_data + delta_d_i + delta_d_c
+        # Clip by value should be in range of our simulation
+        d_return = d_return.clip_by_value(
+            -modelParams.length_sim, modelParams.length_sim
+        )
+
+        return d_return
 
     d_i_c_p = yield Deterministic(
         name="d_i_c_p",
@@ -527,7 +533,7 @@ def construct_R_0(name, modelParams, loc, scale, hn_scale):
     log.debug(f"R_0_c:\n{R_0_c}")
 
     # for robustness
-    tf.clip_by_value(R_0_c, 1, 5)
+    R_0_c = tf.clip_by_value(R_0_c, 1, 5)
 
     return tf.repeat(
         R_0_c[..., tf.newaxis], repeats=modelParams.num_age_groups, axis=-1

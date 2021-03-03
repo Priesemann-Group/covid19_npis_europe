@@ -370,8 +370,8 @@ def construct_R_t(name, modelParams, R_0):
 
         d_return = d_data + delta_d_i + delta_d_c
         # Clip by value should be in range of our simulation
-        d_return = d_return.clip_by_value(
-            -modelParams.length_sim, modelParams.length_sim
+        d_return = tf.clip_by_value(
+            d_return, -modelParams.length_sim, modelParams.length_sim
         )
 
         return d_return

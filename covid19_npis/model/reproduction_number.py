@@ -376,7 +376,7 @@ def construct_R_t(name, modelParams, R_0):
         Helper function to construct gamma_i_c_p and calculate gamma_i_c
         """
         # Create time index tensor of the simulation length
-        t = tf.range(0, modelParams.length_sim, dtype="float32")
+        t = tf.range(0, modelParams.length_sim, dtype=tf.float32)
 
         # We need to expand the dims of d_icp because we need a additional time dimension
         # for "t - d_icp"

@@ -97,15 +97,16 @@ def distribution(
             df = prior
 
         if plot_age_groups_together and ("age_group" in df.index.names):
+            unq_age = df.index.get_level_values("age_group").unique()
             fig, ax = plt.subplots(
-                len(df.index.get_level_values("age_group").unique()),
+                len(unq_age),
                 1,
                 figsize=(
                     2.2,
-                    2.2 * len(df.index.get_level_values("age_group").unique()),
+                    2.2 * len(unq_age),
                 ),
             )
-            for i, ag in enumerate(df.index.get_level_values("age_group").unique()):
+            for i, ag in enumerate(unq_age):
                 # Create pivot table i.e. time on index and draw on columns
                 if posterior is not None:
                     posterior_t = posterior.xs(ag).to_numpy().flatten()
@@ -116,6 +117,7 @@ def distribution(
                 else:
                     prior_t = None
 
+                ax_now = ax[i] if len(unq_age)>1 else ax
                 # Plot
                 _distribution(
                     array_posterior=posterior_t,
@@ -123,10 +125,10 @@ def distribution(
                     dist_name=dist.name,
                     dist_math=get_math_from_name(dist.name),
                     suffix=f"{i}",
-                    ax=ax[i],
+                    ax=ax_now,
                 )
                 # Set title for axis
-                ax[i].set_title(ag)
+                ax_now.set_title(ag)
         elif len(df.index.names) == 1:
             fig, ax = plt.subplots(
                 len(df.index.get_level_values(df.index.names[0]).unique()),
@@ -248,7 +250,7 @@ def distribution_matrix(trace, sample_state, key, dir_save=None):
     High level function to create a distribution plot
     for matrix like variables e.g. 'C'.
     Uses last two dimensions for matrix like plot.
-    
+
     Parameters
     ----------
         trace: arivz.InferenceData
@@ -310,11 +312,13 @@ def distribution_matrix(trace, sample_state, key, dir_save=None):
             len(rows), len(cols), figsize=(2.2 * len(cols), 2.2 * len(rows))
         )
         for x, row in enumerate(rows):
+            ax_row = ax[x] if len(rows)>1 else ax
             if posterior is not None:
                 posterior_x = posterior.xs(row, level=posterior.index.names[-1])
             if prior is not None:
                 prior_x = prior.xs(row, level=prior.index.names[-1])
             for y, col in enumerate(cols):
+                ax_col = ax_row[y] if len(cols)>1 else ax_row
                 if posterior is not None:
                     posterior_xy = posterior_x.xs(col).to_numpy().flatten()
                 else:
@@ -331,14 +335,18 @@ def distribution_matrix(trace, sample_state, key, dir_save=None):
                     dist_name=dist.name,
                     dist_math=get_math_from_name(dist.name),
                     suffix=f"{x},{y}",
-                    ax=ax[x, y],
+                    ax=ax_col,
                 )
 
         # Create titles for the axes
         for x, row in enumerate(rows):
-            ax[x, 0].set_ylabel(row)
+            ax_row = ax[x] if len(rows)>1 else ax
+            ax_col = ax_row[0] if len(cols)>1 else ax_row
+            ax_col.set_ylabel(row)
         for y, col in enumerate(cols):
-            ax[0, y].set_title(col)
+            ax_col = ax[x] if len(cols)>1 else ax
+            ax_row = ax_col[0] if len(rows)>1 else ax_col
+            ax_row.set_title(col)
 
         # Suptitle
         fig.suptitle(

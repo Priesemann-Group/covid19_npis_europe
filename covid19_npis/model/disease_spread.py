@@ -411,76 +411,80 @@ def normalize_matrix(matrix):
 def construct_C(
     name, modelParams, mean_C=-0.5, sigma_C=1, sigma_country=0.5, sigma_age=0.5
 ):
-
-    C_country_sigma = yield HalfNormal(
-        name=f"{name}_country_sigma",
-        scale=sigma_country,
-        conditionally_independent=True,
-        event_stack=(1, 1),
-    )
-    C_age_sigma = yield HalfNormal(
-        name=f"{name}_age_sigma",
-        scale=sigma_age,
-        conditionally_independent=True,
-        event_stack=(1, 1),
-    )
-
-    Delta_C_country = (
-        yield Normal(
-            name=f"Delta_{name}_country",
-            loc=0,
-            scale=1,
-            conditionally_independent=True,
-            event_stack=(modelParams.num_countries, 1),
-            shape_label=("country", None),
-        )
-    ) * C_country_sigma
-
-    Delta_C_age = (
-        yield Normal(
-            name=f"Delta_{name}_age",
-            loc=0,
-            scale=1,
-            conditionally_independent=True,
-            event_stack=(
-                1,
-                modelParams.num_age_groups * (modelParams.num_age_groups - 1) // 2,
-            ),
-            shape_label=(None, "age groups cross terms"),
-        )
-    ) * C_age_sigma
-
-    Base_C = (
-        yield Normal(
-            name=f"Base_{name}",
-            loc=0,
-            scale=sigma_C,
+    if modelParams.num_age_groups==1:
+        C_matrix = tf.ones([modelParams.num_countries,1,1])
+        log.info('only one age group identified - not using contact matrix')
+    else:
+        C_country_sigma = yield HalfNormal(
+            name=f"{name}_country_sigma",
+            scale=sigma_country,
             conditionally_independent=True,
             event_stack=(1, 1),
         )
-    ) + mean_C
-    C_array = Base_C + Delta_C_age + Delta_C_country
-    C_array = tf.math.sigmoid(C_array)
-    C_array = tf.clip_by_value(
-        C_array, 0, 0.99
-    )  # ensures off diagonal terms are smaller than diagonal terms
+        C_age_sigma = yield HalfNormal(
+            name=f"{name}_age_sigma",
+            scale=sigma_age,
+            conditionally_independent=True,
+            event_stack=(1, 1),
+        )
 
-    size = modelParams.num_age_groups
-    transf_array = lambda arr: normalize_matrix(
-        _subdiagonal_array_to_matrix(arr, size) + tf.linalg.eye(size, dtype=arr.dtype)
-    )
+        Delta_C_country = (
+            yield Normal(
+                name=f"Delta_{name}_country",
+                loc=0,
+                scale=1,
+                conditionally_independent=True,
+                event_stack=(modelParams.num_countries, 1),
+                shape_label=("country", None),
+            )
+        ) * C_country_sigma
 
-    C_matrix = transf_array(C_array)
+        Delta_C_age = (
+            yield Normal(
+                name=f"Delta_{name}_age",
+                loc=0,
+                scale=1,
+                conditionally_independent=True,
+                event_stack=(
+                    1,
+                    modelParams.num_age_groups * (modelParams.num_age_groups - 1) // 2,
+                ),
+                shape_label=(None, "age groups cross terms"),
+            )
+        ) * C_age_sigma
+
+        Base_C = (
+            yield Normal(
+                name=f"Base_{name}",
+                loc=0,
+                scale=sigma_C,
+                conditionally_independent=True,
+                event_stack=(1, 1),
+            )
+        ) + mean_C
+        C_array = Base_C + Delta_C_age + Delta_C_country
+        C_array = tf.math.sigmoid(C_array)
+        C_array = tf.clip_by_value(
+            C_array, 0, 0.99
+        )  # ensures off diagonal terms are smaller than diagonal terms
+
+        size = modelParams.num_age_groups
+        transf_array = lambda arr: normalize_matrix(
+            _subdiagonal_array_to_matrix(arr, size) + tf.linalg.eye(size, dtype=arr.dtype)
+        )
+
+        yield Deterministic(
+            name=f"{name}_mean",
+            value=transf_array(tf.math.sigmoid(Base_C + Delta_C_age))[..., 0, :, :],
+            shape_label=("age_group_i", "age_group_j"),
+        )
+
+        C_matrix = transf_array(C_array)
 
     C_matrix = yield Deterministic(
         name=f"{name}",
         value=C_matrix,
         shape_label=("country", "age_group_i", "age_group_j"),
-    )
-    yield Deterministic(
-        name=f"{name}_mean",
-        value=transf_array(tf.math.sigmoid(Base_C + Delta_C_age))[..., 0, :, :],
-        shape_label=("age_group_i", "age_group_j"),
     )
     return C_matrix
 

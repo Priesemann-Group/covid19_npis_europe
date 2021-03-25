@@ -100,6 +100,7 @@ class ModelParams:
             """
             if not check_dict[key]:
                 return None
+
             for i, country in enumerate(self._countries):
                 if i > 0:
                     df = df.join(getattr(country, attribute_name))
@@ -115,6 +116,8 @@ class ModelParams:
             for key in country.exist:
                 check[key] &= country.exist[key]
         self._check = check  # Save for data summary
+
+        print(self._check)
 
         """ Update dataframes
         """
@@ -586,6 +589,7 @@ class ModelParams:
             Length of the inserted/loaded data in days
         """
         return len(self._dataframe_new_cases)
+        # return tf.size(self._dataframe_new_cases)
 
     @property
     def length_sim(self):
@@ -596,6 +600,7 @@ class ModelParams:
             Length of the simulation in days.
         """
         return len(self._tensor_pos_tests)
+        # return self._tensor_pos_tests.shape
 
     @property
     def max_num_cp(self):

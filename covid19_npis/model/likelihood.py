@@ -92,6 +92,9 @@ def _studentT_positive_tests(modelParams, pos_tests):
     log.debug(f"pos_tests_data_tensor:\n{data}")
     mask = np.argwhere(~np.isnan(data).flatten())
 
+    log.info(f"data:\n{index_mask(data, mask)}")
+    log.info(f"data shape:\n{index_mask(data, mask).shape}")
+
     len_batch_shape = len(pos_tests.shape) - 3
     likelihood = yield StudentT(
         name="likelihood_pos_tests",
@@ -104,6 +107,8 @@ def _studentT_positive_tests(modelParams, pos_tests):
         reinterpreted_batch_ndims=1,
     )
     log.debug(f"likelihood_pos_tests:\n{likelihood}")
+    log.info(f"likelihood_pos_tests:\n{likelihood}")
+    log.info(f"likelihood_pos_tests shape:\n{likelihood.shape}")
     tf.debugging.check_numerics(
         likelihood, "Nan in likelihood", name="likelihood_pos_tests"
     )

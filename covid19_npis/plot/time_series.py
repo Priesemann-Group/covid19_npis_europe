@@ -127,27 +127,30 @@ def timeseries(
         name_str = name_str[1:]
 
         if plot_age_groups_together and "age_group" in df.index.names:
+            unq_age = df.index.get_level_values("age_group").unique();
+
             fig, a_axes = plt.subplots(
-                len(df.index.get_level_values("age_group").unique()),
+                len(unq_age),
                 1,
-                figsize=(4, 1.5 * len(df.index.get_level_values("age_group").unique())),
+                figsize=(4, 1.5 * len(unq_age)),
             )
-            for i, ag in enumerate(df.index.get_level_values("age_group").unique()):
+            for i, ag in enumerate(unq_age):
                 temp = df.xs(ag, level="age_group")
 
                 # Create pivot table i.e. time on index and draw on columns
                 temp = temp.reset_index().pivot_table(index="time", columns="draw")
 
+                ax_now = a_axes[i] if len(unq_age)>1 else a_axes;
                 # Plot data
-                _timeseries(temp.index, temp.to_numpy(), what="model", ax=a_axes[i])
+                _timeseries(temp.index, temp.to_numpy(), what="model", ax=ax_now)
+
 
                 # Plot observed
                 if observed is not None:
-                    _timeseries(
-                        observed.index, observed.to_numpy(), what="data", ax=a_axes[i]
-                    )
+                    _timeseries(observed.index, observed.to_numpy(), what="data", ax=ax_now)
+
                 # Set title for axis
-                a_axes[i].set_title(ag)
+                ax_now.set_title(ag)
 
             axes[name_str] = a_axes
         else:

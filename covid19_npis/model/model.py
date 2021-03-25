@@ -33,6 +33,7 @@ def main_model(modelParams):
     ----
     Create Docstring for this function.
     """
+    # yield
 
     """# Create initial Reproduction Number R_0:
     The returned R_0 tensor has the |shape| batch, country, age_group.
@@ -61,6 +62,7 @@ def main_model(modelParams):
     """
     C = yield construct_C(name="C", modelParams=modelParams)
     log.debug(f"C:\n{C}")
+
 
     """ # Create generation interval g:
     """
@@ -129,7 +131,6 @@ def main_model(modelParams):
         modelParams=modelParams,
         new_E_t=new_E_t,
     )
-
     # Deaths
 
     # Infection fatality ratio

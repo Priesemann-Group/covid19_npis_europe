@@ -117,8 +117,6 @@ class ModelParams:
                 check[key] &= country.exist[key]
         self._check = check  # Save for data summary
 
-        print(self._check)
-
         """ Update dataframes
         """
         # Positive tests
@@ -152,6 +150,8 @@ class ModelParams:
         """
         self._update_data_summary()
 
+        self._adjust_stratification()
+
         """ Calculate positive tests data tensor (tensorflow)
         Set data tensor, replaces values smaller than 40 by nans.
         """
@@ -184,6 +184,7 @@ class ModelParams:
             - datetime.timedelta(days=self._offset_sim_data),
             "sim end": self.date_data_end,
             "age_groups": [],
+            # "age_group_data": {},
             "countries": [],
             "interventions": [],
             "files": self._check,
@@ -193,6 +194,8 @@ class ModelParams:
             level="country"
         ).unique():
             data["countries"].append(country_name)
+        ### added
+            # data["age_group_data"][country_name] = list(self.pos_tests_dataframe[country_name].columns)
         # Create age group list dynamic from data dataframe
         for age_group_name in self.pos_tests_dataframe.columns.get_level_values(
             level="age_group"
@@ -221,6 +224,24 @@ class ModelParams:
 
     def __repr__(self):
         return self.__str__()
+
+
+    # ------------------------------------------------------------------------------ #
+    # Stratifications
+    # ------------------------------------------------------------------------------ #
+
+    def _adjust_stratification(self):
+        """
+        Adjusts data frames for possibly different stratifications in age groups, by adding empty rows for all non-present age groups
+        """
+
+        age_groups = np.unique(self._dataframe_new_cases.columns.get_level_values(level="age_group"))
+        for country in self.data_summary['countries']:
+            for age_group in (set(age_groups) - set(self._dataframe_new_cases[country].columns)):
+                self._dataframe_new_cases[country,age_group] = np.NaN
+
+        self._dataframe_new_cases = self._dataframe_new_cases.sort_index(axis=1)
+
 
     # ------------------------------------------------------------------------------ #
     # Interventions
@@ -328,15 +349,18 @@ class ModelParams:
         df: pd.DataFrame
             Positive tests dataframe
         """
+
         new_cases_tensor = (
             df.to_numpy()
             .astype(self.dtype)
-            .reshape((-1, len(self.countries), len(self.age_groups)))
+            .reshape((-1, self.num_countries, self.num_age_groups))
+            # .reshape((-1, len(self.countries), len(self.age_groups)))
         )
         new_cases_tensor = np.concatenate(
             [
                 np.zeros(
-                    (self._offset_sim_data, len(self.countries), len(self.age_groups))
+                    (self._offset_sim_data, self.num_countries, self.num_age_groups)
+                    # (self._offset_sim_data, len(self.countries), len(self.age_groups))
                 ),
                 new_cases_tensor,
             ]
@@ -522,11 +546,15 @@ class ModelParams:
             age_dict = country.age_groups
 
             for age_group in self.age_groups:
-                # Select age range from config and sum over it
-                lower, upper = age_dict[age_group]
-                d_c.append(country.data_population[lower:upper].sum().values[0])
+                if age_group in age_dict:
+                    # Select age range from config and sum over it
+                    lower, upper = age_dict[age_group]
+                    d_c.append(country.data_population[lower:upper].sum().values[0])
+                else:
+                    # If age group not present in this country data
+                    d_c.append(np.NaN)
             data.append(d_c)
-        return tf.constant(data, dtype="float32")
+        return tf.constant(data, dtype=tf.float32)
 
     @property
     def N_data_tensor_total(self):
@@ -556,7 +584,8 @@ class ModelParams:
 
     @property
     def num_age_groups(self):
-        return len(self.data_summary["age_groups"])
+        return len(np.unique(self.data_summary["age_groups"]))
+        # return len(self.data_summary["age_groups"])
 
     @property
     def num_countries(self):

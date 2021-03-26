@@ -145,6 +145,7 @@ data/Germany_landkreise*
 scripts/figures/*/*/*.png
 scripts/figures/*/*.png
 scripts/figures/*.png
+scripts/figures*
 # traces
 *.h5
 scripts/traces/*

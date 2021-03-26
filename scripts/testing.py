@@ -54,7 +54,7 @@ if tf.executing_eagerly():
 def define_model(squeeze_age=False):
     countries = [
         "Germany",
-        # "Germany_1age",
+        "Germany_1age",
         "Belgium",
         # "Belgium_1age",
         # #    "Czechia",
@@ -76,47 +76,29 @@ def define_model(squeeze_age=False):
         for country in countries
     ]
 
-    if squeeze_age:
-        for i,con in enumerate(c):
-            # con.age_groups = {
-            #     'age_group_0': [0,100],
-            #     'age_group_1': [101,101],
-            #     'age_group_2': [101,101],
-            #     'age_group_3': [101,101]
-            # }
-            con.data_new_cases = pd.DataFrame(con.data_new_cases.groupby(level=0,axis=1).sum())
-            con.data_new_cases['age_group'] = 'age_group_0'
-            con.data_new_cases = con.data_new_cases.set_index('age_group', append=True).unstack('age_group')
-            con.data_new_cases[con.name,'age_group_0'] = np.random.randint(10,20,167)*1.
-            con.data_new_cases[con.name,'age_group_1'] = np.random.randint(10,20,167)*1.
-            con.data_new_cases[con.name,'age_group_2'] = np.random.randint(10,20,167)*1.
-            con.data_new_cases[con.name,'age_group_3'] = np.random.randint(10,20,167)*1.
-
-        # return c
-
     # Construct our modelParams from the data.
     modelParams = covid19_npis.ModelParams(countries=c, minimal_daily_deaths=1)
 
     # Define our model
     this_model = covid19_npis.model.model.main_model(modelParams)
 
-    if tf.executing_eagerly(): # does only work, when eager exec is turned on
-        # Test shapes, should be all 3:
-        def print_dist_shapes(st):
-            for name, dist in itertools.chain(
-                st.discrete_distributions.items(), st.continuous_distributions.items(),
-            ):
-                if dist.log_prob(st.all_values[name]).shape != (3,):
-                    log.warning(
-                        f"False shape: {dist.log_prob(st.all_values[name]).shape}, {name}"
-                    )
-            for p in st.potentials:
-                if p.value.shape != (3,):
-                    log.warning(f"False shape: {p.value.shape} {p.name}")
-
-
-        _, sample_state = pm.evaluate_model_transformed(this_model, sample_shape=(3,))
-        print_dist_shapes(sample_state)
+    # if tf.executing_eagerly(): # does only work, when eager exec is turned on
+    #     # Test shapes, should be all 3:
+    #     def print_dist_shapes(st):
+    #         for name, dist in itertools.chain(
+    #             st.discrete_distributions.items(), st.continuous_distributions.items(),
+    #         ):
+    #             if dist.log_prob(st.all_values[name]).shape != (3,):
+    #                 log.warning(
+    #                     f"False shape: {dist.log_prob(st.all_values[name]).shape}, {name}"
+    #                 )
+    #         for p in st.potentials:
+    #             if p.value.shape != (3,):
+    #                 log.warning(f"False shape: {p.value.shape} {p.name}")
+    #
+    #
+    #     _, sample_state = pm.evaluate_model_transformed(this_model, sample_shape=(3,))
+    #     print_dist_shapes(sample_state)
 
     return c, modelParams, this_model
 

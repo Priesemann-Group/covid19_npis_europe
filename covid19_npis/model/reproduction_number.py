@@ -351,7 +351,7 @@ def construct_R_t(name, modelParams, R_0):
         delta_d_i = tf.einsum(  # Multiply distribution by hyperprior
             "...ica,...->...ica", delta_d_i, d_sigma_interv
         )
-
+        
         delta_d_c = yield distributions["delta_d_c"]
         d_sigma_country = yield distributions["d_sigma_country"]
         delta_d_c = tf.einsum(  # Multiply distribution by hyperprior

@@ -543,12 +543,12 @@ class ModelParams:
             d_c = []
 
             # Get real age groups from country config
-            age_dict = country.age_groups
+            age_group_c = country.age_groups
 
             for age_group in self.age_groups:
-                if age_group in age_dict:
+                if age_group in age_group_c:
                     # Select age range from config and sum over it
-                    lower, upper = age_dict[age_group]
+                    lower, upper = age_group_c[age_group]
                     d_c.append(country.data_population[lower:upper].sum().values[0])
                 else:
                     # If age group not present in this country data

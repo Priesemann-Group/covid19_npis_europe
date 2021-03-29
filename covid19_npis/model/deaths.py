@@ -233,11 +233,13 @@ def _calc_Phi_IFR(
         shape_label=("country",),
     )
 
+    n_batches = None if (len(beta.shape)==1) else beta.shape[0]
+
     # for robustness, clip at about 5 sigmas
     alpha = tf.clip_by_value(alpha, 0.1, 0.14)
     beta = tf.clip_by_value(beta, -10, -5)
 
-    ages = tf.range(0.0, 101.0, delta=1.0, dtype="float32")  # [0...100]
+    ages = tf.range(0.0, 101.0, delta=1.0, dtype=tf.float32)  # [0...100]
     log.debug(f"ages\n{ages}")
     log.debug(f"beta\n{beta}")
     log.debug(f"alpha\n{alpha[..., tf.newaxis]}")
@@ -254,21 +256,28 @@ def _calc_Phi_IFR(
 
     # Multiply N_pop(a) * IFR(a) for every age group and country
     product = tf.einsum("...ca,ca->...ca", IFR, N_total)
+
     log.debug(f"product\n{product}")
     # for each  country and age group:
     phi = []
     for c, country in enumerate(modelParams.countries):
         phi_c = []
+
+        age_group_c = country.age_groups
+
         for age_group in modelParams.age_groups:
             # Get lower/upper bound for age groups in selected country
-            lower, upper = country.age_groups[age_group]  # inclusive
+            if age_group in age_group_c:
+                lower, upper = country.age_groups[age_group]  # inclusive
 
-            phi_a = tf.math.reduce_sum(product[..., c, lower : upper + 1], axis=-1)
-            log.debug(f"phi_a\n{phi_a.shape}")
-            phi_c.append(phi_a)
+                phi_a = tf.math.reduce_sum(product[..., c, lower : upper + 1], axis=-1)
+                log.debug(f"phi_a\n{phi_a.shape}")
+                phi_c.append(phi_a)
+            else:
+                phi_c.append(tf.constant(np.NaN,shape=(n_batches,) if n_batches else ()))
         phi.append(phi_c)
     log.debug(f"phi\n{tf.convert_to_tensor(phi).shape}")
-
+    
     phi = tf.einsum("ca...->...ca", tf.convert_to_tensor(phi))  # Transpose
 
     Phi_IFR = tf.einsum("ca,...ca->...ca", 1.0 / N_agegroups, phi)

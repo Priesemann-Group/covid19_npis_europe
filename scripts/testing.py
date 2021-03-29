@@ -51,7 +51,7 @@ if tf.executing_eagerly():
 
 # Load our data from csv files into our own custom data classes
 
-def define_model(squeeze_age=False):
+def define_model():
     countries = [
         "Germany",
         "Germany_1age",

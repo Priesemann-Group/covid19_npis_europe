@@ -535,6 +535,11 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel):
         Sample from distribution of new, daily cases
     """
 
+    log.info(f'E_0_t\n{E_0_t}')
+    log.info(f'R_t\n{R_t}')
+    log.info(f'C\n{C}')
+    # log.info(f'E_0_t\n{E_0_t}')
+
     # @tf.function(autograph=False)
 
     # For robustness of inference

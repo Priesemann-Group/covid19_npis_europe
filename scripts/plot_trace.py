@@ -193,7 +193,7 @@ pbar = tqdm(
 # Timeseries
 ts_axes = {}
 for ts_name in args.timeseries:
-    pbar.set_description(f"Creating plots [{ts_name[0:3]}]")
+    pbar.set_description(f"Creating plots [{ts_name}]")
 
     # Set observed data for plotting
     if ts_name == "new_E_t" or ts_name == "positive_tests":

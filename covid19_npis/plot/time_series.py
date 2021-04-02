@@ -46,7 +46,7 @@ def timeseries(
     trace_posterior, trace_prior : arivz InferenceData
         Raw data from pymc4 sampling
 
-    sample_state : pymc4 sample stae
+    sample_state : pymc4 sample state
 
     key : str
         Name of the timeseries variable to plot. Same name as in the model definitions.

@@ -158,5 +158,5 @@ def main_model(modelParams):
     )
 
     # Removed return value because it produces strange behaviour in prior predictive
-    # InferecneData
+    # InferenceData
     # return likelihood

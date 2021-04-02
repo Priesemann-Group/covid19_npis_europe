@@ -174,7 +174,6 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
 
     filter_axes_data = utils.get_filter_axis_data_from_dims(len(new_E_t.shape))
     # Convolution with gamma kernel
-    log.info(f'new_E_t\n{new_E_t}')
     new_E_t_delayed = utils.convolution_with_varying_kernel(
         data=new_E_t,
         kernel=delay_kernel,
@@ -196,8 +195,6 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
     positive_tests = _calc_positive_tests(
         new_E_t_delayed=new_E_t_delayed, phi_plus=phi_t, phi_age=phi_age,
     )
-    # log.info(f'pos tests\n{positive_tests.shape}')
-    # log.info(f'pos tests\n{(~np.isnan(positive_tests)).sum()}')
 
     positive_tests = yield weekly_modulation(
         name=name_positive, modelParams=modelParams, cases=positive_tests,
@@ -209,6 +206,7 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
         value=positive_tests,
         shape_label=("time", "country", "age_group"),
     )
+    log.debug(f"positive_tests\n{positive_tests}")
 
     """ # Total tests
     """
@@ -230,7 +228,7 @@ def generate_testing(name_total, name_positive, modelParams, new_E_t):
         value=tf.reduce_sum(total_tests, axis=-1),
         shape_label=("time", "country"),
     )
-    log.debug(f"total_tests\n{total_tests}")
+    # log.debug(f"total_tests\n{total_tests}")
     return (total_tests, positive_tests)
 
 
@@ -267,9 +265,6 @@ def _calc_positive_tests(new_E_t_delayed, phi_plus, phi_age):
         |shape| batch, time, country, age_group
     """
 
-    # log.info(f'new E_t delayed\n{new_E_t_delayed}')
-    # log.info(f'phi plus\n{phi_plus}')
-    # log.info(f'phi age\n{phi_age}')
     n_plus = tf.einsum("...tca,...tc,...a->...tca", new_E_t_delayed, phi_plus, phi_age)
     return n_plus
 
@@ -319,7 +314,6 @@ def _calc_total_number_of_tests_performed(
             :math:`n_{\Sigma, c,a}(t)`
             |shape| batch, time, country, age_group
     """
-
     inner = (
         tf.einsum("...tca,...tc->...tca", new_E_t_delayed, phi_plus)
         + tf.einsum("...tca,...tc,...tc->...tca", new_E_t_delayed, phi_plus, eta)
@@ -801,8 +795,8 @@ def construct_testing_state(
         conditionally_independent=True,
     )
 
-    log.debug(f"xi_sigma{xi_sigma}")
-    log.debug(f"xi_mu_cross{xi_mu_cross}")
+    log.debug(f"xi_sigma\n{xi_sigma}")
+    log.debug(f"xi_mu_cross\n{xi_mu_cross}")
 
     """ Correlate with cholsky and multivariant normal distribution
     """

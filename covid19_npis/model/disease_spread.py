@@ -53,7 +53,8 @@ def construct_E_0_t(
             |shape| time, batch, country, age_group
     """
     batch_dims = tuple(R_t.shape)[:-3]
-    data = modelParams.pos_tests_data_array
+    # data = modelParams.pos_tests_data_array
+    data = modelParams.pos_tests_data_tensor
     assert data.ndim == 3
     assert (
         modelParams.offset_sim_data >= len_gen_interv_kernel + mean_test_delay
@@ -61,11 +62,11 @@ def construct_E_0_t(
     i_data_begin_list = modelParams.indices_begin_data
     i_sim_begin_list = i_data_begin_list - len_gen_interv_kernel - mean_test_delay
 
-    # eigvals, _ = tf.linalg.eigh(R_t[..., i_data_begin, :, :])
-    # largest_eigval = eigvals[-1]
-    R_t_rescaled = R_t ** (1 / 5.0)
+    # # eigvals, _ = tf.linalg.eigh(R_t[..., i_data_begin, :, :])
+    # # largest_eigval = eigvals[-1]
+    R_t_rescaled = R_t ** (1. / 5)
     R_inv = 1 / R_t_rescaled
-    R_inv = tf.clip_by_value(R_inv, clip_value_min=0.7, clip_value_max=1.2)
+    R_inv = tf.clip_by_value(R_inv, clip_value_min=0.7, clip_value_max=1.3)
     """
     R = R_t_rescaled[0]
     R_sqrt = tf.math.sqrt(R)
@@ -79,10 +80,12 @@ def construct_E_0_t(
     avg_cases_begin = []
     for c in range(data.shape[1]):
         avg_cases_begin.append(
-            np.nanmean(data[i_data_begin_list[c] : i_data_begin_list[c] + 5, c], axis=0)
+            tf.reduce_mean(data[i_data_begin_list[c] : i_data_begin_list[c] + 5, c], axis=0)
         )
-    avg_cases_begin = np.array(avg_cases_begin)
-    E_t = tf.convert_to_tensor(avg_cases_begin)
+    # avg_cases_begin = np.array(avg_cases_begin)
+    E_t = tf.stack(avg_cases_begin)
+
+    # E_t = tf.convert_to_tensor(avg_cases_begin)
     log.debug(f"avg_cases_begin:\n{avg_cases_begin}")
 
     if len(R_t.shape) == 5:
@@ -115,10 +118,10 @@ def construct_E_0_t(
     """
     E_0_t_mean = [None for _ in range(len_gen_interv_kernel - 1, -1, -1)]
     R_inv_transposed = tf.transpose(R_inv, perm=perm_forw)
+    # log.info(f'mean_test_delay: {mean_test_delay}')
     for i in range(len_gen_interv_kernel - 1, -1, -1):
         # R = tf.gather(R_t_rescaled, i_sim_begin_list + i, axis=-3, batch_dims=1,))
         # E_t = tf.linalg.matvec(R_eff_inv, E_t)
-
         R_current = tf.transpose(
             tf.gather(
                 R_inv_transposed,
@@ -131,12 +134,16 @@ def construct_E_0_t(
             0
         ]  # A little complicated expression, because tensorflow doesn't allow advanced numpy indexing
 
+        # log.info(f'R_current: {1/R_current}')
         E_t = R_current * E_t
         log.debug(f"i, E_t:{i}\n{E_t}")
         E_0_t_mean[i] = E_t
     E_0_t_mean = tf.stack(E_0_t_mean, axis=-3)
     E_0_t_mean = tf.clip_by_value(E_0_t_mean, 1e-5, 1e6)
     log.debug(f"E_0_t_mean:\n{E_0_t_mean}")
+    # log.info(f"E_0_t_mean:\n{E_0_t_mean.shape}")
+    # log.info(f"E_0_t_mean (young):\n{E_0_t_mean[:30,0,0]}")
+    # log.info(f"E_0_t_mean (old):\n{E_0_t_mean[:30,0,3]}")
 
     E_0_diff_base = yield Normal(
         name="E_0_diff_base",
@@ -149,6 +156,7 @@ def construct_E_0_t(
     E_0_base = E_0_t_mean[..., 0:1, :, :] * tf.exp(E_0_diff_base)
     E_0_mean_diff = E_0_t_mean[..., 1:, :, :] - E_0_t_mean[..., :-1, :, :]
 
+    # log.info(f"E_0_mean_diff shape:\n{E_0_mean_diff.shape}")
     E_0_diff_add = yield Normal(
         name="E_0_diff_add",
         loc=0.0,
@@ -157,6 +165,7 @@ def construct_E_0_t(
         event_stack=tuple(E_0_mean_diff.shape[-3:]),
     )
     E_0_base_add = E_0_mean_diff * tf.exp(E_0_diff_add)
+    # log.info(f"E_0_base_add shape:\n{E_0_base_add.shape}")
     log.debug(f"E_0_base:\n{E_0_base}")
     log.debug(f"E_0_base_add:\n{E_0_base_add}")
     log.debug(f"R_t:\n{R_t.shape}")
@@ -169,6 +178,8 @@ def construct_E_0_t(
         "...kca->k...ca", E_0_t_rand
     )  # Now: shape:  len_gen_interv_kernel x batch_dims x countries x age_groups
 
+    # log.info(f"E_0_t_rand:\n{E_0_t_rand}")
+    # log.info(f"E_0_t_rand shape:\n{E_0_t_rand.shape}")
     log.debug(f"E_0_t_rand:\n{E_0_t_rand}")
     E_0_t = []
     batch_shape = R_t.shape[1:-2]
@@ -191,7 +202,10 @@ def construct_E_0_t(
                 axis=0,
             )
         )
+    # log.info(f"E_0_t_rand shape:\n{E_0_t_rand.shape}")
     E_0_t = tf.concat(E_0_t, axis=-2)
+    # log.info(f'E_0_t:\n{tf.reduce_sum(E_0_t,axis=0)}')
+    # log.info(f'E_0_t shape:\n{E_0_t.shape}')
 
     return E_0_t
 
@@ -493,7 +507,7 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel):
     r"""
     This function combines a variety of different steps:
 
-        #. Converts the given :math:`E_0` values  to an exponential distributed initial :math:`E_{0_t}` with an
+        #. Converts the given :math:`E_0` values to an exponential distributed initial :math:`E_{0_t}` with an
            length of :math:`l` this can be seen in :py:func:`_construct_E_0_t`.
 
         #. Calculates :math:`R_{eff}` for each time step using the given contact matrix :math:`C`:
@@ -502,7 +516,7 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel):
                 R_{diag} &= \text{diag}(\sqrt{R}) \\
                 R_{eff}  &= R_{diag} \cdot C \cdot R_{diag}
 
-        #. Calculates the :math:`\tilde{I}` arrays i.e. new infectious for each age group and
+        #. Calculates the :math:`\tilde{I}` arrays i.e. new infections for each age group and
            country, with the efficient reproduction matrix :math:`R_{eff}`, the susceptible pool
            :math:`S`, the population size :math:`N` and the generation interval :math:`g(\tau)`.
            This is done recursive for every time step.
@@ -535,10 +549,9 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel):
         Sample from distribution of new, daily cases
     """
 
-    log.info(f'E_0_t\n{E_0_t}')
-    log.info(f'R_t\n{R_t}')
-    log.info(f'C\n{C}')
     # log.info(f'E_0_t\n{E_0_t}')
+    # log.info(f'R_t\n{R_t}')
+    # log.info(f'C\n{C}')
 
     # @tf.function(autograph=False)
 
@@ -555,12 +568,17 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel):
         # Internal state
         f = S_t / N
 
+        # log.info(f'i:\n{i}')
         # Convolution:
 
         # log.debug(f"E_t {E_t}")
         # Calc "infectious" people, weighted by serial_p (country x age_group)
 
-        infectious = tf.einsum("t...ca,...t->...ca", E_lastv, gen_kernel)  # Convolution
+        # log.info(f'E_lastv:\n{E_lastv}')
+        E_lastv_noNaN = tf.where(tf.math.is_nan(E_lastv),tf.zeros(E_lastv.shape),E_lastv) # replacing NaN values -> 0
+        infectious = tf.einsum("t...ca,...t->...ca", E_lastv_noNaN, gen_kernel)  # Convolution
+        # log.info(f'infectious:\n{infectious}')
+
 
         # Calculate effective R_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
         R_sqrt = tf.math.sqrt(R)
@@ -575,9 +593,9 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel):
         # log.debug(f"h:\n{h}")
 
         # Calculate new infections
+        # log.info(f'R_eff:\n{R_eff}')
         new = tf.einsum("...ci,...cij,...cj->...cj", infectious, R_eff, f) + h
         new = tf.clip_by_value(new, 0, 1e9)
-
         # log.debug(f"new:\n{new}")  # kernel_time,batch,country,age_group
         E_nextv = tf.concat(
             [new[tf.newaxis, ...], E_lastv[:-1, ...],], axis=0,
@@ -589,11 +607,20 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel):
 
     # Number of days that we look into the past for our convolution
     len_gen_interv_kernel = gen_kernel.shape[-1]
-
+    # log.info(f'sum E\n{tf.reduce_sum(E_0_t, axis=0)}')
+    # log.info(f'N\n{N}')
+    # log.info(f'len gen interval\n{len_gen_interv_kernel}')
+    # log.info(f'isnan\n{tf.math.is_nan(E_0_t)}')
+    # log.info(f'isnan shape\n{tf.math.is_nan(E_0_t).shape}')
+    # log.info(f'zeros\n{tf.zeros(E_0_t).shape}')
+    # E_0_t_noNaN = tf.where(tf.math.is_nan(E_0_t),tf.zeros(E_0_t),E_0_t)
+    # S_initial = N - tf.reduce_sum(E_0_t_noNaN, axis=0)
     S_initial = N - tf.reduce_sum(E_0_t, axis=0)
+    # log.info(f'S_initial\n{S_initial}')
 
     R_t_for_loop = R_t[len_gen_interv_kernel:]
     h_t_for_loop = E_0_t[len_gen_interv_kernel:]
+    # log.info(f'h_t_for_loop\n{h_t_for_loop[:30,...]}')
     # Initial susceptible population = total - infected
 
     """ Calculate time evolution of new, daily infections
@@ -604,7 +631,7 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel):
     initial = (
         tf.zeros(S_initial.shape, dtype=S_initial.dtype),
         E_0_t[:len_gen_interv_kernel],
-        S_initial,
+        S_initial
     )
     out = tf.scan(fn=loop_body, elems=(R_t_for_loop, h_t_for_loop), initializer=initial)
     daily_infections_final = out[0]
@@ -620,6 +647,9 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel):
         f"daily_infections_final sum:\n{tf.reduce_sum(daily_infections_final, axis=-3)}"
     )
     daily_infections_final = tf.clip_by_value(daily_infections_final, 1e-6, 1e6)
+
+    # log.info(f'daily infections\n{daily_infections_final}')
+    # log.info(f'daily infections [shape]\n{daily_infections_final.shape}')
 
     return daily_infections_final  # batch_dims x time x country x age
 

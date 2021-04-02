@@ -263,21 +263,24 @@ def _calc_Phi_IFR(
     for c, country in enumerate(modelParams.countries):
         phi_c = []
 
-        age_group_c = country.age_groups
+        if modelParams.data_summary['age_groups_summarized'][c]:
+            age_group_c = modelParams.data_summary['age_groups_ref']
+        else:
+            age_group_c = country.age_groups
 
         for age_group in modelParams.age_groups:
             # Get lower/upper bound for age groups in selected country
-            if age_group in age_group_c:
-                lower, upper = country.age_groups[age_group]  # inclusive
+            # if age_group in age_group_c:
+            lower, upper = age_group_c[age_group]  # inclusive
 
-                phi_a = tf.math.reduce_sum(product[..., c, lower : upper + 1], axis=-1)
-                log.debug(f"phi_a\n{phi_a.shape}")
-                phi_c.append(phi_a)
-            else:
-                phi_c.append(tf.constant(np.NaN,shape=(n_batches,) if n_batches else ()))
+            phi_a = tf.math.reduce_sum(product[..., c, lower : upper + 1], axis=-1)
+            log.debug(f"phi_a\n{phi_a.shape}")
+            phi_c.append(phi_a)
+            # else:
+                # phi_c.append(tf.constant(np.NaN,shape=(n_batches,) if n_batches else ()))
         phi.append(phi_c)
     log.debug(f"phi\n{tf.convert_to_tensor(phi).shape}")
-    
+
     phi = tf.einsum("ca...->...ca", tf.convert_to_tensor(phi))  # Transpose
 
     Phi_IFR = tf.einsum("ca,...ca->...ca", 1.0 / N_agegroups, phi)
@@ -372,4 +375,5 @@ def calc_delayed_deaths(name, new_cases, Phi_IFR, m, theta, length_kernel=40):
         shape_label=("time", "country"),
     )
     log.debug(f"deaths\n{delayed_deaths_compact}")
+
     return delayed_deaths

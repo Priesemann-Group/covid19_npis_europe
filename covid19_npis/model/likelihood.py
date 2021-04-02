@@ -40,16 +40,22 @@ def studentT_likelihood(modelParams, pos_tests, total_tests, deaths):
 
     """
 
+    # log.info(f'pos_tests:\n{pos_tests}')
+    # log.info(f'total_tests:\n{total_tests}')
+    # log.info(f'deaths_tests:\n{deaths}')
+
     likelihood = yield _studentT_positive_tests(modelParams, pos_tests)
+    # log.info(f'likelihood\n{likelihood}')
 
-    if modelParams.data_summary["files"]["/tests.csv"]:
-        likelihood_total_tests = yield _studentT_total_tests(modelParams, total_tests)
-        # likelihood = tf.stack([likelihood, likelihood_total_tests], axis=-1)
+    # if modelParams.data_summary["files"]["/tests.csv"]:
+    #     likelihood_total_tests = yield _studentT_total_tests(modelParams, total_tests)
+    #     # likelihood = tf.stack([likelihood, likelihood_total_tests], axis=-1)
 
-    if modelParams.data_summary["files"]["/deaths.csv"]:
-        likelihood_deaths = yield _studentT_deaths(modelParams, deaths)
+    # if modelParams.data_summary["files"]["/deaths.csv"]:
+    #     likelihood_deaths = yield _studentT_deaths(modelParams, deaths)
 
     log.debug(f"likelihood:\n{likelihood}")
+    # log.info(f"likelihood:\n{likelihood}")
     return likelihood
 
 
@@ -72,9 +78,6 @@ def _studentT_positive_tests(modelParams, pos_tests):
         |shape| batch, time, country, age_group
     """
 
-    # log.info('pos tests')
-    # log.info(f"\n{pos_tests.shape}")
-
     # Scale of the likelihood sigma
     sigma = yield HalfCauchy(
         name="sigma_likelihood_pos_tests",
@@ -84,31 +87,38 @@ def _studentT_positive_tests(modelParams, pos_tests):
         transform=transformations.SoftPlus(),
         shape_label="country",
     )
-    sigma = sigma[..., tf.newaxis, :, tf.newaxis]  # add time and age group dimension
+    # sigma = sigma[..., tf.newaxis, :, tf.newaxis]  # add time and age group dimension
     log.debug(f"sigma:\n{sigma}")
 
     # Retrieve data from the modelParameters and create a boolean mask
-    data = modelParams.pos_tests_data_tensor
-    log.debug(f"pos_tests_data_tensor:\n{data}")
-    mask = np.argwhere(~np.isnan(data).flatten())
-
-    log.info(f"data:\n{index_mask(data, mask)}")
-    log.info(f"data shape:\n{index_mask(data, mask).shape}")
-
     len_batch_shape = len(pos_tests.shape) - 3
+
+    pos_tests_sum = tf.reduce_sum(pos_tests,axis=-1)
+
+    loc_str = index_mask(pos_tests, modelParams.data_stratified_mask, batch_dims=len_batch_shape)
+    loc_sum = index_mask(pos_tests_sum, modelParams.data_summarized_mask, batch_dims=len_batch_shape)
+    loc_masked = tf.concat([loc_str,loc_sum],axis=-1)
+
+    scale_str = index_mask(sigma[..., tf.newaxis, :, tf.newaxis] * tf.sqrt(pos_tests + 1), modelParams.data_stratified_mask, batch_dims=len_batch_shape
+    )
+    scale_sum = index_mask(sigma[..., tf.newaxis, :] * tf.sqrt(pos_tests_sum + 1), modelParams.data_summarized_mask, batch_dims=len_batch_shape
+    )
+    scale_masked = tf.concat([scale_str,scale_sum],axis=-1)
+
+    observed_str = index_mask(modelParams.pos_tests_data_tensor, modelParams.data_stratified_mask)    # could also be done in mP
+    observed_sum = index_mask(modelParams.pos_tests_total_data_tensor, modelParams.data_summarized_mask)    # could also be done in mP
+    observed_masked = tf.concat([observed_str,observed_sum],axis=-1)
+
     likelihood = yield StudentT(
         name="likelihood_pos_tests",
-        loc=index_mask(pos_tests, mask, batch_dims=len_batch_shape),
-        scale=index_mask(
-            sigma * tf.sqrt(pos_tests + 1), mask, batch_dims=len_batch_shape
-        ),
+        loc=loc_masked,
+        scale=scale_masked,
         df=4,
-        observed=index_mask(data, mask),
+        observed=observed_masked,
         reinterpreted_batch_ndims=1,
     )
+
     log.debug(f"likelihood_pos_tests:\n{likelihood}")
-    log.info(f"likelihood_pos_tests:\n{likelihood}")
-    log.info(f"likelihood_pos_tests shape:\n{likelihood.shape}")
     tf.debugging.check_numerics(
         likelihood, "Nan in likelihood", name="likelihood_pos_tests"
     )

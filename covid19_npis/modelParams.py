@@ -28,6 +28,7 @@ class ModelParams:
     def __init__(
         self,
         countries,
+        # R_interval_time=5,
         offset_sim_data=20,
         minimal_daily_cases=40,
         min_offset_sim_death_data=40,
@@ -37,6 +38,7 @@ class ModelParams:
         dtype="float32",
     ):
         self._dtype = dtype
+        # self._R_interval_time = R_interval_time
         self._offset_sim_data = offset_sim_data
         self._minimal_daily_cases = minimal_daily_cases
         self._min_offset_sim_death_data = min_offset_sim_death_data
@@ -101,14 +103,23 @@ class ModelParams:
             if not check_dict[key]:
                 return None
 
+            # df = None
+            # df_total = pd.DataFrame()
             for i, country in enumerate(self._countries):
+                # if ((not accumulate) | (accumulate & (len(getattr(country,attribute_name).columns)>1))):
                 if i > 0:
                     df = df.join(getattr(country, attribute_name))
                 else:
                     df = getattr(country, attribute_name)
-            return df
+                # if accumulate:
+                    # df_total[country.name] = getattr(country, attribute_name).sum(axis=1)
+            return df#, df_total
 
-        self._countries = countries
+        # sort countries alphabetically to have consistent indexes
+        c_sort = np.argsort([c.name for c in countries])
+        self._countries = []
+        for c in c_sort:
+            self._countries.append(countries[c])
 
         # Create dictionary and add existing csv files
         check = self._countries[0].exist
@@ -143,14 +154,16 @@ class ModelParams:
         self._dataframe_interventions = join_dataframes(
             key="/interventions.csv",
             check_dict=check,
-            attribute_name="data_interventions",
+            attribute_name="data_interventions"
         )
 
         """ Update data summary
         """
         self._update_data_summary()
+        # log.info(f'data_summary:\n{self.data_summary}')
 
-        self._adjust_stratification()
+        # self._adjust_stratification(attributes=['_dataframe_new_cases'])
+
 
         """ Calculate positive tests data tensor (tensorflow)
         Set data tensor, replaces values smaller than 40 by nans.
@@ -166,6 +179,8 @@ class ModelParams:
         set data tensor, replaces values smaller than 10 by nans.
         """
         self.deaths_data_tensor = self._dataframe_deaths  # Uses setter below!
+
+        self._set_data_mask()   # prepare data masks for use in likelihood computation
 
         """ # Update intervetions data tensor
         """
@@ -184,23 +199,36 @@ class ModelParams:
             - datetime.timedelta(days=self._offset_sim_data),
             "sim end": self.date_data_end,
             "age_groups": [],
-            # "age_group_data": {},
+            "age_groups_ref": [],
+            "age_groups_summarized": [],
             "countries": [],
             "interventions": [],
             "files": self._check,
         }
         # Create countries lookup list dynamic from data dataframe
-        for country_name in self.pos_tests_dataframe.columns.get_level_values(
-            level="country"
-        ).unique():
+        # for country_name in sorted(self.pos_tests_dataframe.columns.get_level_values(level='country').unique()):
+        for country in self._countries:
+            country_name = country.name
+            # age_groups = count
             data["countries"].append(country_name)
         ### added
+            age_groups = self.pos_tests_dataframe[country_name].columns
+            if len(age_groups)>1:
+                if len(data['age_groups']):
+                    assert len(data['age_groups'])==len(age_groups), "data with different number of age groups provided - please provide either similiar age stratification, or summarized data"
+                else:
+                    data['age_groups'] = list(age_groups)
+                    data['age_groups_ref'] = country.age_groups
+                data['age_groups_summarized'].append(False)
+            else:
+                data['age_groups_summarized'].append(True)
+        data['age_groups_summarized'] = np.array(data['age_groups_summarized'])
             # data["age_group_data"][country_name] = list(self.pos_tests_dataframe[country_name].columns)
         # Create age group list dynamic from data dataframe
-        for age_group_name in self.pos_tests_dataframe.columns.get_level_values(
-            level="age_group"
-        ).unique():
-            data["age_groups"].append(age_group_name)
+        # for age_group_name in self.pos_tests_dataframe.columns.get_level_values(
+        #     level="age_group"
+        # ).unique():
+        #     data["age_groups"].append(age_group_name)
         # Create interventions list dynamic from interventions dataframe
         for i in self._dataframe_interventions.columns.get_level_values(
             level="intervention"
@@ -224,24 +252,6 @@ class ModelParams:
 
     def __repr__(self):
         return self.__str__()
-
-
-    # ------------------------------------------------------------------------------ #
-    # Stratifications
-    # ------------------------------------------------------------------------------ #
-
-    def _adjust_stratification(self):
-        """
-        Adjusts data frames for possibly different stratifications in age groups, by adding empty rows for all non-present age groups
-        """
-
-        age_groups = np.unique(self._dataframe_new_cases.columns.get_level_values(level="age_group"))
-        for country in self.data_summary['countries']:
-            for age_group in (set(age_groups) - set(self._dataframe_new_cases[country].columns)):
-                self._dataframe_new_cases[country,age_group] = np.NaN
-
-        self._dataframe_new_cases = self._dataframe_new_cases.sort_index(axis=1)
-
 
     # ------------------------------------------------------------------------------ #
     # Interventions
@@ -327,9 +337,9 @@ class ModelParams:
         return self._tensor_pos_tests
 
     @property
-    def pos_tests_data_array(self):
+    def pos_tests_total_data_tensor(self):
         """
-        Numpy Array of daily new cases / positive tests for countries/regions
+        Tensor of daily new cases / positive tests for countries/regions
         and age groups.
 
         Returns
@@ -337,7 +347,20 @@ class ModelParams:
         tf.Tensor
             |shape| time, country, agegroup
         """
-        return self._array_pos_tests.astype(self.dtype)
+        return self._tensor_pos_tests_total
+
+    # @property
+    # def pos_tests_data_array(self):
+    #     """
+    #     Numpy Array of daily new cases / positive tests for countries/regions
+    #     and age groups.
+    #
+    #     Returns
+    #     -------
+    #     tf.Tensor
+    #         |shape| time, country, agegroup
+    #     """
+    #     return self._array_pos_tests.astype(self.dtype)
 
     @pos_tests_data_tensor.setter
     def pos_tests_data_tensor(self, df):
@@ -350,41 +373,44 @@ class ModelParams:
             Positive tests dataframe
         """
 
-        new_cases_tensor = (
-            df.to_numpy()
-            .astype(self.dtype)
-            .reshape((-1, self.num_countries, self.num_age_groups))
-            # .reshape((-1, len(self.countries), len(self.age_groups)))
-        )
-        new_cases_tensor = np.concatenate(
+        # create tensor with stratified (provided or artificial) case data for all countries
+        new_cases = np.zeros((self.pos_tests_dataframe.shape[0],0,self.num_age_groups))
+        for i,c in enumerate(self.countries):
+            new_cases_tmp = self.pos_tests_dataframe[c.name].to_numpy()
+            if self.data_summary['age_groups_summarized'][i]: ## write existing data into array
+                new_cases_tmp = np.repeat(new_cases_tmp/self.num_age_groups,self.num_age_groups,axis=1) ## could be further refined according to demographics - but not suuuper important
+
+            new_cases = np.concatenate([new_cases,new_cases_tmp[:,np.newaxis,:]],axis=1)
+
+        # prepend data with zeros for simulation offset
+        new_cases = np.concatenate(
             [
-                np.zeros(
-                    (self._offset_sim_data, self.num_countries, self.num_age_groups)
-                    # (self._offset_sim_data, len(self.countries), len(self.age_groups))
-                ),
-                new_cases_tensor,
-            ]
+                np.zeros((self._offset_sim_data, self.num_countries, self.num_age_groups)),
+                new_cases,
+            ], axis=0
         )
+
         i_data_begin_list = []
-        for c in range(new_cases_tensor.shape[1]):
+        for c in range(new_cases.shape[1]):
             mask = (
-                np.sum(new_cases_tensor[:, c, :], axis=-1) > self._minimal_daily_cases
+                np.nansum(new_cases[:, c, :], axis=-1) > self._minimal_daily_cases
             )
             if mask.sum() == 0:  # [False,False,False]
                 i_data_begin = len(mask) - 1
             else:
                 i_data_begin = np.min(np.nonzero(mask)[0])
             i_data_begin_list.append(i_data_begin)
-
         i_data_begin_list = np.array(i_data_begin_list)
         # i_data_begin_list = np.maximum(i_data_begin_list, self._offset_sim_data)
         self._indices_begin_data = i_data_begin_list
 
         for c, i in enumerate(self.indices_begin_data):
-            new_cases_tensor[:i, c, :] = np.nan
+            new_cases[:i, c, :] = np.nan
 
-        self._array_pos_tests = new_cases_tensor
-        self._tensor_pos_tests = tf.constant(new_cases_tensor, dtype=self.dtype)
+        self._tensor_pos_tests = tf.constant(new_cases,dtype=self.dtype)
+        self._tensor_pos_tests_total = tf.constant(new_cases.sum(axis=-1),dtype=self.dtype)
+
+        # self._tensor_pos_tests = tf.constant(new_cases_tensor, dtype=self.dtype)
 
     # ------------------------------------------------------------------------------ #
     # Total tests
@@ -520,6 +546,20 @@ class ModelParams:
 
         self._tensor_deaths = tf.constant(deaths_tensor, dtype=self.dtype)
 
+
+
+    # ------------------------------------------------------------------------------ #
+    # masks
+    # ------------------------------------------------------------------------------ #
+    def _set_data_mask(self):
+
+        self.data_stratified_mask = np.argwhere(
+            (~np.isnan(self.pos_tests_data_tensor) & ~self.data_summary['age_groups_summarized'][np.newaxis,:,np.newaxis]).flatten()
+        )
+        self.data_summarized_mask = np.argwhere(
+            (~np.isnan(self.pos_tests_total_data_tensor) & self.data_summary['age_groups_summarized'][np.newaxis,:]).flatten()
+        )
+
     # ------------------------------------------------------------------------------ #
     # Population
     # ------------------------------------------------------------------------------ #
@@ -542,17 +582,18 @@ class ModelParams:
         for c, country in enumerate(self.countries):
             d_c = []
 
-            # Get real age groups from country config
-            age_group_c = country.age_groups
+            # Get age groups from country config
+            if self.data_summary['age_groups_summarized'][c]:
+                # If age group not present in this country data
+                age_groups_c = self.data_summary['age_groups_ref']
+            else:
+                age_groups_c = country.age_groups
 
             for age_group in self.age_groups:
-                if age_group in age_group_c:
-                    # Select age range from config and sum over it
-                    lower, upper = age_group_c[age_group]
-                    d_c.append(country.data_population[lower:upper].sum().values[0])
-                else:
-                    # If age group not present in this country data
-                    d_c.append(np.NaN)
+                # Select age range from config and sum over it
+                lower, upper = age_groups_c[age_group]
+                d_c.append(country.data_population[lower:upper].sum().values[0])
+
             data.append(d_c)
         return tf.constant(data, dtype=tf.float32)
 
@@ -617,8 +658,9 @@ class ModelParams:
         :number
             Length of the inserted/loaded data in days
         """
-        return len(self._dataframe_new_cases)
+        # return len(self._dataframe_new_cases)
         # return tf.size(self._dataframe_new_cases)
+        return self._dataframe_new_cases.shape[-2]
 
     @property
     def length_sim(self):
@@ -628,8 +670,8 @@ class ModelParams:
         :number
             Length of the simulation in days.
         """
-        return len(self._tensor_pos_tests)
-        # return self._tensor_pos_tests.shape
+        # return len(self._tensor_pos_tests)
+        return self._tensor_pos_tests.shape[-3]
 
     @property
     def max_num_cp(self):

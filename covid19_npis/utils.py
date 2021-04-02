@@ -75,10 +75,10 @@ def save_trace(
 
     if not os.path.exists(store):
         os.makedirs(store)
-    
+
     # Name of file
     if name is None:
-        name = datetime.datetime.now().strftime("%y_%m_%d_%H")
+        name = datetime.datetime.now().strftime("%y_%m_%d_%H_%M")
 
     # Save via pickle
     import pickle

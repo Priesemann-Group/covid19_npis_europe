@@ -64,9 +64,9 @@ def construct_E_0_t(
 
     # # eigvals, _ = tf.linalg.eigh(R_t[..., i_data_begin, :, :])
     # # largest_eigval = eigvals[-1]
-    R_t_rescaled = R_t ** (1. / 5)
+    R_t_rescaled = R_t ** (1. / modelParams._R_interval_time)
     R_inv = 1 / R_t_rescaled
-    R_inv = tf.clip_by_value(R_inv, clip_value_min=0.7, clip_value_max=1.3)
+    R_inv = tf.clip_by_value(R_inv, clip_value_min=0.7, clip_value_max=1.2)
     """
     R = R_t_rescaled[0]
     R_sqrt = tf.math.sqrt(R)
@@ -80,7 +80,7 @@ def construct_E_0_t(
     avg_cases_begin = []
     for c in range(data.shape[1]):
         avg_cases_begin.append(
-            tf.reduce_mean(data[i_data_begin_list[c] : i_data_begin_list[c] + 5, c], axis=0)
+            tf.reduce_mean(data[i_data_begin_list[c] : i_data_begin_list[c] + modelParams._R_interval_time, c], axis=0)
         )
     # avg_cases_begin = np.array(avg_cases_begin)
     E_t = tf.stack(avg_cases_begin)

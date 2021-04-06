@@ -108,6 +108,8 @@ def _studentT_positive_tests(modelParams, pos_tests):
     observed_str = index_mask(modelParams.pos_tests_data_tensor, modelParams.data_stratified_mask)    # could also be done in mP
     observed_sum = index_mask(modelParams.pos_tests_total_data_tensor, modelParams.data_summarized_mask)    # could also be done in mP
     observed_masked = tf.concat([observed_str,observed_sum],axis=-1)
+    log.info(f'loc masked\n{loc_masked}')
+    log.info(f'observed masked\n{observed_masked}')
 
     likelihood = yield StudentT(
         name="likelihood_pos_tests",

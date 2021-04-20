@@ -103,6 +103,7 @@ args = parser.parse_args()
 # ------------------------------------------------------------------------------ #
 # modelParams, trace = covid19_npis.utils.load_trace_zarr(args.file)
 modelParams, trace = covid19_npis.utils.load_trace(args.file)
+modelParams._R_interval_time = 5
 
 # Create model and sample state from modelParams
 this_model = covid19_npis.model.main_model(modelParams)
@@ -165,7 +166,7 @@ print(
 #################"""
 )
 log.info(f"Timeseries plots: {all_ts}")
-log.info(f"Distribtuion plots: {all_dists}")
+log.info(f"Distribution plots: {all_dists}")
 
 if args.distributions is None:
     args.distributions = all_dists
@@ -196,7 +197,7 @@ for ts_name in args.timeseries:
     pbar.set_description(f"Creating plots [{ts_name}]")
 
     # Set observed data for plotting
-    if ts_name == "new_E_t" or ts_name == "positive_tests":
+    if ts_name == "new_E_t" or ts_name == "positive_tests" or ts_name == "positive_tests_modulated":
         observed = modelParams.pos_tests_dataframe
     elif (ts_name == "total_tests_compact") and (
         modelParams.data_summary["files"]["/tests.csv"]

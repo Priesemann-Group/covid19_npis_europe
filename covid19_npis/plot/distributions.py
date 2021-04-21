@@ -104,7 +104,9 @@ def distribution(
                     2.2,
                     2.2 * len(df.index.get_level_values("age_group").unique()),
                 ),
+                squeeze=False,
             )
+            ax = ax[:, 0]
             for i, ag in enumerate(df.index.get_level_values("age_group").unique()):
                 # Create pivot table i.e. time on index and draw on columns
                 if posterior is not None:
@@ -135,7 +137,9 @@ def distribution(
                     2.2,
                     2.2 * len(df.index.get_level_values(df.index.names[0]).unique()),
                 ),
+                squeeze=False,
             )
+            ax = ax[:, 0]
             for i, ag in enumerate(
                 df.index.get_level_values(df.index.names[0]).unique()
             ):
@@ -307,7 +311,10 @@ def distribution_matrix(trace, sample_state, key, dir_save=None):
         Plots matrix from the last two dimensions
         """
         fig, ax = plt.subplots(
-            len(rows), len(cols), figsize=(2.2 * len(cols), 2.2 * len(rows))
+            len(rows),
+            len(cols),
+            figsize=(2.2 * len(cols), 2.2 * len(rows)),
+            squeeze=False,
         )
         for x, row in enumerate(rows):
             if posterior is not None:

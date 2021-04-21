@@ -96,7 +96,7 @@ def other_init(self, *args, **kwargs):
 
 def init_with_softplus_transform(self, *args, **kwargs):
     kwargs["validate_args"] = False
-    if "transform" not in kwargs.keys() or True:
+    if "transform" not in kwargs.keys():
         kwargs["transform"] = transformations.Exp_SinhArcsinh()
     super(self.__class__, self).__init__(*args, **kwargs)
 

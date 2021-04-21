@@ -119,7 +119,7 @@ def timeseries(
                         _observed = observed.xs(value, level=lev, axis=1)
                     else:
                         _observed = None
-                    recursive_plot(df_t, name_str + "_" + value, _observed)
+                    recursive_plot(df_t, name_str + "_" + str(value), _observed)
 
                 return  # Stop theses recursions
 
@@ -130,8 +130,13 @@ def timeseries(
             fig, a_axes = plt.subplots(
                 len(df.index.get_level_values("age_group").unique()),
                 1,
-                figsize=(4, 1.5 * len(df.index.get_level_values("age_group").unique())),
+                figsize=(
+                    4,
+                    1.5 + 1.5 * len(df.index.get_level_values("age_group").unique()),
+                ),
+                squeeze=False,
             )
+            a_axes = a_axes[:, 0]
             for i, ag in enumerate(df.index.get_level_values("age_group").unique()):
                 temp = df.xs(ag, level="age_group")
 

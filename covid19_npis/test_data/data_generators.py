@@ -216,7 +216,7 @@ def test_data_from_model(model, modelParams, params_dict, to_return=None):
     model_name = model(modelParams).name
 
     dict_with_model_name = {
-        f"{model_name}/{key}": tf.cast(value, "float32")[tf.newaxis, tf.newaxis]
+        f"{model_name}|{key}": tf.cast(value, "float32")[tf.newaxis, tf.newaxis]
         for key, value in params_dict.items()
     }
     trace = az.from_dict(posterior=dict_with_model_name,)
@@ -231,7 +231,7 @@ def test_data_from_model(model, modelParams, params_dict, to_return=None):
     variables = to_return
 
     for var in variables:
-        var_names.append(f"{model_name}/{var}")
+        var_names.append(f"{model_name}|{var}")
 
     # Sample
     trace = pm.sample_posterior_predictive(
@@ -275,7 +275,7 @@ def test_data_from_model(model, modelParams, params_dict, to_return=None):
     """
     dfs = [convert_to_pandas(var) for var in variables]
 
-    return dfs
+    return dfs, trace
 
 
 def save_data(path, new_cases, R_t, interv):

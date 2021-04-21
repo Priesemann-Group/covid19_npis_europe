@@ -637,6 +637,136 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel):
     return daily_infections_final  # batch_dims x time x country x age
 
 
+def InfectionModel_SIR(N, I_0, lambda_t, C, recov_rate=1 / 8, h_t=None):
+    r"""
+    This function combines a variety of different steps:
+
+        #. Converts the given :math:`E_0` values  to an exponential distributed initial :math:`E_{0_t}` with an
+           length of :math:`l` this can be seen in :py:func:`_construct_E_0_t`.
+
+        #. Calculates :math:`R_{eff}` for each time step using the given contact matrix :math:`C`:
+
+            .. math::
+                R_{diag} &= \text{diag}(\sqrt{R}) \\
+                R_{eff}  &= R_{diag} \cdot C \cdot R_{diag}
+
+        #. Calculates the :math:`\tilde{I}` arrays i.e. new infectious for each age group and
+           country, with the efficient reproduction matrix :math:`R_{eff}`, the susceptible pool
+           :math:`S`, the population size :math:`N` and the generation interval :math:`g(\tau)`.
+           This is done recursive for every time step.
+
+            .. math::
+                    \tilde{I}(t) &= \frac{S(t)}{N} \cdot R_{eff} \cdot \sum_{\tau=0}^{t} \tilde{I}(t-1-\tau) g(\tau) \\
+                    S(t) &= S(t-1) - \tilde{I}(t-1)
+
+    Parameters
+    ----------
+    N:
+        Total population per country
+        |shape| country, age_group
+    I_0_t:
+        Initial number of infectious.
+        |shape| batch_dims, country, age_group
+    lambda_t:
+        spreading rate matrix.
+        |shape| time, batch_dims, country, age_group
+
+    C:
+        inter-age-group Contact-Matrix (see 8)
+        |shape| country, age_group, age_group
+    recov_rate:
+        recovery rate
+        |shape| batch_dims, country, age_group
+    h_t:
+        eventual external input
+        |shape| time, batch_dims, country, age_group
+    Returns
+    -------
+    :
+        Sample from distribution of new, daily cases
+    """
+
+    # @tf.function(autograph=False)
+
+    # For robustness of inference
+    # R_t = tf.clip_by_value(R_t, 0.5, 7)
+    # R_t = tf.clip_by_norm(R_t, 100, axes=0)
+
+    def loop_body(params, elems):
+        # Unpack a:
+        # Old E_next is E_lastv now
+        lambda_, h = elems
+        _, I_last, S_t = params  # Internal state
+
+        # Internal state
+        f = S_t / N
+
+        # log.debug(f"I_t {I_t}")
+
+        # Calculate effective lambda_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
+        lambda_sqrt = tf.math.sqrt(lambda_ + 1e-7)
+        lambda_diag = tf.linalg.diag(lambda_sqrt)
+        lambda_eff = tf.einsum(
+            "...ij,...ik,...kl->...il", lambda_diag, C, lambda_diag
+        )  # Effective growth number
+
+        # log.debug(f"infectious: {infectious}")
+        # log.debug(f"R_eff:\n{R_eff}")
+        # log.debug(f"f:\n{f}")
+        # log.debug(f"h:\n{h}")
+
+        # Calculate new infections
+        infections = tf.einsum("...ci,...cij,...cj->...cj", I_last, lambda_eff, f) + h
+        infections = tf.clip_by_value(infections, 0.01, 1e9)  # for robustness
+
+        # Calculate new infectious pool
+        I_new = infections + I_last - recov_rate * I_last
+
+        return infections, I_new, S_t
+
+    # Number of days that we look into the past for our convolution
+
+    S_initial = N - I_0
+
+    len_added = 1
+
+    lambda_t_for_loop = lambda_t[len_added:]
+    if not h_t:
+        h_t_for_loop = tf.zeros_like(lambda_t_for_loop)
+    else:
+        h_t_for_loop = h_t[len_added:]
+    # Initial susceptible population = total - infected
+
+    """ Calculate time evolution of new, daily infections
+        as well as time evolution of susceptibles
+        as lists
+    """
+
+    initial = (
+        tf.zeros_like(S_initial),
+        I_0,
+        S_initial,
+    )
+    out = tf.scan(
+        fn=loop_body, elems=(lambda_t_for_loop, h_t_for_loop), initializer=initial
+    )
+    daily_infections_final = out[0]
+    daily_infections_final = tf.concat(
+        [I_0[tf.newaxis, ...], daily_infections_final], axis=0
+    )
+
+    # Transpose tensor in order to have batch dim before time dim
+    daily_infections_final = tf.einsum("t...ca->...tca", daily_infections_final)
+
+    log.debug(f"daily_infections_final:\n{daily_infections_final}")
+    log.debug(
+        f"daily_infections_final sum:\n{tf.reduce_sum(daily_infections_final, axis=-3)}"
+    )
+    daily_infections_final = tf.clip_by_value(daily_infections_final, 1e-6, 1e6)
+
+    return daily_infections_final  # batch_dims x time x country x age
+
+
 def InfectionModel_unrolled(N, E_0, R_t, C, g_p):
     r"""
     This function unrolls the loop. It compiling time is slower (about 10 minutes)

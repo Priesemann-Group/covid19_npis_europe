@@ -806,13 +806,16 @@ def construct_testing_state(
 
     """ Correlate with cholsky and multivariant normal distribution
     """
-    Sigma = yield LKJCholesky(
-        name="Sigma_cholesky",
-        dimension=4,
-        concentration=2.0,  # eta
-        # validate_args=True,
-        transform=transformations.CorrelationCholesky(),
-        conditionally_independent=True,
+    Sigma = (
+        yield LKJCholesky(
+            name="Sigma_cholesky",
+            dimension=4,
+            concentration=2.0,  # eta
+            # validate_args=True,
+            transform=transformations.CorrelationCholesky(),
+            conditionally_independent=True,
+        )
+        + 1e-5
     )
     Sigma = tf.einsum(
         "...ij,...i->...ij",  # todo look at i,j

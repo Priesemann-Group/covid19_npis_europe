@@ -1,5 +1,6 @@
 from .disease_spread import (
     InfectionModel,
+    InfectionModel_SIR,
     construct_generation_interval,
     InfectionModel_unrolled,
     construct_E_0_t,
@@ -9,7 +10,7 @@ from .disease_spread import (
 
 from .likelihood import studentT_likelihood
 
-from .reproduction_number import construct_R_t, construct_R_0
+from .reproduction_number import construct_R_t, construct_R_0, construct_lambda_0
 
 from .utils import (
     convolution_with_fixed_kernel,

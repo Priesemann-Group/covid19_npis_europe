@@ -97,13 +97,14 @@ def _create_distributions(modelParams):
         transform=transformations.SoftPlus(scale=1),
         conditionally_independent=True,
     )
-    alpha_sigma_a = HalfStudentT(
-        df=4,
-        name="alpha_sigma_age_group",
-        scale=0.1,
-        transform=transformations.SoftPlus(scale=1),
-        conditionally_independent=True,
-    )
+    if modelParams.num_age_groups > 1:
+        alpha_sigma_a = HalfStudentT(
+            df=4,
+            name="alpha_sigma_age_group",
+            scale=0.1,
+            transform=transformations.SoftPlus(scale=1),
+            conditionally_independent=True,
+        )
     # We need to multiply alpha_sigma_c and alpha_sigma_a later. (See construct R_t)
     delta_alpha_cross_c = Normal(
         name="delta_alpha_cross_c",
@@ -113,18 +114,19 @@ def _create_distributions(modelParams):
         shape_label=(None, "country", None),
         conditionally_independent=True,
     )
-    delta_alpha_cross_a = Normal(
-        name="delta_alpha_cross_a",
-        loc=0.0,
-        scale=1.0,
-        event_stack=(
-            1,
-            1,
-            modelParams.num_age_groups,
-        ),  # intervention country age_group
-        shape_label=(None, None, "age_group"),
-        conditionally_independent=True,
-    )
+    if modelParams.num_age_groups > 1:
+        delta_alpha_cross_a = Normal(
+            name="delta_alpha_cross_a",
+            loc=0.0,
+            scale=1.0,
+            event_stack=(
+                1,
+                1,
+                modelParams.num_age_groups,
+            ),  # intervention country age_group
+            shape_label=(None, None, "age_group"),
+            conditionally_independent=True,
+        )
     alpha_cross_i = Normal(
         name="alpha_cross_i",
         loc=-1.0,  # See publication for reasoning behind -1 and 2
@@ -211,9 +213,7 @@ def _create_distributions(modelParams):
     # We create a dict here to pass all distributions to another function
     distributions = {}
     distributions["alpha_sigma_c"] = alpha_sigma_c
-    distributions["alpha_sigma_a"] = alpha_sigma_a
     distributions["delta_alpha_cross_c"] = delta_alpha_cross_c
-    distributions["delta_alpha_cross_a"] = delta_alpha_cross_a
     distributions["alpha_cross_i"] = alpha_cross_i
     distributions["l_sigma_interv"] = l_sigma_interv
     distributions["l_positive_cross"] = l_positive_cross
@@ -223,11 +223,13 @@ def _create_distributions(modelParams):
     distributions["d_sigma_country"] = d_sigma_country
     distributions["delta_d_i"] = delta_d_i
     distributions["delta_d_c"] = delta_d_c
-
+    if modelParams.num_age_groups > 1:
+        distributions["delta_alpha_cross_a"] = delta_alpha_cross_a
+        distributions["alpha_sigma_a"] = alpha_sigma_a
     return distributions
 
 
-def construct_R_t(name, modelParams, R_0):
+def construct_R_t(name, modelParams, R_0, include_noise=True):
     r"""
         Constructs the time dependent reproduction number :math:`R(t)` for every country and age group.
         There are a lot of things happening here be sure to check our paper for more indepth explanations!
@@ -301,20 +303,27 @@ def construct_R_t(name, modelParams, R_0):
             "...ica,...->...ica", delta_alpha_cross_c, alpha_sigma_c
         )
 
-        delta_alpha_cross_a = yield distributions["delta_alpha_cross_a"]
-        alpha_sigma_a = yield distributions["alpha_sigma_a"]
-        delta_alpha_cross_a = tf.einsum(  # Multiply distribution by hyperprior
-            "...ica,...->...ica", delta_alpha_cross_a, alpha_sigma_a
-        )
         # Draw for the interventions
         alpha_cross_i = yield distributions["alpha_cross_i"]
         # Add all together, dimensions are defined in _create_distributions
-        alpha_cross_i_c_a = alpha_cross_i + delta_alpha_cross_c + delta_alpha_cross_a
-        yield Deterministic(
-            name="alpha_i_a",
-            value=tf.math.sigmoid(alpha_cross_i + delta_alpha_cross_a)[..., :, 0, :],
-            shape_label=("intervention", "age_group"),
-        )
+        if modelParams.num_age_groups > 1:
+            delta_alpha_cross_a = yield distributions["delta_alpha_cross_a"]
+            alpha_sigma_a = yield distributions["alpha_sigma_a"]
+            delta_alpha_cross_a = tf.einsum(  # Multiply distribution by hyperprior
+                "...ica,...->...ica", delta_alpha_cross_a, alpha_sigma_a
+            )
+            alpha_cross_i_c_a = (
+                alpha_cross_i + delta_alpha_cross_c + delta_alpha_cross_a
+            )
+            yield Deterministic(
+                name="alpha_i_a",
+                value=tf.math.sigmoid(alpha_cross_i + delta_alpha_cross_a)[
+                    ..., :, 0, :
+                ],
+                shape_label=("intervention", "age_group"),
+            )
+        else:
+            alpha_cross_i_c_a = alpha_cross_i + delta_alpha_cross_c
 
         return tf.math.softplus(alpha_cross_i_c_a)
 
@@ -465,11 +474,12 @@ def construct_R_t(name, modelParams, R_0):
     R_t = yield Deterministic(
         name=name, value=R_eff, shape_label=("time", "country", "age_group"),
     )
-    sum_noise = yield construct_noise("noise_R", modelParams)
+    if include_noise:
+        sum_noise = yield construct_noise("noise_R", modelParams)
 
-    # Add noise to R, this softplus has the same value and slope at 0 than exp but
-    # grows more slowly.
-    R_t = R_t * tf.nn.softplus(sum_noise / tf.math.log(2.0)) / tf.math.log(2.0)
+        # Add noise to R, this softplus has the same value and slope at 0 than exp but
+        # grows more slowly.
+        R_t = R_t * tf.nn.softplus(sum_noise / tf.math.log(2.0)) / tf.math.log(2.0)
 
     # Swap dimensions to follow specifications
     R_t = tf.einsum("...tca -> t...ca", R_t)
@@ -545,10 +555,86 @@ def construct_R_0(name, modelParams, loc, scale, hn_scale):
     log.debug(f"R_0_c:\n{R_0_c}")
 
     # for robustness
-    R_0_c = tf.clip_by_value(R_0_c, 1, 5)
+    R_0_c = tf.clip_by_value(R_0_c, 0.1, 5)
 
     return tf.repeat(
         R_0_c[..., tf.newaxis], repeats=modelParams.num_age_groups, axis=-1
+    )
+
+
+def construct_lambda_0(name, modelParams, loc, scale, hn_scale):
+    r"""
+        Constructs lambda_0 in the following hierarchical manner:
+
+        .. math::
+
+            \lambda^*_{0,c} &= \lambda^*_0 + \Delta \lambda^*_{0,c}, \\
+            \lambda^*_0 &\sim \mathcal{N}\left(0.4,0.1\right)\\
+            \Delta \lambda^*_{0,c} &\sim \mathcal{N}\left(0, \sigma_{\lambda^*, \text{country}}\right)\quad \forall c,\\
+            \sigma_{\lambda^*, \text{country}} &\sim HalfNormal\left(0.05\right)
+
+        Parameters
+        ----------
+        name: str
+            Name of the distribution (gets added to trace).
+        modelParams: :py:class:`covid19_npis.ModelParams`
+            Instance of modelParams, mainly used for number of age groups and
+            number of countries.
+        loc: number
+            Location parameter of the R^*_0 Normal distribution.
+        scale: number
+            Scale paramter of the R^*_0 Normal distribution.
+        hn_scale: number
+            Scale parameter of the \sigma_{R^*, \text{country}} HaflNormal distribution.
+
+        Returns
+        -------
+        :
+            R_0 tensor |shape| batch, country, age_group
+    """
+
+    lambda_0 = (
+        yield Normal(
+            name="lambda_0", loc=0.0, scale=scale, conditionally_independent=True,
+        )
+    ) + loc
+    log.debug(f"lambda_0:\n{lambda_0}")
+
+    lambda_0_sigma_c = (
+        yield HalfStudentT(
+            df=4,
+            name="lambda_0_sigma_c",
+            scale=1.0,
+            conditionally_independent=True,
+            transform=transformations.SoftPlus(),
+        )
+    ) * hn_scale
+
+    delta_lambda_0_c = (
+        yield Normal(
+            name="delta_lambda_0_c",
+            loc=0.0,
+            scale=1.0,
+            event_stack=(modelParams.num_countries),
+            shape_label=("country"),
+            conditionally_independent=True,
+        )
+    ) * lambda_0_sigma_c[..., tf.newaxis]
+    log.debug(f"delta_lambda_0_c:\n{delta_lambda_0_c}")
+
+    # Add to trace via deterministic
+    lambda_0_c = lambda_0[..., tf.newaxis] + delta_lambda_0_c
+    log.debug(f"lambda_0_c before softplus:\n{lambda_0_c}")
+
+    # Softplus because we want to make sure that R_0 > 0.
+    lambda_0_c = tf.math.softplus(10 * lambda_0_c) / 10
+    lambda_0_c = yield Deterministic(
+        name=name, value=lambda_0_c, shape_label=("country"),
+    )
+    log.debug(f"lambda_0_c:\n{lambda_0_c}")
+
+    return tf.repeat(
+        lambda_0_c[..., tf.newaxis], repeats=modelParams.num_age_groups, axis=-1
     )
 
 

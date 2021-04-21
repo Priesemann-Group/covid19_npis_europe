@@ -150,9 +150,11 @@ def timeseries(
                 fig, a_axes = plt.subplots(
                     len(unq_age),
                     1,
-                    figsize=(4, 1.5 * len(unq_age)),
-                )
-                for i, ag in enumerate(unq_age):
+                    figsize=(4, 1.5+ 1.5 * len(unq_age)),
+                squeeze=False,
+            )
+            a_axes = a_axes[:, 0]
+            for i, ag in enumerate(unq_age):
                     temp = df.xs(ag, level="age_group")
 
                     # Create pivot table i.e. time on index and draw on columns

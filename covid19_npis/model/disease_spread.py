@@ -425,10 +425,20 @@ def normalize_matrix(matrix):
 def construct_C(
     name, modelParams, mean_C=-0.5, sigma_C=1, sigma_country=0.5, sigma_age=0.5
 ):
-    if modelParams.num_age_groups==1:
-        C_matrix = tf.ones([modelParams.num_countries,1,1])
-        log.info('only one age group identified - not using contact matrix')
+    if modelParams._const_contact:
+        # len_batch_shape = len(pos_tests.shape) - 3
+        C_matrix = yield Deterministic(
+            name=f"{name}",
+            value=tf.eye(modelParams.num_age_groups,batch_shape=[modelParams.num_countries]),
+            shape_label=("country", "age_group_i", "age_group_j"),
+        )
+        log.info(f'C_matrix (shape): \n{C_matrix.shape}')
+        return C_matrix
+        # log.info('only one age group identified - not using contact matrix')
     else:
+        log.info(sigma_C)
+        log.info(sigma_country)
+        log.info(sigma_age)
         C_country_sigma = yield HalfNormal(
             name=f"{name}_country_sigma",
             scale=sigma_country,
@@ -476,6 +486,9 @@ def construct_C(
                 event_stack=(1, 1),
             )
         ) + mean_C
+        log.info(f'C country sigma(shape): \n{C_country_sigma.shape}')
+        log.info(f'Delta C country(shape): \n{Delta_C_country.shape}')
+        log.info(f'Base C (shape): \n{Base_C.shape}')
         C_array = Base_C + Delta_C_age + Delta_C_country
         C_array = tf.math.sigmoid(C_array)
         C_array = tf.clip_by_value(
@@ -486,6 +499,8 @@ def construct_C(
         transf_array = lambda arr: normalize_matrix(
             _subdiagonal_array_to_matrix(arr, size) + tf.linalg.eye(size, dtype=arr.dtype)
         )
+        # log.info(f'C array: \n{C_array}')
+        log.info(f'C array (shape): \n{C_array.shape}')
 
         yield Deterministic(
             name=f"{name}_mean",
@@ -495,12 +510,14 @@ def construct_C(
 
         C_matrix = transf_array(C_array)
 
-    C_matrix = yield Deterministic(
-        name=f"{name}",
-        value=C_matrix,
-        shape_label=("country", "age_group_i", "age_group_j"),
-    )
-    return C_matrix
+        C_matrix = yield Deterministic(
+            name=f"{name}",
+            value=C_matrix,
+            shape_label=("country", "age_group_i", "age_group_j"),
+        )
+        # log.info(f'C_matrix: \n{C_matrix}')
+        log.info(f'C_matrix (shape): \n{C_matrix.shape}')
+        return C_matrix
 
 
 def InfectionModel(N, E_0_t, R_t, C, gen_kernel):

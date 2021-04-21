@@ -28,6 +28,7 @@ class ModelParams:
     def __init__(
         self,
         countries,
+        const_contact=True,
         R_interval_time=5,
         offset_sim_data=20,
         minimal_daily_cases=40,
@@ -38,6 +39,7 @@ class ModelParams:
         dtype="float32",
     ):
         self._dtype = dtype
+        self._const_contact = const_contact
         self._R_interval_time = R_interval_time
         self._offset_sim_data = offset_sim_data
         self._minimal_daily_cases = minimal_daily_cases

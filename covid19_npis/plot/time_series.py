@@ -98,6 +98,8 @@ def timeseries(
 
         # We start x function calls depending on the number of dimensions, going from
         # left to right i.e. country than agegroup
+        log.info(f'observed: \n{observed}')
+
         if len(df.index.names) > 1:
 
             # Iterate over all levels expect time,draw,age_group
@@ -121,7 +123,7 @@ def timeseries(
                         _observed = None
                     recursive_plot(df_t, name_str + "_" + str(value), _observed)
 
-                return  # Stop theses recursions
+                return  # Stop these recursions
 
         # Remove "_" from name
         name_str = name_str[1:]

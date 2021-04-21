@@ -419,7 +419,8 @@ if __name__ == "__main__":
     # For each country select data and save it
     path = "../../data/coverage_db/"
     data_begin = datetime.datetime(2020, 3, 2)
-    data_end = datetime.datetime(2020, 8, 15)
+    # data_end = datetime.datetime(2020, 8, 15)
+    data_end = datetime.date.today()
     countries = [
         "Germany",
         "France",

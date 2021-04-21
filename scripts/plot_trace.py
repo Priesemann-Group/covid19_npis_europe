@@ -104,6 +104,7 @@ args = parser.parse_args()
 # modelParams, trace = covid19_npis.utils.load_trace_zarr(args.file)
 modelParams, trace = covid19_npis.utils.load_trace(args.file)
 modelParams._R_interval_time = 5
+modelParams._const_contact = False
 
 # Create model and sample state from modelParams
 this_model = covid19_npis.model.main_model(modelParams)
@@ -124,6 +125,7 @@ skip_dist_ts = [
     "total_tests",
     "deaths",
     "testing_delay",
+    "C_mean",
 ]
 
 
@@ -145,6 +147,8 @@ def check_for_dist_or_ts(this_model, sample_state_dict):
 
 # Get all default distributions and timesries
 all_ts, all_dists = check_for_dist_or_ts(this_model, sample_state.deterministics)
+all_ts = ['positive_tests','positive_tests_modulated']
+all_dists = []
 log.info("Plotting may take some time! Go ahead and grab a coffee or two.")
 print(
     r"""

@@ -28,8 +28,8 @@ class ModelParams:
     def __init__(
         self,
         countries,
-        const_contact=True,
-        R_interval_time=5,
+        const_contact=True, # set 'true' for a constant contact matrix (without age-group interaction)
+        R_interval_time=5,  # time interval over which the reproduction number is calculated
         offset_sim_data=20,
         minimal_daily_cases=40,
         min_offset_sim_death_data=40,

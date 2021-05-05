@@ -10,6 +10,8 @@ from .utils import (
 from .. import modelParams
 
 import numpy as np
+import pandas as pd
+import datetime
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.patches
@@ -79,7 +81,18 @@ def timeseries(
             "No time or date found in variable dimensions!\n (Is the distribution shape_label set?!)"
         )
 
-    # Drop chains index if seperated!
+    if (observed is not None) and ('age_group' in observed.columns.names):
+        # constructing summarized datasets for age-stratified data
+        idx = pd.IndexSlice
+        for country in observed.columns.get_level_values('country').unique():
+
+            if len(observed[country].columns)==1:
+                df_summarized = df.loc[idx[:,:,:,country,:],:].groupby(level=[0,1,2,3]).sum()
+                df_summarized['age_group'] = 'age_group_sum'
+                df_summarized.set_index('age_group',append=True,inplace=True)
+                df = df.append(df_summarized)
+
+    # Drop chains index if not seperated!
     if not plot_chain_separated:
         df.index = df.index.droplevel("chain")
 
@@ -98,8 +111,6 @@ def timeseries(
 
         # We start x function calls depending on the number of dimensions, going from
         # left to right i.e. country than agegroup
-        log.info(f'observed: \n{observed}')
-
         if len(df.index.names) > 1:
 
             # Iterate over all levels expect time,draw,age_group
@@ -117,13 +128,17 @@ def timeseries(
                     # create new dataframe for next recursion
                     df_t = df.xs(value, level=lev)
                     if observed is not None:
-                        # I hope the dataframes have the same format
-                        _observed = observed.xs(value, level=lev, axis=1)
+                        if lev in observed.columns.names: # observed is missing "chains"
+                            # I hope the dataframes have the same format
+                            _observed = observed.xs(value, level=lev, axis=1)
+                        else:
+                            _observed = observed
                     else:
                         _observed = None
                     recursive_plot(df_t, name_str + "_" + str(value), _observed)
 
                 return  # Stop these recursions
+
 
         # Remove "_" from name
         name_str = name_str[1:]
@@ -131,28 +146,66 @@ def timeseries(
         if plot_age_groups_together and "age_group" in df.index.names:
             unq_age = df.index.get_level_values("age_group").unique();
 
-            fig, a_axes = plt.subplots(
-                len(unq_age),
-                1,
-                figsize=(4, 1.5 * len(unq_age)),
-            )
-            for i, ag in enumerate(unq_age):
-                temp = df.xs(ag, level="age_group")
+            if observed is None or len(observed.columns)>1:
+                fig, a_axes = plt.subplots(
+                    len(unq_age),
+                    1,
+                    figsize=(4, 1.5 * len(unq_age)),
+                )
+                for i, ag in enumerate(unq_age):
+                    temp = df.xs(ag, level="age_group")
 
+                    # Create pivot table i.e. time on index and draw on columns
+                    temp = temp.reset_index().pivot_table(index="time", columns="draw")
+
+                    ax_now = a_axes[i] if len(unq_age)>1 else a_axes;
+                    # Plot data
+                    _timeseries(temp.index, temp.to_numpy(), what="model", ax=ax_now)
+
+
+                    # Plot observed
+                    if observed is not None:
+                        _timeseries(observed[ag].index, observed[ag].to_numpy(), what="data", ax=ax_now)
+
+                    # Set title for axis
+                    ax_now.set_title(ag)
+            else:
+                # plot summarized data
+                fig, a_axes = plt.subplots(
+                    2,
+                    1,
+                    figsize=(4, 1.5 * 2),
+                )
+                temp = df.xs('age_group_sum', level="age_group")
                 # Create pivot table i.e. time on index and draw on columns
                 temp = temp.reset_index().pivot_table(index="time", columns="draw")
-
-                ax_now = a_axes[i] if len(unq_age)>1 else a_axes;
+                ax_now = a_axes[0];
                 # Plot data
                 _timeseries(temp.index, temp.to_numpy(), what="model", ax=ax_now)
 
-
                 # Plot observed
                 if observed is not None:
-                    _timeseries(observed.index, observed.to_numpy(), what="data", ax=ax_now)
+                    _timeseries(observed['age_group_0'].index, observed['age_group_0'].to_numpy(), what="data", ax=ax_now)
 
                 # Set title for axis
-                ax_now.set_title(ag)
+                ax_now.set_title('Summarized')
+
+                # plot age stratified data (from model)
+                ax_now = a_axes[1];
+                for i, ag in enumerate(unq_age):
+                    if ag=='age_group_sum':
+                        continue
+                    temp = df.xs(ag, level="age_group")
+
+                    # Create pivot table i.e. time on index and draw on columns
+                    temp = temp.reset_index().pivot_table(index="time", columns="draw")
+
+                    # Plot data
+                    _timeseries(temp.index, temp.to_numpy(), what="model", ax=ax_now, color=mpl.colors.to_rgba(rcParams["color_model"],(i+1)/len(unq_age)))
+                    # _timeseries(temp.index, temp.to_numpy(), what="model", ax=ax_now)
+
+                    # Set title for axis
+                ax_now.set_title('age stratified')
 
             axes[name_str] = a_axes
         else:
@@ -285,18 +338,21 @@ def _timeseries(
     # ------------------------------------------------------------------------------ #
 
     if what == "data":
+        kwargs = dict(kwargs, zorder=1)
         if "color" not in kwargs:
             kwargs = dict(kwargs, color=rcParams["color_data"])
         if "marker" not in kwargs:
-            kwargs = dict(kwargs, marker="d")
+            kwargs = dict(kwargs, marker="d", markersize=2)
         if "ls" not in kwargs and "linestyle" not in kwargs:
             kwargs = dict(kwargs, ls="None")
     elif what == "fcast":
+        kwargs = dict(kwargs, zorder=2)
         if "color" not in kwargs:
             kwargs = dict(kwargs, color=rcParams["color_model"])
         if "ls" not in kwargs and "linestyle" not in kwargs:
             kwargs = dict(kwargs, ls="--")
     elif what == "model":
+        kwargs = dict(kwargs, zorder=3)
         if "color" not in kwargs:
             kwargs = dict(kwargs, color=rcParams["color_model"])
         if "ls" not in kwargs and "linestyle" not in kwargs:
@@ -312,6 +368,7 @@ def _timeseries(
         del kwargs["linewidth"]
     if "marker" in kwargs:
         del kwargs["marker"]
+        del kwargs["markersize"]
     if "alpha" in kwargs:
         del kwargs["alpha"]
     if "label" in kwargs:

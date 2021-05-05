@@ -40,25 +40,17 @@ def studentT_likelihood(modelParams, pos_tests, total_tests, deaths):
 
     """
 
-    # log.info(f'pos_tests:\n{pos_tests}')
-    # log.info(f'total_tests:\n{total_tests}')
-    # log.info(f'deaths_tests:\n{deaths}')
-
     likelihood = yield _studentT_positive_tests(modelParams, pos_tests)
-    # log.info(f'likelihood\n{likelihood.shape}')
 
     if modelParams.data_summary["files"]["/tests.csv"]:
         likelihood_total_tests = yield _studentT_total_tests(modelParams, total_tests)
-        # log.info(f'likelihood total tests\n{likelihood_total_tests.shape}')
         likelihood = tf.concat([likelihood, likelihood_total_tests], axis=-1)
 
     if modelParams.data_summary["files"]["/deaths.csv"]:
         likelihood_deaths = yield _studentT_deaths(modelParams, deaths)
-        # log.info(f'likelihood deaths\n{likelihood_total_tests.shape}')
         likelihood = tf.concat([likelihood, likelihood_total_tests], axis=-1)
 
     log.debug(f"likelihood:\n{likelihood}")
-    # log.info(f"likelihood (all):\n{likelihood}")
     return likelihood
 
 
@@ -112,8 +104,6 @@ def _studentT_positive_tests(modelParams, pos_tests):
     observed_str = index_mask(modelParams.pos_tests_data_tensor, modelParams.data_stratified_mask)    # could also be done in mP
     observed_sum = index_mask(modelParams.pos_tests_total_data_tensor, modelParams.data_summarized_mask)    # could also be done in mP
     observed_masked = tf.concat([observed_str,observed_sum],axis=-1)
-    # log.info(f'loc masked\n{loc_masked}')
-    # log.info(f'observed masked\n{observed_masked}')
 
     likelihood = yield StudentT(
         name="likelihood_pos_tests",
@@ -160,9 +150,7 @@ def _studentT_total_tests(modelParams, total_tests):
     # Sadly we do not have age strata for the total performed test. We sum over the
     # age groups to get a value for all ages. We can add an exception later if we find
     # data for that.
-    # log.info(f'total tests\n{total_tests.shape}')
     total_tests_without_age = tf.reduce_sum(total_tests, axis=-1)
-    # log.info(f"total tests w/o age\n{total_tests_without_age.shape}")
 
     # Scale of the likelihood sigma for each country
     sigma = yield HalfCauchy(

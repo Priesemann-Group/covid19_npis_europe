@@ -507,9 +507,6 @@ def convolution_with_map(data, kernel, modelParams):
     )
     # Transpose to get the time dimension to the back
 
-    log.info(data_shift.shape)
-    log.info(kernel.shape)
-
     if len(data.shape) == 4:
         output_shape = (
             data.shape[0],
@@ -532,7 +529,6 @@ def convolution_with_map(data, kernel, modelParams):
         dtype="float32",
         fn_output_signature=tf.TensorSpec(shape=output_shape, dtype="float32"),
     )
-    log.info(convolution.shape)
     convolution = tf.einsum("t...ca->...tca", convolution)
     return convolution
 

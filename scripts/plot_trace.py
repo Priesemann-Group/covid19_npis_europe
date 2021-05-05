@@ -144,11 +144,12 @@ def check_for_dist_or_ts(this_model, sample_state_dict):
             continue
     return ts, dists
 
-
 # Get all default distributions and timesries
 all_ts, all_dists = check_for_dist_or_ts(this_model, sample_state.deterministics)
-all_ts = ['positive_tests','positive_tests_modulated']
-all_dists = []
+log.info(all_ts)
+log.info(all_dists)
+# all_ts = ['positive_tests_modulated','total_tests_compact']
+# all_dists = []
 log.info("Plotting may take some time! Go ahead and grab a coffee or two.")
 print(
     r"""

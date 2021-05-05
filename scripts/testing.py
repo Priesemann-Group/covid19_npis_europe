@@ -82,23 +82,23 @@ def define_model():
     # Define our model
     this_model = covid19_npis.model.model.main_model(modelParams)
 
-    # if tf.executing_eagerly(): # does only work, when eager exec is turned on
-    #     # Test shapes, should be all 3:
-    #     def print_dist_shapes(st):
-    #         for name, dist in itertools.chain(
-    #             st.discrete_distributions.items(), st.continuous_distributions.items(),
-    #         ):
-    #             if dist.log_prob(st.all_values[name]).shape != (3,):
-    #                 log.warning(
-    #                     f"False shape: {dist.log_prob(st.all_values[name]).shape}, {name}"
-    #                 )
-    #         for p in st.potentials:
-    #             if p.value.shape != (3,):
-    #                 log.warning(f"False shape: {p.value.shape} {p.name}")
-    #
-    #
-    #     _, sample_state = pm.evaluate_model_transformed(this_model, sample_shape=(3,))
-    #     print_dist_shapes(sample_state)
+    if tf.executing_eagerly(): # does only work, when eager exec is turned on
+        # Test shapes, should be all 3:
+        def print_dist_shapes(st):
+            for name, dist in itertools.chain(
+                st.discrete_distributions.items(), st.continuous_distributions.items(),
+            ):
+                if dist.log_prob(st.all_values[name]).shape != (3,):
+                    log.warning(
+                        f"False shape: {dist.log_prob(st.all_values[name]).shape}, {name}"
+                    )
+            for p in st.potentials:
+                if p.value.shape != (3,):
+                    log.warning(f"False shape: {p.value.shape} {p.name}")
+
+
+        _, sample_state = pm.evaluate_model_transformed(this_model, sample_shape=(3,))
+        print_dist_shapes(sample_state)
 
     return c, modelParams, this_model
 

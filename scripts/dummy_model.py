@@ -176,8 +176,7 @@ trace_prior = pm.sample_prior_predictive(
 fpath = f'./traces/{datetime.datetime.now().strftime("%y_%m_%d_%H")}'
 
 # Save our traces for the plotting script
-# store = covid19_npis.utils.save_trace_zarr(
-store = covid19_npis.utils.save_trace(
+store = covid19_npis.utils.save_trace_zarr(
     trace, modelParams, store=fpath, trace_prior=trace_prior,
 )
 

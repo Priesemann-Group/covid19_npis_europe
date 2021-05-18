@@ -134,7 +134,6 @@ def get_posterior_prior_from_trace(trace, sample_state, key, drop_chain_draw=Fal
             posterior.index = posterior.index.droplevel("chain")
             posterior.index = posterior.index.droplevel("draw")
         elif drop_chain_draw:
-            print("Hi")
             posterior = posterior.reset_index()
             posterior = posterior[key]
     else:

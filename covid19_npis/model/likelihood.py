@@ -48,7 +48,7 @@ def studentT_likelihood(modelParams, pos_tests, total_tests, deaths):
 
     if modelParams.data_summary["files"]["/deaths.csv"]:
         likelihood_deaths = yield _studentT_deaths(modelParams, deaths)
-        likelihood = tf.concat([likelihood, likelihood_total_tests], axis=-1)
+        likelihood = tf.concat([likelihood, likelihood_deaths], axis=-1)
 
     log.debug(f"likelihood:\n{likelihood}")
     return likelihood
@@ -88,22 +88,36 @@ def _studentT_positive_tests(modelParams, pos_tests):
     # Retrieve data from the modelParameters and create a boolean mask
     len_batch_shape = len(pos_tests.shape) - 3
 
-    pos_tests_sum = tf.reduce_sum(pos_tests,axis=-1)
+    pos_tests_sum = tf.reduce_sum(pos_tests, axis=-1)
 
     # obtain entries from age-stratified and non-age-stratified data
-    loc_str = index_mask(pos_tests, modelParams.data_stratified_mask, batch_dims=len_batch_shape)
-    loc_sum = index_mask(pos_tests_sum, modelParams.data_summarized_mask, batch_dims=len_batch_shape)
-    loc_masked = tf.concat([loc_str,loc_sum],axis=-1)
-
-    scale_str = index_mask(sigma[..., tf.newaxis, :, tf.newaxis] * tf.sqrt(pos_tests + 1), modelParams.data_stratified_mask, batch_dims=len_batch_shape
+    loc_str = index_mask(
+        pos_tests, modelParams.data_stratified_mask, batch_dims=len_batch_shape
     )
-    scale_sum = index_mask(sigma[..., tf.newaxis, :] * tf.sqrt(pos_tests_sum + 1), modelParams.data_summarized_mask, batch_dims=len_batch_shape
+    loc_sum = index_mask(
+        pos_tests_sum, modelParams.data_summarized_mask, batch_dims=len_batch_shape
     )
-    scale_masked = tf.concat([scale_str,scale_sum],axis=-1)
+    loc_masked = tf.concat([loc_str, loc_sum], axis=-1)
 
-    observed_str = index_mask(modelParams.pos_tests_data_tensor, modelParams.data_stratified_mask)    # could also be done in mP
-    observed_sum = index_mask(modelParams.pos_tests_total_data_tensor, modelParams.data_summarized_mask)    # could also be done in mP
-    observed_masked = tf.concat([observed_str,observed_sum],axis=-1)
+    scale_str = index_mask(
+        sigma[..., tf.newaxis, :, tf.newaxis] * tf.sqrt(pos_tests + 1),
+        modelParams.data_stratified_mask,
+        batch_dims=len_batch_shape,
+    )
+    scale_sum = index_mask(
+        sigma[..., tf.newaxis, :] * tf.sqrt(pos_tests_sum + 1),
+        modelParams.data_summarized_mask,
+        batch_dims=len_batch_shape,
+    )
+    scale_masked = tf.concat([scale_str, scale_sum], axis=-1)
+
+    observed_str = index_mask(
+        modelParams.pos_tests_data_tensor, modelParams.data_stratified_mask
+    )  # could also be done in mP
+    observed_sum = index_mask(
+        modelParams.pos_tests_total_data_tensor, modelParams.data_summarized_mask
+    )  # could also be done in mP
+    observed_masked = tf.concat([observed_str, observed_sum], axis=-1)
 
     likelihood = yield StudentT(
         name="likelihood_pos_tests",
@@ -187,7 +201,7 @@ def _studentT_total_tests(modelParams, total_tests):
     tf.debugging.check_numerics(
         likelihood, "Nan in likelihood", name="likelihood_total"
     )
-    return likelihood#[..., tf.newaxis]
+    return likelihood  # [..., tf.newaxis]
 
 
 def _studentT_deaths(modelParams, deaths):
@@ -254,4 +268,4 @@ def _studentT_deaths(modelParams, deaths):
     tf.debugging.check_numerics(
         likelihood, "Nan in likelihood", name="likelihood_deaths"
     )
-    return likelihood#[..., tf.newaxis]
+    return likelihood  # [..., tf.newaxis]

@@ -227,7 +227,7 @@ def distribution(
                     else:
                         posterior_t = None
                     if prior is not None:
-                        prior_t = posterior.xs(value, level=lev)
+                        prior_t = prior.xs(value, level=lev)
                     else:
                         prior_t = None
                     recursion(

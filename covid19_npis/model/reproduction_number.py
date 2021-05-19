@@ -278,6 +278,7 @@ def construct_R_t(name, modelParams, R_0):
             Time dependent reproduction number tensor :math:`R(t)`.
             |shape| time, batch, country, age group
     """
+
     # Create distributions for date and hyperpriors.
     distributions = _create_distributions(modelParams)
 
@@ -311,13 +312,6 @@ def construct_R_t(name, modelParams, R_0):
 
         return tf.math.sigmoid(alpha_cross_i_c_a)
 
-    alpha_i_c_a = yield Deterministic(
-        name="alpha_i_c_a",
-        value=(yield alpha()),
-        shape_label=("intervention", "country", "age_group",),
-    )
-    log.debug(f"alpha_i_c_a\n{alpha_i_c_a}")
-
     def length():
         """
         Helper function to construct the l_i,sign(Δγ) tensor
@@ -329,17 +323,11 @@ def construct_R_t(name, modelParams, R_0):
         )
         l_positive_cross = yield distributions["l_positive_cross"]
         l_negative_cross = yield distributions["l_negative_cross"]
+
         # TODO:  NEED TO DETECT WHETHER TO USE POSITIVE OR NEGATIVE l_cross
         l_cross_i_sign = l_positive_cross + delta_l_cross_i
 
         return tf.math.softplus(l_cross_i_sign)
-
-    l_i_sign = yield Deterministic(
-        name="l_i_sign",
-        value=(yield length()),
-        shape_label=("intervention"),  # intervention
-    )
-    log.debug(f"l_i_sign\n{l_i_sign}")
 
     def date():
         """
@@ -351,7 +339,7 @@ def construct_R_t(name, modelParams, R_0):
         delta_d_i = tf.einsum(  # Multiply distribution by hyperprior
             "...ica,...->...ica", delta_d_i, d_sigma_interv
         )
-        
+
         delta_d_c = yield distributions["delta_d_c"]
         d_sigma_country = yield distributions["d_sigma_country"]
         delta_d_c = tf.einsum(  # Multiply distribution by hyperprior
@@ -364,13 +352,6 @@ def construct_R_t(name, modelParams, R_0):
 
         return d_data + delta_d_i + delta_d_c
 
-    d_i_c_p = yield Deterministic(
-        name="d_i_c_p",
-        value=(yield date()),
-        shape_label=("intervention", "country", "change_point",),
-    )
-    log.debug(f"d_i_c_p\n{d_i_c_p}")
-
     def gamma(d_i_c_p, l_i_sign):
         """
         Helper function to construct gamma_i_c_p and calculate gamma_i_c
@@ -381,12 +362,13 @@ def construct_R_t(name, modelParams, R_0):
         # We need to expand the dims of d_icp because we need a additional time dimension
         # for "t - d_icp"
         d_i_c_p = tf.expand_dims(d_i_c_p, axis=-1)
-        inner_sigmoid = tf.einsum("...i,...icpt->...icpt", 4.0 / l_i_sign, t - d_i_c_p)
-        log.debug(f"inner_sigmoid\n{inner_sigmoid}")
+
+        # Get the sigmoid and multiply it with our gamma tensor
+        sigmoid = tf.math.sigmoid(
+            tf.einsum("...i,...icpt->...icpt", 4.0 / l_i_sign, (t - d_i_c_p))
+        )
         gamma_i_c_p = tf.einsum(
-            "...icpt,icp->...icpt",
-            tf.math.sigmoid(inner_sigmoid),
-            modelParams.gamma_data_tensor,
+            "...icpt,icp->...icpt", sigmoid, modelParams.gamma_data_tensor,
         )
         log.debug(
             f"gamma_i_c_p\n{gamma_i_c_p}"
@@ -401,40 +383,69 @@ def construct_R_t(name, modelParams, R_0):
             modelParams.data_summary["interventions"]
         ):  # Should be same across all countries -> 0
             gamma_list_c = []
-            gamma_c_p = tf.gather(gamma_i_c_p, i, axis=-4)
             for c, country in enumerate(modelParams.countries):
-                gamma_p = tf.gather(gamma_c_p, c, axis=-3)
 
                 # Cut gamma_p to get only the used change points values
-                # i.e remove padding!
+                # remove padding!
                 num_change_points = len(country.change_points[intervention])
-                gamma_p = gamma_p[..., 0:num_change_points, :]
+                gamma_p = gamma_i_c_p[..., i, c, 0:num_change_points, :]
+                log.debug(f"gamma_p\n{gamma_p}")
 
                 # Calculate the sum over all change points
                 gamma_values = tf.math.reduce_sum(gamma_p, axis=-2)
+                log.debug(f"gamma_values\n{gamma_values}")
+
+                # Add all countries
                 gamma_list_c.append(gamma_values)
+            # Add all interventions
             gamma_list_i_c.append(gamma_list_c)
 
         gamma = tf.convert_to_tensor(gamma_list_i_c)
-
+        log.debug(f"gamma_asd\n{gamma}")
         # Transpose batch into front
         gamma = tf.einsum("ic...t -> ...ict", gamma)
 
         return gamma
 
+    """ Use helper functions to get basic tensors
+    """
+    alpha_i_c_a = yield Deterministic(
+        name="alpha_i_c_a",
+        value=(yield alpha()),
+        shape_label=("intervention", "country", "age_group",),
+    )
+    log.debug(f"alpha_i_c_a\n{alpha_i_c_a}")
+
+    l_i_sign = yield Deterministic(
+        name="l_i_sign", value=(yield length()), shape_label=("intervention",),
+    )
+    log.debug(f"l_i_sign\n{l_i_sign}")
+
+    d_i_c_p = yield Deterministic(
+        name="d_i_c_p",
+        value=(yield date()),
+        shape_label=("intervention", "country", "change_point",),
+    )
+    log.debug(f"d_i_c_p\n{d_i_c_p}")
+
+    # Superposition of change points
     gamma_i_c = gamma(
         d_i_c_p, l_i_sign
     )  # no yield because we do not sample anything in this function
     log.debug(f"gamma_i_c\n{gamma_i_c}")
     log.debug(f"alpha_i_c_a\n{alpha_i_c_a}")
-    """ Calculate R_eff
+
+    """ Calculate effectiveness and strength sum.
     """
-    exponent = tf.einsum("...ict,...ica->...cat", gamma_i_c, alpha_i_c_a)
+    summation = tf.einsum("...ict,...ica->...cat", gamma_i_c, alpha_i_c_a)
 
-    # for robustness
-    # exponent = tf.clip_by_value(exponent, -0.t2, 3)
+    """ Calculate R_eff
+    In the following we multiply the previously calculated sum with the basic
+    reproduction number. Additionally we add some noise to add robustness
+    """
 
-    R_eff = tf.einsum("...ca,...cat->...tca", R_0, tf.exp(-exponent))
+    # Multiply R_0 and sum
+    R_eff = tf.einsum("...ca,...cat->...tca", R_0, tf.exp(-summation))
     log.debug(f"R_eff\n{R_eff}")
 
     R_t = yield Deterministic(
@@ -446,6 +457,7 @@ def construct_R_t(name, modelParams, R_0):
     # grows more slowly.
     R_t = R_t * tf.nn.softplus(sum_noise / tf.math.log(2.0)) / tf.math.log(2.0)
 
+    # Swap dimensions to follow specifications
     R_t = tf.einsum("...tca -> t...ca", R_t)
 
     return R_t  # shape time, batch, country, age_group
@@ -472,7 +484,7 @@ def construct_R_0(name, modelParams, loc, scale, hn_scale):
         loc: number
             Location parameter of the R^*_0 Normal distribution.
         scale: number
-            Scale paramter of the R^*_0 Normal distribution.
+            Scale parameter of the R^*_0 Normal distribution.
         hn_scale: number
             Scale parameter of the \sigma_{R^*, \text{country}} HaflNormal distribution.
 

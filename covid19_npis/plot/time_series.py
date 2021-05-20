@@ -81,15 +81,19 @@ def timeseries(
             "No time or date found in variable dimensions!\n (Is the distribution shape_label set?!)"
         )
 
-    if (observed is not None) and ('age_group' in observed.columns.names):
+    if (observed is not None) and ("age_group" in observed.columns.names):
         # constructing summarized datasets for age-stratified data
         idx = pd.IndexSlice
-        for country in observed.columns.get_level_values('country').unique():
+        for country in observed.columns.get_level_values("country").unique():
 
-            if len(observed[country].columns)==1:
-                df_summarized = df.loc[idx[:,:,:,country,:],:].groupby(level=[0,1,2,3]).sum()
-                df_summarized['age_group'] = 'age_group_sum'
-                df_summarized.set_index('age_group',append=True,inplace=True)
+            if len(observed[country].columns) == 1:
+                df_summarized = (
+                    df.loc[idx[:, :, :, country, :], :]
+                    .groupby(level=[0, 1, 2, 3])
+                    .sum()
+                )
+                df_summarized["age_group"] = "age_group_sum"
+                df_summarized.set_index("age_group", append=True, inplace=True)
                 df = df.append(df_summarized)
 
     # Drop chains index if not seperated!
@@ -128,7 +132,9 @@ def timeseries(
                     # create new dataframe for next recursion
                     df_t = df.xs(value, level=lev)
                     if observed is not None:
-                        if lev in observed.columns.names: # observed is missing "chains"
+                        if (
+                            lev in observed.columns.names
+                        ):  # observed is missing "chains"
                             # I hope the dataframes have the same format
                             _observed = observed.xs(value, level=lev, axis=1)
                         else:
@@ -139,63 +145,67 @@ def timeseries(
 
                 return  # Stop these recursions
 
-
         # Remove "_" from name
         name_str = name_str[1:]
 
         if plot_age_groups_together and "age_group" in df.index.names:
-            unq_age = df.index.get_level_values("age_group").unique();
+            unq_age = df.index.get_level_values("age_group").unique()
 
-            if observed is None or len(observed.columns)>1:
+            if observed is None or len(observed.columns) > 1:
                 fig, a_axes = plt.subplots(
                     len(unq_age),
                     1,
-                    figsize=(4, 1.5+ 1.5 * len(unq_age)),
-                squeeze=False,
-            )
+                    figsize=(4, 1.5 + 1.5 * len(unq_age)),
+                    squeeze=False,
+                )
             a_axes = a_axes[:, 0]
             for i, ag in enumerate(unq_age):
-                    temp = df.xs(ag, level="age_group")
+                temp = df.xs(ag, level="age_group")
 
-                    # Create pivot table i.e. time on index and draw on columns
-                    temp = temp.reset_index().pivot_table(index="time", columns="draw")
-
-                    ax_now = a_axes[i] if len(unq_age)>1 else a_axes;
-                    # Plot data
-                    _timeseries(temp.index, temp.to_numpy(), what="model", ax=ax_now)
-
-
-                    # Plot observed
-                    if observed is not None:
-                        _timeseries(observed[ag].index, observed[ag].to_numpy(), what="data", ax=ax_now)
-
-                    # Set title for axis
-                    ax_now.set_title(ag)
-            else:
-                # plot summarized data
-                fig, a_axes = plt.subplots(
-                    2,
-                    1,
-                    figsize=(4, 1.5 * 2),
-                )
-                temp = df.xs('age_group_sum', level="age_group")
                 # Create pivot table i.e. time on index and draw on columns
                 temp = temp.reset_index().pivot_table(index="time", columns="draw")
-                ax_now = a_axes[0];
+
+                ax_now = a_axes[i] if len(unq_age) > 1 else a_axes
                 # Plot data
                 _timeseries(temp.index, temp.to_numpy(), what="model", ax=ax_now)
 
                 # Plot observed
                 if observed is not None:
-                    _timeseries(observed['age_group_0'].index, observed['age_group_0'].to_numpy(), what="data", ax=ax_now)
+                    _timeseries(
+                        observed[ag].index,
+                        observed[ag].to_numpy(),
+                        what="data",
+                        ax=ax_now,
+                    )
 
                 # Set title for axis
-                ax_now.set_title('Summarized')
+                ax_now.set_title(ag)
+            else:
+                # plot summarized data
+                fig, a_axes = plt.subplots(2, 1, figsize=(4, 1.5 * 2),)
+                temp = df.xs("age_group_sum", level="age_group")
+                # Create pivot table i.e. time on index and draw on columns
+                temp = temp.reset_index().pivot_table(index="time", columns="draw")
+                ax_now = a_axes[0]
+                # Plot data
+                _timeseries(temp.index, temp.to_numpy(), what="model", ax=ax_now)
+
+                # Plot observed
+                if observed is not None:
+                    _timeseries(
+                        observed["age_group_0"].index,
+                        observed["age_group_0"].to_numpy(),
+                        what="data",
+                        ax=ax_now,
+                    )
+
+                # Set title for axis
+                ax_now.set_title("Summarized")
 
                 # plot age stratified data (from model)
-                ax_now = a_axes[1];
+                ax_now = a_axes[1]
                 for i, ag in enumerate(unq_age):
-                    if ag=='age_group_sum':
+                    if ag == "age_group_sum":
                         continue
                     temp = df.xs(ag, level="age_group")
 
@@ -203,11 +213,19 @@ def timeseries(
                     temp = temp.reset_index().pivot_table(index="time", columns="draw")
 
                     # Plot data
-                    _timeseries(temp.index, temp.to_numpy(), what="model", ax=ax_now, color=mpl.colors.to_rgba(rcParams["color_model"],(i+1)/len(unq_age)))
+                    _timeseries(
+                        temp.index,
+                        temp.to_numpy(),
+                        what="model",
+                        ax=ax_now,
+                        color=mpl.colors.to_rgba(
+                            rcParams["color_model"], (i + 1) / len(unq_age)
+                        ),
+                    )
                     # _timeseries(temp.index, temp.to_numpy(), what="model", ax=ax_now)
 
                     # Set title for axis
-                ax_now.set_title('age stratified')
+                ax_now.set_title("age stratified")
 
             axes[name_str] = a_axes
         else:

@@ -8,7 +8,10 @@ import datetime
 import pandas as pd
 import pymc4 as pm
 import tensorflow as tf
-from tensorflow.python.framework.ops import disable_eager_execution, enable_eager_execution # tensorflow 2.+ has eager execution turned on by default and the supposed function 'tf.config.run_functions_eagerly()' seems ot have no effect. this one works, though
+from tensorflow.python.framework.ops import (
+    disable_eager_execution,
+    enable_eager_execution,
+)  # tensorflow 2.+ has eager execution turned on by default and the supposed function 'tf.config.run_functions_eagerly()' seems ot have no effect. this one works, though
 import numpy as np
 import time
 import os
@@ -51,6 +54,7 @@ if tf.executing_eagerly():
 
 # Load our data from csv files into our own custom data classes
 
+
 def define_model():
     countries = [
         "Germany",
@@ -82,7 +86,7 @@ def define_model():
     # Define our model
     this_model = covid19_npis.model.model.main_model(modelParams)
 
-    if tf.executing_eagerly(): # does only work, when eager exec is turned on
+    if tf.executing_eagerly():  # does only work, when eager exec is turned on
         # Test shapes, should be all 3:
         def print_dist_shapes(st):
             for name, dist in itertools.chain(
@@ -96,13 +100,13 @@ def define_model():
                 if p.value.shape != (3,):
                     log.warning(f"False shape: {p.value.shape} {p.name}")
 
-
         _, sample_state = pm.evaluate_model_transformed(this_model, sample_shape=(3,))
         print_dist_shapes(sample_state)
 
     return c, modelParams, this_model
 
-def run_model(this_model,modelParams,num_samples,num_chains):
+
+def run_model(this_model, modelParams, num_samples, num_chains):
     """ # 2. MCMC Sampling
     """
 
@@ -110,7 +114,6 @@ def run_model(this_model,modelParams,num_samples,num_chains):
     log.info("start")
     # num_chains = 6
     # num_samples = [200,1000]
-
 
     trace_tuning, trace = pm.sample(
         this_model,

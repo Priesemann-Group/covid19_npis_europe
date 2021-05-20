@@ -99,13 +99,7 @@ def distribution(
         if plot_age_groups_together and ("age_group" in df.index.names):
             unq_age = df.index.get_level_values("age_group").unique()
             fig, ax = plt.subplots(
-                len(unq_age),
-                1,
-                figsize=(
-                    2.2,
-                    2.2 * len(unq_age),
-                ),
-                squeeze=False,
+                len(unq_age), 1, figsize=(2.2, 2.2 * len(unq_age),), squeeze=False,
             )
             ax = ax[:, 0]
             for i, ag in enumerate(unq_age):
@@ -119,7 +113,7 @@ def distribution(
                 else:
                     prior_t = None
 
-                ax_now = ax[i] if len(unq_age)>1 else ax
+                ax_now = ax[i] if len(unq_age) > 1 else ax
                 # Plot
                 _distribution(
                     array_posterior=posterior_t,
@@ -319,13 +313,13 @@ def distribution_matrix(trace, sample_state, key, dir_save=None):
             squeeze=False,
         )
         for x, row in enumerate(rows):
-            ax_row = ax[x] if len(rows)>1 else ax
+            ax_row = ax[x] if len(rows) > 1 else ax
             if posterior is not None:
                 posterior_x = posterior.xs(row, level=posterior.index.names[-1])
             if prior is not None:
                 prior_x = prior.xs(row, level=prior.index.names[-1])
             for y, col in enumerate(cols):
-                ax_col = ax_row[y] if len(cols)>1 else ax_row
+                ax_col = ax_row[y] if len(cols) > 1 else ax_row
                 if posterior is not None:
                     posterior_xy = posterior_x.xs(col).to_numpy().flatten()
                 else:
@@ -347,12 +341,12 @@ def distribution_matrix(trace, sample_state, key, dir_save=None):
 
         # Create titles for the axes
         for x, row in enumerate(rows):
-            ax_row = ax[x] if len(rows)>1 else ax
-            ax_col = ax_row[0] if len(cols)>1 else ax_row
+            ax_row = ax[x] if len(rows) > 1 else ax
+            ax_col = ax_row[0] if len(cols) > 1 else ax_row
             ax_col.set_ylabel(row)
         for y, col in enumerate(cols):
-            ax_col = ax[x] if len(cols)>1 else ax
-            ax_row = ax_col[0] if len(rows)>1 else ax_col
+            ax_col = ax[x] if len(cols) > 1 else ax
+            ax_row = ax_col[0] if len(rows) > 1 else ax_col
             ax_row.set_title(col)
 
         # Suptitle

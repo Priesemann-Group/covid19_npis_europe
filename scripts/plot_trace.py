@@ -144,6 +144,7 @@ def check_for_dist_or_ts(this_model, sample_state_dict):
             continue
     return ts, dists
 
+
 # Get all default distributions and timesries
 all_ts, all_dists = check_for_dist_or_ts(this_model, sample_state.deterministics)
 log.info(all_ts)
@@ -202,7 +203,11 @@ for ts_name in args.timeseries:
     pbar.set_description(f"Creating plots [{ts_name}]")
 
     # Set observed data for plotting
-    if ts_name == "new_E_t" or ts_name == "positive_tests" or ts_name == "positive_tests_modulated":
+    if (
+        ts_name == "new_E_t"
+        or ts_name == "positive_tests"
+        or ts_name == "positive_tests_modulated"
+    ):
         observed = modelParams.pos_tests_dataframe
     elif (ts_name == "total_tests_compact") and (
         modelParams.data_summary["files"]["/tests.csv"]

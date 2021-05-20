@@ -85,7 +85,8 @@ def weekly_modulation(name, modelParams, cases):
 
     t = modelParams.get_weekdays()  # get array with weekdays
     f = (1 - weight) * (
-        1 - tf.math.abs(
+        1
+        - tf.math.abs(
             tf.math.sin(tf.reshape(t, (-1, 1, 1)) / 7 * tf.constant(np.pi) + offset / 2)
         )
     )

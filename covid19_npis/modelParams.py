@@ -28,7 +28,7 @@ class ModelParams:
     def __init__(
         self,
         countries,
-        const_contact=True, # set 'true' for a constant contact matrix (without age-group interaction)
+        const_contact=True,  # set 'true' for a constant contact matrix (without age-group interaction)
         R_interval_time=5,  # time interval over which the reproduction number is calculated
         offset_sim_data=20,
         minimal_daily_cases=40,
@@ -114,8 +114,8 @@ class ModelParams:
                 else:
                     df = getattr(country, attribute_name)
                 # if accumulate:
-                    # df_total[country.name] = getattr(country, attribute_name).sum(axis=1)
-            return df#, df_total
+                # df_total[country.name] = getattr(country, attribute_name).sum(axis=1)
+            return df  # , df_total
 
         # sort countries alphabetically to have consistent indexes
         c_sort = np.argsort([c.name for c in countries])
@@ -156,7 +156,7 @@ class ModelParams:
         self._dataframe_interventions = join_dataframes(
             key="/interventions.csv",
             check_dict=check,
-            attribute_name="data_interventions"
+            attribute_name="data_interventions",
         )
 
         """ Update data summary
@@ -165,7 +165,6 @@ class ModelParams:
         # log.info(f'data_summary:\n{self.data_summary}')
 
         # self._adjust_stratification(attributes=['_dataframe_new_cases'])
-
 
         """ Calculate positive tests data tensor (tensorflow)
         Set data tensor, replaces values smaller than 40 by nans.
@@ -182,7 +181,7 @@ class ModelParams:
         """
         self.deaths_data_tensor = self._dataframe_deaths  # Uses setter below!
 
-        self._set_data_mask()   # prepare data masks for use in likelihood computation
+        self._set_data_mask()  # prepare data masks for use in likelihood computation
 
         """ # Update intervetions data tensor
         """
@@ -213,19 +212,21 @@ class ModelParams:
             country_name = country.name
             # age_groups = count
             data["countries"].append(country_name)
-        ### added
+            ### added
             age_groups = self.pos_tests_dataframe[country_name].columns
-            if len(age_groups)>1:
-                if len(data['age_groups']):
-                    assert len(data['age_groups'])==len(age_groups), "data with different number of age groups provided - please provide either similiar age stratification, or summarized data"
+            if len(age_groups) > 1:
+                if len(data["age_groups"]):
+                    assert len(data["age_groups"]) == len(
+                        age_groups
+                    ), "data with different number of age groups provided - please provide either similiar age stratification, or summarized data"
                 else:
-                    data['age_groups'] = list(age_groups)
-                    data['age_groups_ref'] = country.age_groups
-                data['age_groups_summarized'].append(False)
+                    data["age_groups"] = list(age_groups)
+                    data["age_groups_ref"] = country.age_groups
+                data["age_groups_summarized"].append(False)
             else:
-                data['age_groups_summarized'].append(True)
-        data['age_groups_summarized'] = np.array(data['age_groups_summarized'])
-            # data["age_group_data"][country_name] = list(self.pos_tests_dataframe[country_name].columns)
+                data["age_groups_summarized"].append(True)
+        data["age_groups_summarized"] = np.array(data["age_groups_summarized"])
+        # data["age_group_data"][country_name] = list(self.pos_tests_dataframe[country_name].columns)
         # Create age group list dynamic from data dataframe
         # for age_group_name in self.pos_tests_dataframe.columns.get_level_values(
         #     level="age_group"
@@ -376,27 +377,36 @@ class ModelParams:
         """
 
         # create tensor with stratified (provided or artificial) case data for all countries
-        new_cases = np.zeros((self.pos_tests_dataframe.shape[0],0,self.num_age_groups))
-        for i,c in enumerate(self.countries):
+        new_cases = np.zeros(
+            (self.pos_tests_dataframe.shape[0], 0, self.num_age_groups)
+        )
+        for i, c in enumerate(self.countries):
             new_cases_tmp = self.pos_tests_dataframe[c.name].to_numpy()
-            if self.data_summary['age_groups_summarized'][i]: ## write existing data into array
-                new_cases_tmp = np.repeat(new_cases_tmp/self.num_age_groups,self.num_age_groups,axis=1) ## could be further refined according to demographics - but not suuuper important
+            if self.data_summary["age_groups_summarized"][
+                i
+            ]:  ## write existing data into array
+                new_cases_tmp = np.repeat(
+                    new_cases_tmp / self.num_age_groups, self.num_age_groups, axis=1
+                )  ## could be further refined according to demographics - but not suuuper important
 
-            new_cases = np.concatenate([new_cases,new_cases_tmp[:,np.newaxis,:]],axis=1)
+            new_cases = np.concatenate(
+                [new_cases, new_cases_tmp[:, np.newaxis, :]], axis=1
+            )
 
         # prepend data with zeros for simulation offset
         new_cases = np.concatenate(
             [
-                np.zeros((self._offset_sim_data, self.num_countries, self.num_age_groups)),
+                np.zeros(
+                    (self._offset_sim_data, self.num_countries, self.num_age_groups)
+                ),
                 new_cases,
-            ], axis=0
+            ],
+            axis=0,
         )
 
         i_data_begin_list = []
         for c in range(new_cases.shape[1]):
-            mask = (
-                np.nansum(new_cases[:, c, :], axis=-1) > self._minimal_daily_cases
-            )
+            mask = np.nansum(new_cases[:, c, :], axis=-1) > self._minimal_daily_cases
             if mask.sum() == 0:  # [False,False,False]
                 i_data_begin = len(mask) - 1
             else:
@@ -409,8 +419,10 @@ class ModelParams:
         for c, i in enumerate(self.indices_begin_data):
             new_cases[:i, c, :] = np.nan
 
-        self._tensor_pos_tests = tf.constant(new_cases,dtype=self.dtype)
-        self._tensor_pos_tests_total = tf.constant(new_cases.sum(axis=-1),dtype=self.dtype)
+        self._tensor_pos_tests = tf.constant(new_cases, dtype=self.dtype)
+        self._tensor_pos_tests_total = tf.constant(
+            new_cases.sum(axis=-1), dtype=self.dtype
+        )
 
         # self._tensor_pos_tests = tf.constant(new_cases_tensor, dtype=self.dtype)
 
@@ -548,18 +560,22 @@ class ModelParams:
 
         self._tensor_deaths = tf.constant(deaths_tensor, dtype=self.dtype)
 
-
-
     # ------------------------------------------------------------------------------ #
     # masks
     # ------------------------------------------------------------------------------ #
     def _set_data_mask(self):
 
         self.data_stratified_mask = np.argwhere(
-            (~np.isnan(self.pos_tests_data_tensor) & ~self.data_summary['age_groups_summarized'][np.newaxis,:,np.newaxis]).flatten()
+            (
+                ~np.isnan(self.pos_tests_data_tensor)
+                & ~self.data_summary["age_groups_summarized"][np.newaxis, :, np.newaxis]
+            ).flatten()
         )
         self.data_summarized_mask = np.argwhere(
-            (~np.isnan(self.pos_tests_total_data_tensor) & self.data_summary['age_groups_summarized'][np.newaxis,:]).flatten()
+            (
+                ~np.isnan(self.pos_tests_total_data_tensor)
+                & self.data_summary["age_groups_summarized"][np.newaxis, :]
+            ).flatten()
         )
 
     # ------------------------------------------------------------------------------ #
@@ -585,9 +601,9 @@ class ModelParams:
             d_c = []
 
             # Get age groups from country config
-            if self.data_summary['age_groups_summarized'][c]:
+            if self.data_summary["age_groups_summarized"][c]:
                 # If age group not present in this country data
-                age_groups_c = self.data_summary['age_groups_ref']
+                age_groups_c = self.data_summary["age_groups_ref"]
             else:
                 age_groups_c = country.age_groups
 

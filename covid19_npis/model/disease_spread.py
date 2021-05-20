@@ -65,7 +65,7 @@ def construct_E_0_t(
 
     # # eigvals, _ = tf.linalg.eigh(R_t[..., i_data_begin, :, :])
     # # largest_eigval = eigvals[-1]
-    R_t_rescaled = (R_t+1e-5) ** (1. / (modelParams._R_interval_time+1e-3))
+    R_t_rescaled = (R_t + 1e-5) ** (1.0 / (modelParams._R_interval_time + 1e-3))
     R_inv = 1 / (R_t_rescaled + 1e-3)
     R_inv = tf.clip_by_value(R_inv, clip_value_min=0.7, clip_value_max=1.2)
     """
@@ -81,7 +81,14 @@ def construct_E_0_t(
     avg_cases_begin = []
     for c in range(data.shape[1]):
         avg_cases_begin.append(
-            tf.reduce_mean(data[i_data_begin_list[c] : i_data_begin_list[c] + modelParams._R_interval_time, c], axis=0)
+            tf.reduce_mean(
+                data[
+                    i_data_begin_list[c] : i_data_begin_list[c]
+                    + modelParams._R_interval_time,
+                    c,
+                ],
+                axis=0,
+            )
         )
     # avg_cases_begin = np.array(avg_cases_begin)
     E_t = tf.stack(avg_cases_begin)
@@ -422,7 +429,9 @@ def construct_C(
         # len_batch_shape = len(pos_tests.shape) - 3
         C_matrix = yield Deterministic(
             name=f"{name}",
-            value=tf.eye(modelParams.num_age_groups,batch_shape=[modelParams.num_countries]),
+            value=tf.eye(
+                modelParams.num_age_groups, batch_shape=[modelParams.num_countries]
+            ),
             shape_label=("country", "age_group_i", "age_group_j"),
         )
         return C_matrix
@@ -461,10 +470,10 @@ def construct_C(
                 conditionally_independent=True,
                 event_stack=(
                     1,
-                        modelParams.num_age_groups * (modelParams.num_age_groups - 1) // 2,
-                    ),
+                    modelParams.num_age_groups * (modelParams.num_age_groups - 1) // 2,
+                ),
                 shape_label=(None, "age groups cross terms"),
-                )
+            )
         ) * C_age_sigma
 
         Base_C = (
@@ -480,12 +489,13 @@ def construct_C(
         C_array = Base_C + Delta_C_age + Delta_C_country
         C_array = tf.math.sigmoid(C_array)
         C_array = tf.clip_by_value(
-        C_array, 0.001, 0.99
+            C_array, 0.001, 0.99
         )  # ensures off diagonal terms are smaller than diagonal terms
 
         size = modelParams.num_age_groups
         transf_array = lambda arr: normalize_matrix(
-            _subdiagonal_array_to_matrix(arr, size) + tf.linalg.eye(size, dtype=arr.dtype)
+            _subdiagonal_array_to_matrix(arr, size)
+            + tf.linalg.eye(size, dtype=arr.dtype)
         )
 
         yield Deterministic(
@@ -570,9 +580,12 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel):
         # log.debug(f"E_t {E_t}")
         # Calc "infectious" people, weighted by serial_p (country x age_group)
 
-        E_lastv_noNaN = tf.where(tf.math.is_nan(E_lastv),tf.zeros(E_lastv.shape),E_lastv) # replacing NaN values -> 0
-        infectious = tf.einsum("t...ca,...t->...ca", E_lastv_noNaN, gen_kernel)  # Convolution
-
+        E_lastv_noNaN = tf.where(
+            tf.math.is_nan(E_lastv), tf.zeros(E_lastv.shape), E_lastv
+        )  # replacing NaN values -> 0
+        infectious = tf.einsum(
+            "t...ca,...t->...ca", E_lastv_noNaN, gen_kernel
+        )  # Convolution
 
         # Calculate effective R_t [country,age_group] from Contact-Matrix C [country,age_group,age_group]
         R_sqrt = tf.math.sqrt(R + 1e-7)
@@ -617,7 +630,7 @@ def InfectionModel(N, E_0_t, R_t, C, gen_kernel):
     initial = (
         tf.zeros(S_initial.shape, dtype=S_initial.dtype),
         E_0_t[:len_gen_interv_kernel],
-        S_initial
+        S_initial,
     )
     out = tf.scan(fn=loop_body, elems=(R_t_for_loop, h_t_for_loop), initializer=initial)
     daily_infections_final = out[0]

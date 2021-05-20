@@ -63,7 +63,6 @@ def main_model(modelParams):
     C = yield construct_C(name="C", modelParams=modelParams)
     log.debug(f"C:\n{C}")
 
-
     """ # Create generation interval g:
     """
     len_gen_interv_kernel = 12

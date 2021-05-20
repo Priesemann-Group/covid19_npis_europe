@@ -236,7 +236,7 @@ def _calc_Phi_IFR(
         shape_label=("country",),
     )
 
-    n_batches = None if (len(beta.shape)==1) else beta.shape[0]
+    n_batches = None if (len(beta.shape) == 1) else beta.shape[0]
 
     # for robustness, clip at about 5 sigmas
     alpha = tf.clip_by_value(alpha, 0.1, 0.14)
@@ -266,8 +266,8 @@ def _calc_Phi_IFR(
     for c, country in enumerate(modelParams.countries):
         phi_c = []
 
-        if modelParams.data_summary['age_groups_summarized'][c]:
-            age_group_c = modelParams.data_summary['age_groups_ref']
+        if modelParams.data_summary["age_groups_summarized"][c]:
+            age_group_c = modelParams.data_summary["age_groups_ref"]
         else:
             age_group_c = country.age_groups
 
@@ -280,7 +280,7 @@ def _calc_Phi_IFR(
             log.debug(f"phi_a\n{phi_a.shape}")
             phi_c.append(phi_a)
             # else:
-                # phi_c.append(tf.constant(np.NaN,shape=(n_batches,) if n_batches else ()))
+            # phi_c.append(tf.constant(np.NaN,shape=(n_batches,) if n_batches else ()))
         phi.append(phi_c)
     log.debug(f"phi\n{tf.convert_to_tensor(phi).shape}")
 

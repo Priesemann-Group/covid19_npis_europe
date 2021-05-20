@@ -18,14 +18,6 @@ tf.config.optimizer.set_jit(
 )
 """
 
-
-"""
-SM: I dont know what this is doing, please explain :)
-
-os.environ["KMP_BLOCKTIME"] = "1"
-os.environ["KMP_SETTINGS"] = "1"
-os.environ["KMP_AFFINITY"] = "granularity=fine,verbose,compact,1,0"
-"""
 import pymc4 as pm
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -34,29 +26,13 @@ import time
 import os
 import matplotlib.pyplot as plt
 
-"""
-SM: I dont know what this is doing, please explain :)
 
-old_opts = tf.config.optimizer.get_experimental_options()
-print(old_opts)
-tf.config.optimizer.set_experimental_options(
-    {
-        "autoparallel_optimizer": True,
-        "layout_optimizer": True,
-        "loop_optimizer": True,
-        "dependency_optimizer": True,
-        "shape_optimizer": True,
-        "function_optimizer": True,
-        "constant_folding_optimizer": True,
-    }
-)
-print(tf.config.optimizer.get_experimental_options())
-"""
 sys.path.append("../")
 import covid19_npis
 
 """ # Debugging and other snippets
 """
+
 
 # Logs setup
 log = logging.getLogger()
@@ -146,88 +122,93 @@ def print_dist_shapes(st):
 _, sample_state = pm.evaluate_model_transformed(this_model, sample_shape=(3,))
 print_dist_shapes(sample_state)
 
-(
-    posterior_approx,
-    bijector,
-    transformed_names,
-) = covid19_npis.model.build_approximate_posterior(this_model)
-
-sample_size = 50
-
-(
-    logpfn,
-    init_random,
-    _deterministics_callback,
-    deterministic_names,
-    state_,
-) = pm.mcmc.samplers.build_logp_and_deterministic_functions(
-    this_model, num_chains=sample_size, collect_reduced_log_prob=False
-)
-
-
-trace_loss = lambda traceable_quantities: tf.debugging.check_numerics(
-    traceable_quantities.loss, f"loss not finite: {traceable_quantities.loss}"
-)
-
-# For eventual debugging:
-# tf.config.run_functions_eagerly(True)
-# tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
-
-begin = time.time()
-posterior = tfp.vi.fit_surrogate_posterior(
-    logpfn,
-    posterior_approx,
-    tf.optimizers.Adam(
-        learning_rate=0.0001, epsilon=0.1, beta_1=0.9, beta_2=0.999, clipvalue=10.0
-    ),
-    4000,
-    convergence_criterion=None,
-    sample_size=sample_size,
-    trainable_variables=None,
-    # jit_compile=False,
-    variational_loss_fn=functools.partial(
-        tfp.vi.monte_carlo_variational_loss,
-        discrepancy_fn=tfp.vi.kl_reverse,
-        use_reparameterization=True,
-    ),
-    trace_fn=trace_loss,
-)
-print(f"Runtime: {time.time() - begin:.3f} s")
-
-
-_, st = pm.evaluate_model_posterior_predictive(
-    this_model, values=posterior_approx.sample(100)
-)
-var_names = list(st.all_values.keys()) + list(st.deterministics_values.keys())
-samples = {
-    k: (
-        st.untransformed_values[k]
-        if k in st.untransformed_values
-        else (
-            st.deterministics_values[k]
-            if k in st.deterministics_values
-            else st.transformed_values[k]
-        )
-    )
-    for k in var_names
-}
-
-
 """  # 2. MCMC Sampling
 """
+num_chains = 6
+use_VI = False
+
+if use_VI:
+    (
+        posterior_approx,
+        bijector,
+        transformed_names,
+    ) = covid19_npis.model.build_approximate_posterior(this_model)
+
+    sample_size = 50
+
+    (
+        logpfn,
+        init_random,
+        _deterministics_callback,
+        deterministic_names,
+        state_,
+    ) = pm.mcmc.samplers.build_logp_and_deterministic_functions(
+        this_model, num_chains=sample_size, collect_reduced_log_prob=False
+    )
+
+    trace_loss = lambda traceable_quantities: tf.debugging.check_numerics(
+        traceable_quantities.loss, f"loss not finite: {traceable_quantities.loss}"
+    )
+
+    # For eventual debugging:
+    # tf.config.run_functions_eagerly(True)
+    # tf.debugging.enable_check_numerics(stack_height_limit=50, path_length_limit=50)
+
+    begin = time.time()
+    posterior = tfp.vi.fit_surrogate_posterior(
+        logpfn,
+        posterior_approx,
+        tf.optimizers.Adam(
+            learning_rate=0.0001, epsilon=0.1, beta_1=0.9, beta_2=0.999, clipvalue=10.0
+        ),
+        4000,
+        convergence_criterion=None,
+        sample_size=sample_size,
+        trainable_variables=None,
+        # jit_compile=False,
+        variational_loss_fn=functools.partial(
+            tfp.vi.monte_carlo_variational_loss,
+            discrepancy_fn=tfp.vi.kl_reverse,
+            use_reparameterization=True,
+        ),
+        trace_fn=trace_loss,
+    )
+    print(f"Runtime: {time.time() - begin:.3f} s")
+
+    _, st = pm.evaluate_model_posterior_predictive(
+        this_model, values=posterior_approx.sample(100)
+    )
+    var_names = list(st.all_values.keys()) + list(st.deterministics_values.keys())
+    samples = {
+        k: (
+            st.untransformed_values[k]
+            if k in st.untransformed_values
+            else (
+                st.deterministics_values[k]
+                if k in st.deterministics_values
+                else st.transformed_values[k]
+            )
+        )
+        for k in var_names
+    }
+    from tensorflow_probability import bijectors as tfb
+
+    init_state = posterior_approx.sample(num_chains)
+    init_state = [init_state[name] for name in transformed_names]
+    bijector_to_list = tfb.Restructure(
+        [name for name in transformed_names], {name: name for name in transformed_names}
+    )
+    bijector_list = tfb.Chain(
+        [bijector_to_list, bijector, tfb.Invert(bijector_to_list)]
+    )
+
+else:
+    bijector_list = None
+    init_state = None
+
 
 begin_time = time.time()
 log.info("start")
-num_chains = 6
-
-from tensorflow_probability import bijectors as tfb
-
-init_state = posterior_approx.sample(num_chains)
-init_state = [init_state[name] for name in transformed_names]
-bijector_to_list = tfb.Restructure(
-    [name for name in transformed_names], {name: name for name in transformed_names}
-)
-bijector_list = tfb.Chain([bijector_to_list, bijector, tfb.Invert(bijector_to_list)])
 
 
 trace_tuning, trace = pm.sample(
@@ -241,7 +222,7 @@ trace_tuning, trace = pm.sample(
     xla=False,
     initial_step_size=0.001,
     ratio_tuning_epochs=1.3,
-    max_tree_depth=5,
+    max_tree_depth=4,
     decay_rate=0.75,
     target_accept_prob=0.75,
     step_size_adaption_per_chain=False,

@@ -816,8 +816,7 @@ def construct_testing_state(
             transform=transformations.CorrelationCholesky(),
             conditionally_independent=True,
         )
-        + 1e-5
-    )
+    ) + 1e-5
     Sigma = tf.einsum(
         "...ij,...i->...ij",  # todo look at i,j
         Sigma,

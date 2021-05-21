@@ -112,7 +112,6 @@ def distribution(
                 else:
                     prior_t = None
 
-                ax_now = ax[i] if len(unq_age) > 1 else ax
                 # Plot
                 _distribution(
                     array_posterior=posterior_t,
@@ -120,10 +119,10 @@ def distribution(
                     dist_name=dist.name,
                     dist_math=get_math_from_name(dist.name),
                     suffix=f"{i}",
-                    ax=ax_now,
+                    ax=ax[i, 0],
                 )
                 # Set title for axis
-                ax_now.set_title(ag)
+                ax[i, 0].set_title(ag)
         elif len(df.index.names) == 1:
             # Exception for dummy dimensions in change point logic
             check = [
@@ -157,11 +156,6 @@ def distribution(
                 if i >= num_rows:
                     continue
 
-                if num_rows == 1:
-                    p_axes = ax
-                else:
-                    p_axes = ax[i]
-
                 # Plot
                 _distribution(
                     array_posterior=posterior_t,
@@ -169,9 +163,9 @@ def distribution(
                     dist_name=dist.name,
                     dist_math=get_math_from_name(dist.name),
                     suffix=f"{i}",
-                    ax=p_axes,
+                    ax=ax[i, 0],
                 )
-                p_axes.set_title(ag)
+                ax[i, 0].set_title(ag)
         else:
             i = 0
             if posterior is not None:

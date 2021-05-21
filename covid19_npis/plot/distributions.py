@@ -7,12 +7,12 @@ from tqdm.auto import tqdm
 from scipy import stats
 
 from .rcParams import *
-
 from .utils import (
     get_posterior_prior_from_trace,
     get_math_from_name,
     get_dist_by_name_from_sample_state,
 )
+from .. import modelParams
 
 mpl.rc("figure", max_open_warning=0)
 log = logging.getLogger(__name__)
@@ -99,9 +99,11 @@ def distribution(
         if plot_age_groups_together and ("age_group" in df.index.names):
             unq_age = df.index.get_level_values("age_group").unique()
             fig, ax = plt.subplots(
-                len(unq_age), 1, figsize=(2.2, 2.2 * len(unq_age),), squeeze=False,
+                len(unq_age), 
+                1,
+                figsize=(2.2, 2.2 * len(unq_age),),
+                squeeze=False
             )
-            ax = ax[:, 0]
             for i, ag in enumerate(unq_age):
                 # Create pivot table i.e. time on index and draw on columns
                 if posterior is not None:
@@ -126,16 +128,26 @@ def distribution(
                 # Set title for axis
                 ax_now.set_title(ag)
         elif len(df.index.names) == 1:
+            # Exception for dummy dimensions in change point logic
+            check = [
+                "d_i_c_p",
+            ]
+            if dist.name in check:
+                intervention, country = name_str.split("/")
+                country = modelParams.modelParams.country_by_name(country)
+                num_rows = len(country.change_points[intervention])
+            else:
+                num_rows = len(df.index.get_level_values(df.index.names[0]).unique())
+
+            if num_rows == 0:
+                return
+
             fig, ax = plt.subplots(
-                len(df.index.get_level_values(df.index.names[0]).unique()),
-                1,
-                figsize=(
-                    2.2,
-                    2.2 * len(df.index.get_level_values(df.index.names[0]).unique()),
-                ),
+                num_rows, 
+                1, 
+                figsize=(2.2, 2.2 * num_rows,),
                 squeeze=False,
             )
-            ax = ax[:, 0]
             for i, ag in enumerate(
                 df.index.get_level_values(df.index.names[0]).unique()
             ):
@@ -148,6 +160,14 @@ def distribution(
                 else:
                     prior_t = None
 
+                if i >= num_rows:
+                    continue
+
+                if num_rows == 1:
+                    p_axes = ax
+                else:
+                    p_axes = ax[i]
+
                 # Plot
                 _distribution(
                     array_posterior=posterior_t,
@@ -155,9 +175,9 @@ def distribution(
                     dist_name=dist.name,
                     dist_math=get_math_from_name(dist.name),
                     suffix=f"{i}",
-                    ax=ax[i],
+                    ax=p_axes,
                 )
-                ax[i].set_title(ag)
+                p_axes.set_title(ag)
         else:
             i = 0
             if posterior is not None:

@@ -80,6 +80,17 @@ class ModelParams:
         """
         return self._countries
 
+    def country_by_name(self, name):
+        """
+        Returns country by name
+        """
+        for country in self._countries:
+            if country.name == name:
+                return country
+
+        # Error
+        raise Error("Name not found in country list")
+
     @countries.setter
     def countries(self, countries):
         """

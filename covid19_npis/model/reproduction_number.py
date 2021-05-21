@@ -193,6 +193,13 @@ def _create_distributions(modelParams):
         transform=transformations.SoftPlus(scale=3),
         conditionally_independent=True,
     )
+    d_sigma_change_point = HalfStudentT(
+        df=4,
+        name="d_sigma_change_point",
+        scale=0.3,
+        transform=transformations.SoftPlus(scale=3),
+        conditionally_independent=True,
+    )
     delta_d_i = Normal(
         name="delta_d_i",
         loc=0.0,
@@ -209,6 +216,14 @@ def _create_distributions(modelParams):
         shape_label=(None, "country", None),
         conditionally_independent=True,
     )
+    delta_d_p = Normal(
+        name="delta_d_p",
+        loc=0.0,
+        scale=1.0,
+        event_stack=(1, 1, modelParams.gamma_data_tensor.shape[-1]),
+        shape_label=(None, None, "change_point"),
+        conditionally_independent=True,
+    )
 
     # We create a dict here to pass all distributions to another function
     distributions = {}
@@ -221,8 +236,10 @@ def _create_distributions(modelParams):
     distributions["delta_l_cross_i"] = delta_l_cross_i
     distributions["d_sigma_interv"] = d_sigma_interv
     distributions["d_sigma_country"] = d_sigma_country
+    distributions["d_sigma_change_point"] = d_sigma_change_point
     distributions["delta_d_i"] = delta_d_i
     distributions["delta_d_c"] = delta_d_c
+    distributions["delta_d_p"] = delta_d_p
     if modelParams.num_age_groups > 1:
         distributions["delta_alpha_cross_a"] = delta_alpha_cross_a
         distributions["alpha_sigma_a"] = alpha_sigma_a
@@ -352,20 +369,26 @@ def construct_R_t(name, modelParams, R_0, include_noise=True):
         delta_d_i = yield distributions["delta_d_i"]
         d_sigma_interv = yield distributions["d_sigma_interv"]
         delta_d_i = tf.einsum(  # Multiply distribution by hyperprior
-            "...ica,...->...ica", delta_d_i, d_sigma_interv
+            "...icp,...->...icp", delta_d_i, d_sigma_interv
         )
 
         delta_d_c = yield distributions["delta_d_c"]
         d_sigma_country = yield distributions["d_sigma_country"]
         delta_d_c = tf.einsum(  # Multiply distribution by hyperprior
-            "...ica,...->...ica", delta_d_c, d_sigma_country
+            "...icp,...->...icp", delta_d_c, d_sigma_country
+        )
+
+        delta_d_p = yield distributions["delta_d_p"]
+        d_sigma_change_point = yield distributions["d_sigma_change_point"]
+        delta_d_p = tf.einsum(  # Multiply distribution by hyperprior
+            "...icp,...->...icp", delta_d_p, d_sigma_change_point
         )
         # Get data tensor padded with 0 if the cp does not exist for an intervention/country combo
         d_data = (
             modelParams.date_data_tensor
         )  # shape intervention, country, change_points
 
-        d_return = d_data + delta_d_i + delta_d_c
+        d_return = d_data + delta_d_i + delta_d_c + delta_d_p
         # Clip by value should be in range of our simulation
         d_return = tf.clip_by_value(
             d_return, -modelParams.length_sim, modelParams.length_sim

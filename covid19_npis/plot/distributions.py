@@ -99,10 +99,7 @@ def distribution(
         if plot_age_groups_together and ("age_group" in df.index.names):
             unq_age = df.index.get_level_values("age_group").unique()
             fig, ax = plt.subplots(
-                len(unq_age), 
-                1,
-                figsize=(2.2, 2.2 * len(unq_age),),
-                squeeze=False
+                len(unq_age), 1, figsize=(2.2, 2.2 * len(unq_age),), squeeze=False
             )
             for i, ag in enumerate(unq_age):
                 # Create pivot table i.e. time on index and draw on columns
@@ -143,10 +140,7 @@ def distribution(
                 return
 
             fig, ax = plt.subplots(
-                num_rows, 
-                1, 
-                figsize=(2.2, 2.2 * num_rows,),
-                squeeze=False,
+                num_rows, 1, figsize=(2.2, 2.2 * num_rows,), squeeze=False,
             )
             for i, ag in enumerate(
                 df.index.get_level_values(df.index.names[0]).unique()

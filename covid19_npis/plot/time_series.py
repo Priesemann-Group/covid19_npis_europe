@@ -147,39 +147,38 @@ def timeseries(
 
         # Remove "_" from name
         name_str = name_str[1:]
-
         if plot_age_groups_together and "age_group" in df.index.names:
             unq_age = df.index.get_level_values("age_group").unique()
 
-            if observed is None or len(observed.columns) > 1:
+            if (observed is None) or (len(observed.columns) > 1):
                 fig, a_axes = plt.subplots(
                     len(unq_age),
                     1,
                     figsize=(4, 1.5 + 1.5 * len(unq_age)),
                     squeeze=False,
                 )
-            a_axes = a_axes[:, 0]
-            for i, ag in enumerate(unq_age):
-                temp = df.xs(ag, level="age_group")
+                a_axes = a_axes[:, 0]
+                for i, ag in enumerate(unq_age):
+                    temp = df.xs(ag, level="age_group")
 
-                # Create pivot table i.e. time on index and draw on columns
-                temp = temp.reset_index().pivot_table(index="time", columns="draw")
+                    # Create pivot table i.e. time on index and draw on columns
+                    temp = temp.reset_index().pivot_table(index="time", columns="draw")
 
-                ax_now = a_axes[i] if len(unq_age) > 1 else a_axes
-                # Plot data
-                _timeseries(temp.index, temp.to_numpy(), what="model", ax=ax_now)
+                    ax_now = a_axes[i] if len(unq_age) > 1 else a_axes
+                    # Plot data
+                    _timeseries(temp.index, temp.to_numpy(), what="model", ax=ax_now)
 
-                # Plot observed
-                if observed is not None:
-                    _timeseries(
-                        observed[ag].index,
-                        observed[ag].to_numpy(),
-                        what="data",
-                        ax=ax_now,
-                    )
+                    # Plot observed
+                    if observed is not None:
+                        _timeseries(
+                            observed[ag].index,
+                            observed[ag].to_numpy(),
+                            what="data",
+                            ax=ax_now,
+                        )
 
-                # Set title for axis
-                ax_now.set_title(ag)
+                    # Set title for axis
+                    ax_now.set_title(ag)
             else:
                 # plot summarized data
                 fig, a_axes = plt.subplots(2, 1, figsize=(4, 1.5 * 2),)

@@ -6,7 +6,7 @@
 #
 # @Author:        Sebastian B. Mohr
 # @Created:       2020-12-18 14:40:45
-# @Last Modified: 2021-01-27 12:54:39
+# @Last Modified: 2021-05-21 16:01:36
 # ------------------------------------------------------------------------------ #
 
 # Get trace fp
@@ -101,8 +101,11 @@ args = parser.parse_args()
 # ------------------------------------------------------------------------------ #
 # Load pickled trace
 # ------------------------------------------------------------------------------ #
-# modelParams, trace = covid19_npis.utils.load_trace_zarr(args.file)
-modelParams, trace = covid19_npis.utils.load_trace(args.file)
+try:
+    modelParams, trace = covid19_npis.utils.load_trace(args.file)
+except Exception as e:
+    modelParams, trace = covid19_npis.utils.load_trace_zarr(args.file)
+
 modelParams._R_interval_time = 5
 modelParams._const_contact = False
 

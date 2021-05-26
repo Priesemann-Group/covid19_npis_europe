@@ -18,7 +18,7 @@ from .utils import (
     convolution_with_map,
 )
 
-from .approximate_posterior import build_approximate_posterior
+from .approximate_posterior import build_approximate_posterior, build_iaf
 
 from . import number_of_tests
 from . import deaths

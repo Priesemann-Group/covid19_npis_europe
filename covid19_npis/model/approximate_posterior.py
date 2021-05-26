@@ -56,7 +56,9 @@ def build_iaf(values_iaf_dict, order_list, values_exclude_dict=None):
         k: i for k, i in zip(values_iaf_dict.keys(), range(len(values_iaf_dict)))
     }
 
-    size_iaf = sum([int(np.prod(tensor.shape)) for tensor in values_iaf_dict.values()])
+    size_iaf = 2 * sum(
+        [int(np.prod(tensor.shape)) for tensor in values_iaf_dict.values()]
+    )
 
     size_splits = [int(np.prod(v.shape)) for v in values_iaf_dict.values()]
 

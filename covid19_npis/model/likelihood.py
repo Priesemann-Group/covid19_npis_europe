@@ -76,7 +76,7 @@ def _studentT_positive_tests(modelParams, pos_tests):
     # Scale of the likelihood sigma
     sigma = yield HalfCauchy(
         name="sigma_likelihood_pos_tests",
-        scale=50.0,
+        scale=1,
         event_stack=modelParams.num_countries,
         conditionally_independent=True,
         transform=transformations.SoftPlus(),
@@ -169,7 +169,7 @@ def _studentT_total_tests(modelParams, total_tests):
     # Scale of the likelihood sigma for each country
     sigma = yield HalfCauchy(
         name="sigma_likelihood_total_tests",
-        scale=50.0,
+        scale=1,
         event_stack=modelParams.num_countries,
         conditionally_independent=True,
         transform=transformations.SoftPlus(),
@@ -227,7 +227,7 @@ def _studentT_deaths(modelParams, deaths):
     # Scale of the likelihood sigma for each country
     sigma = yield HalfCauchy(
         name="sigma_likelihood_deaths",
-        scale=5,
+        scale=1,
         event_stack=modelParams.num_countries,
         conditionally_independent=True,
         transform=transformations.SoftPlus(),

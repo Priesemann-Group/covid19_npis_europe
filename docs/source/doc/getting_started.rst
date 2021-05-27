@@ -15,7 +15,7 @@ requirements.txt to allow the installation of another distribution (tensorflow-g
 
 .. code-block:: console
 
-    pip install tensorflow==2.4.1
+    pip install tensorflow==2.5.0
     pip install -r requirements.txt
 
 

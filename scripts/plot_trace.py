@@ -101,10 +101,10 @@ args = parser.parse_args()
 # ------------------------------------------------------------------------------ #
 # Load pickled trace
 # ------------------------------------------------------------------------------ #
-try:
-    modelParams, trace = covid19_npis.utils.load_trace(args.file)
-except Exception as e:
-    modelParams, trace = covid19_npis.utils.load_trace_zarr(args.file)
+# try:
+modelParams, trace = covid19_npis.utils.load_trace(args.file)
+# except Exception as e:
+#     modelParams, trace = covid19_npis.utils.load_trace_zarr(args.file)
 
 modelParams._R_interval_time = 5
 modelParams._const_contact = False
@@ -129,6 +129,7 @@ skip_dist_ts = [
     "deaths",
     "testing_delay",
     "C_mean",
+    "C",
 ]
 
 

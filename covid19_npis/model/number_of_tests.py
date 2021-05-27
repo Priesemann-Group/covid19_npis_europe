@@ -787,7 +787,7 @@ def construct_testing_state(
     )
     log.debug(f"eta_sigma{eta_sigma}")
     log.debug(f"eta_mu_cross{eta_mu_cross}")
-
+    
     # Xi
     xi_sigma = yield HalfCauchy(
         name=f"{name_xi}_sigma",

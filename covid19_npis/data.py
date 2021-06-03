@@ -136,7 +136,7 @@ def convert_trace_to_dataframe(trace, sample_state, key, data_type=None):
     -2 is modelParams.distribution...shape[1]
     -1 is modelParams.distribution...shape[2]
 
-    The last 3 can shift up to the number of labels 
+    The last 3 can shift up to the number of labels
     """
     ndim = len(get_shape_from_dataframe(df))
 
@@ -248,22 +248,26 @@ class Country(object):
     interventions = []
 
     def __init__(self, path_to_folder):
+
         self.path_to_folder = path_to_folder
 
-        # Check if files exist
-        self.exist = self.__check_files_exist()
+        if os.path.exists(path_to_folder):
+            # Check if files exist
+            self.exist = self.__check_files_exist()
 
-        # Load file if it exists
-        self.__load_files(self.exist)
+            # Load file if it exists
+            self.__load_files(self.exist)
 
-        self.__check_for_age_group_names()
+            self.__check_for_age_group_names()
 
-        # Create change_points from interventions time series
-        self.change_points = {}
-        for column in self.data_interventions.columns:
-            self.change_points.update(
-                self.create_change_points(self.data_interventions[column])
-            )
+            # Create change_points from interventions time series
+            self.change_points = {}
+            for column in self.data_interventions.columns:
+                self.change_points.update(
+                    self.create_change_points(self.data_interventions[column])
+                )
+        else:
+            raise Exception(f"Could not find {self.path_to_folder} folder. Unable to continue without! Please adjust countries and/or check downloaded data.")
 
     def __check_files_exist(self):
         def helper(file):

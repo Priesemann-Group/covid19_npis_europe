@@ -30,6 +30,8 @@ class ModelParams:
         countries,
         const_contact=True,  # set 'true' for a constant contact matrix (without age-group interaction)
         R_interval_time=5,  # time interval over which the reproduction number is calculated
+        sim_begin='2020-05-01',
+        sim_end='2020-11-30',
         offset_sim_data=20,
         minimal_daily_cases=40,
         min_offset_sim_death_data=40,
@@ -41,6 +43,8 @@ class ModelParams:
         self._dtype = dtype
         self._const_contact = const_contact
         self._R_interval_time = R_interval_time
+        self._sim_begin = sim_begin
+        self._sim_end = sim_end
         self._offset_sim_data = offset_sim_data
         self._minimal_daily_cases = minimal_daily_cases
         self._min_offset_sim_death_data = min_offset_sim_death_data
@@ -124,6 +128,9 @@ class ModelParams:
                     df = df.join(getattr(country, attribute_name))
                 else:
                     df = getattr(country, attribute_name)
+                if df.index.name=='date':
+                    df = df[self._sim_begin:self._sim_end]
+                # print(df.index.name)
                 # if accumulate:
                 # df_total[country.name] = getattr(country, attribute_name).sum(axis=1)
             return df  # , df_total
@@ -147,7 +154,7 @@ class ModelParams:
         self._dataframe_new_cases = join_dataframes(
             key="/new_cases.csv", check_dict=check, attribute_name="data_new_cases"
         )
-
+        
         # Total tests
         self._dataframe_total_tests = join_dataframes(
             key="/tests.csv", check_dict=check, attribute_name="data_total_tests"
@@ -221,7 +228,6 @@ class ModelParams:
         # for country_name in sorted(self.pos_tests_dataframe.columns.get_level_values(level='country').unique()):
         for country in self._countries:
             country_name = country.name
-            # age_groups = count
             data["countries"].append(country_name)
             ### added
             age_groups = self.pos_tests_dataframe[country_name].columns
